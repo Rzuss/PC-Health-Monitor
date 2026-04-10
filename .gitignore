@@ -1,0 +1,16 @@
+# Auto-generated launcher (created by Create-Desktop-Shortcut.bat)
+Launch-Monitor.vbs
+
+# Windows thumbnail cache
+Thumbs.db
+Desktop.ini
+
+# PowerShell history
+$RECYCLE.BIN/
+
+# VS Code settings (optional, remove if you want to share them)
+.vscode/
+
+# Temp files
+*.tmp
+*.log
