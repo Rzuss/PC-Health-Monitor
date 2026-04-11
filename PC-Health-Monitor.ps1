@@ -491,6 +491,60 @@ $cleanAllBtn.Add_Click({
 $tabs.TabPages.Add($tab3)
 
 # ========================================================================
+# SYSTEM TRAY ICON
+# ========================================================================
+$trayIcon = New-Object Windows.Forms.NotifyIcon
+$trayIcon.Text    = "PC Health Monitor"
+$trayIcon.Visible = $true
+try   { $trayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\perfmon.exe") }
+catch { $trayIcon.Icon = [Drawing.SystemIcons]::Application }
+
+# Context menu with dark theme colors
+$trayMenu = New-Object Windows.Forms.ContextMenuStrip
+$trayMenu.BackColor = $C.BgCard
+$trayMenu.ForeColor = $C.Text
+
+$trayOpen = New-Object Windows.Forms.ToolStripMenuItem "Open"
+$trayOpen.BackColor = $C.BgCard
+$trayOpen.ForeColor = $C.Blue
+
+$traySep  = New-Object Windows.Forms.ToolStripSeparator
+
+$trayExit = New-Object Windows.Forms.ToolStripMenuItem "Exit"
+$trayExit.BackColor = $C.BgCard
+$trayExit.ForeColor = $C.Red
+
+[void]$trayMenu.Items.Add($trayOpen)
+[void]$trayMenu.Items.Add($traySep)
+[void]$trayMenu.Items.Add($trayExit)
+$trayIcon.ContextMenuStrip = $trayMenu
+
+# Double-click tray icon: restore window
+$trayIcon.Add_DoubleClick({
+    $form.Show()
+    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
+    $form.Activate()
+})
+
+$trayOpen.Add_Click({
+    $form.Show()
+    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
+    $form.Activate()
+})
+
+$trayExit.Add_Click({
+    $script:realExit = $true
+    $form.Close()
+})
+
+# -- Alert state variables -----------------------------------------------
+$script:cpuHighTicks  = 0       # consecutive refresh ticks with CPU above 85%
+$script:cpuAlertFired = $false  # prevents repeated balloon for the same high-CPU episode
+$script:lastRamAlert  = [DateTime]::MinValue
+$script:lastDiskAlert = [DateTime]::MinValue
+$script:trayHintShown = $false  # show the "minimized to tray" hint only once
+
+# ========================================================================
 # LIVE REFRESH LOGIC
 # ========================================================================
 $script:tickCount = 0
@@ -525,6 +579,42 @@ function Do-Refresh {
         }
 
         $lastUpdLbl.Text = "Updated: $(Get-Date -Format 'HH:mm:ss')"
+
+        # -- Smart tray alerts -------------------------------------------
+        # CPU: balloon after ~12 seconds of sustained load above 85% (4 ticks x 3s)
+        if ($d.CpuPct -gt 85) {
+            $script:cpuHighTicks++
+            if ($script:cpuHighTicks -ge 4 -and -not $script:cpuAlertFired) {
+                $script:cpuAlertFired = $true
+                $trayIcon.ShowBalloonTip(6000, "High CPU Usage",
+                    "CPU has been above 85% for over 10 seconds ($($d.CpuPct)%)",
+                    [Windows.Forms.ToolTipIcon]::Warning)
+            }
+        } else {
+            $script:cpuHighTicks  = 0
+            $script:cpuAlertFired = $false
+        }
+
+        # RAM: balloon when above 85%, cooldown 5 minutes between alerts
+        if ($d.RamPct -gt 85) {
+            if (([DateTime]::Now - $script:lastRamAlert).TotalMinutes -gt 5) {
+                $script:lastRamAlert = [DateTime]::Now
+                $trayIcon.ShowBalloonTip(6000, "High RAM Usage",
+                    "RAM usage is at $($d.RamPct)% ($($d.UsedRAM) GB / $script:totalRAM GB)",
+                    [Windows.Forms.ToolTipIcon]::Warning)
+            }
+        }
+
+        # Disk: balloon when above 90%, cooldown 10 minutes between alerts
+        if ($d.DPct -gt 90) {
+            if (([DateTime]::Now - $script:lastDiskAlert).TotalMinutes -gt 10) {
+                $script:lastDiskAlert = [DateTime]::Now
+                $trayIcon.ShowBalloonTip(6000, "Low Disk Space",
+                    "Drive C: is $($d.DPct)% full - only $($d.DFree) GB free",
+                    [Windows.Forms.ToolTipIcon]::Warning)
+            }
+        }
+
         $script:tickCount++
     } catch {}
 }
@@ -538,8 +628,28 @@ $timer.Start()
 # Refresh button: immediate refresh
 $refreshBtn.Add_Click({ Do-Refresh })
 
-# Stop timer when form closes
-$form.Add_FormClosing({ $timer.Stop(); $timer.Dispose() })
+# -- Tray exit flag: true only when "Exit" is chosen from the tray menu
+$script:realExit = $false
+
+# X button hides the window to tray; only "Exit" from the tray menu truly closes
+$form.Add_FormClosing({
+    param($sender, $e)
+    if (-not $script:realExit) {
+        $e.Cancel = $true
+        $form.Hide()
+        if (-not $script:trayHintShown) {
+            $script:trayHintShown = $true
+            $trayIcon.ShowBalloonTip(3000, "PC Health Monitor",
+                "Still running in the background. Right-click the tray icon to restore or exit.",
+                [Windows.Forms.ToolTipIcon]::Info)
+        }
+    } else {
+        $timer.Stop()
+        $timer.Dispose()
+        $trayIcon.Visible = $false
+        $trayIcon.Dispose()
+    }
+})
 
 # -- Launch --------------------------------------------------------------
 [void]$form.ShowDialog()
