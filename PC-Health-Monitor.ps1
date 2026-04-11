@@ -3,23 +3,28 @@
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms.DataVisualization
 [System.Windows.Forms.Application]::EnableVisualStyles()
+
+# -- Admin Check ---------------------------------------------------------
+$script:isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator)
 
 # -- Color Palette -------------------------------------------------------
 $C = @{
-    BgBase   = [Drawing.Color]::FromArgb(24,  24,  37)
-    BgCard   = [Drawing.Color]::FromArgb(36,  36,  54)
-    BgCard2  = [Drawing.Color]::FromArgb(49,  50,  68)
-    Blue     = [Drawing.Color]::FromArgb(137, 180, 250)
-    Green    = [Drawing.Color]::FromArgb(166, 227, 161)
-    Red      = [Drawing.Color]::FromArgb(243, 139, 168)
-    Yellow   = [Drawing.Color]::FromArgb(249, 226, 175)
-    Purple   = [Drawing.Color]::FromArgb(203, 166, 247)
-    Text     = [Drawing.Color]::FromArgb(205, 214, 244)
-    SubText  = [Drawing.Color]::FromArgb(147, 153, 178)
-    White    = [Drawing.Color]::White
-    DarkRed  = [Drawing.Color]::FromArgb(180, 80,  100)
-    DarkGreen= [Drawing.Color]::FromArgb(60,  140, 80)
+    BgBase    = [Drawing.Color]::FromArgb(24,  24,  37)
+    BgCard    = [Drawing.Color]::FromArgb(36,  36,  54)
+    BgCard2   = [Drawing.Color]::FromArgb(49,  50,  68)
+    Blue      = [Drawing.Color]::FromArgb(137, 180, 250)
+    Green     = [Drawing.Color]::FromArgb(166, 227, 161)
+    Red       = [Drawing.Color]::FromArgb(243, 139, 168)
+    Yellow    = [Drawing.Color]::FromArgb(249, 226, 175)
+    Purple    = [Drawing.Color]::FromArgb(203, 166, 247)
+    Text      = [Drawing.Color]::FromArgb(205, 214, 244)
+    SubText   = [Drawing.Color]::FromArgb(147, 153, 178)
+    White     = [Drawing.Color]::White
+    DarkRed   = [Drawing.Color]::FromArgb(180, 80,  100)
+    DarkGreen = [Drawing.Color]::FromArgb(60,  140, 80)
 }
 
 # -- Helper Functions ----------------------------------------------------
@@ -103,13 +108,14 @@ function Pct-Color($pct) {
 }
 
 # -- Initial data collection ---------------------------------------------
-$os       = Get-CimInstance Win32_OperatingSystem
-$cpuInfo  = Get-CimInstance Win32_Processor
+$os      = Get-CimInstance Win32_OperatingSystem
+$cpuInfo = Get-CimInstance Win32_Processor
 $totalRAM = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
 
 function Get-LiveData {
-    $osNow  = Get-CimInstance Win32_OperatingSystem
-    $cpuNow = Get-CimInstance Win32_Processor
+    # Fetch only the needed properties to reduce per-tick query time
+    $osNow  = Get-CimInstance Win32_OperatingSystem -Property FreePhysicalMemory
+    $cpuNow = Get-CimInstance Win32_Processor -Property LoadPercentage
     $diskC  = Get-PSDrive C
 
     $freeRAM = [math]::Round($osNow.FreePhysicalMemory / 1MB, 1)
@@ -149,7 +155,7 @@ foreach ($rp in $runPaths) {
     }
 }
 
-# Junk files
+# Junk file locations
 $junkDefs = @(
     @{Name="User Temp Files";   Path=$env:TEMP},
     @{Name="Windows Temp";      Path="C:\Windows\Temp"},
@@ -169,6 +175,9 @@ $junkItems = foreach ($j in $junkDefs) {
 }
 $totalJunkGB = [math]::Round(($junkItems | Measure-Object SizeMB -Sum).Sum / 1024, 2)
 
+# Cleanup locations that require administrator rights
+$adminRequiredNames = @("Windows Temp", "WU Download Cache")
+
 # -- MAIN FORM -----------------------------------------------------------
 $form = New-Object Windows.Forms.Form
 $form.Text          = "PC Health Monitor - $env:COMPUTERNAME"
@@ -185,7 +194,6 @@ $titlePnl = New-Pnl 0 0 980 64 $C.BgCard
 $titlePnl.Controls.Add((New-Lbl "  PC Health Monitor" 12 8 500 32 15 $true $C.Blue))
 $titlePnl.Controls.Add((New-Lbl "  $env:COMPUTERNAME   |   $($os.Caption)" 14 42 700 18 8 $false $C.SubText))
 
-# Last-updated timestamp label
 $lastUpdLbl = New-Lbl "Updated: just now" 700 48 250 16 7 $false $C.SubText
 $titlePnl.Controls.Add($lastUpdLbl)
 
@@ -193,10 +201,21 @@ $refreshBtn = New-Btn "Refresh" 880 15 80 34 $C.BgCard2 $C.Blue
 $titlePnl.Controls.Add($refreshBtn)
 $form.Controls.Add($titlePnl)
 
+# -- Admin warning strip (shown only when not running as Administrator) --
+$tabsY = 64
+$tabsH = 658
+if (-not $script:isAdmin) {
+    $warnPnl = New-Pnl 0 64 980 22 ([Drawing.Color]::FromArgb(55, 50, 20))
+    $warnPnl.Controls.Add((New-Lbl "  Running without Administrator rights - some features may be limited" 0 3 880 16 8 $false $C.Yellow))
+    $form.Controls.Add($warnPnl)
+    $tabsY = 86
+    $tabsH = 636
+}
+
 # -- Tab Control ---------------------------------------------------------
 $tabs = New-Object Windows.Forms.TabControl
-$tabs.Location  = [Drawing.Point]::new(0, 64)
-$tabs.Size      = [Drawing.Size]::new(980, 658)
+$tabs.Location  = [Drawing.Point]::new(0, $tabsY)
+$tabs.Size      = [Drawing.Size]::new(980, $tabsH)
 $tabs.BackColor = $C.BgBase
 $tabs.ForeColor = $C.Text
 $tabs.Font      = New-Object Drawing.Font("Segoe UI", 10)
@@ -209,13 +228,12 @@ $tab1 = New-Object Windows.Forms.TabPage
 $tab1.Text      = "   Dashboard   "
 $tab1.BackColor = $C.BgBase
 
-# -- Stat cards -- store references for live updates --------------------
-$UI = @{}   # holds all updateable controls
+$UI = @{}
 
 $cardDefs = @(
-    @{Key="Cpu";  Title="CPU Load";   X=15;  Color=$C.Blue;   Val="$($live.CpuPct)%";                                     Pct=$live.CpuPct},
-    @{Key="Ram";  Title="RAM Usage";  X=338; Color=$C.Purple; Val="$($live.UsedRAM) GB / $totalRAM GB";                   Pct=$live.RamPct},
-    @{Key="Disk"; Title="Disk C:";    X=661; Color=$C.Yellow; Val="$($live.DUsed) GB used  |  $($live.DFree) GB free";    Pct=$live.DPct}
+    @{Key="Cpu";  Title="CPU Load";   X=15;  Color=$C.Blue;   Val="$($live.CpuPct)%";                                    Pct=$live.CpuPct},
+    @{Key="Ram";  Title="RAM Usage";  X=338; Color=$C.Purple; Val="$($live.UsedRAM) GB / $totalRAM GB";                  Pct=$live.RamPct},
+    @{Key="Disk"; Title="Disk C:";    X=661; Color=$C.Yellow; Val="$($live.DUsed) GB used  |  $($live.DFree) GB free";   Pct=$live.DPct}
 )
 
 foreach ($cd in $cardDefs) {
@@ -245,13 +263,49 @@ foreach ($cd in $cardDefs) {
     $tab1.Controls.Add($cp)
 }
 
-# -- Process list -------------------------------------------------------
-$tab1.Controls.Add((New-Lbl "  Top 25 Processes by RAM" 15 145 500 26 11 $true $C.Text))
+# -- CPU History Chart ---------------------------------------------------
+$cpuChart = New-Object System.Windows.Forms.DataVisualization.Charting.Chart
+$cpuChart.Location        = [Drawing.Point]::new(15, 140)
+$cpuChart.Size            = [Drawing.Size]::new(940, 120)
+$cpuChart.BackColor       = $C.BgBase
+$cpuChart.BorderlineColor = [Drawing.Color]::Transparent
+$cpuChart.BorderSkin.SkinStyle = [System.Windows.Forms.DataVisualization.Charting.BorderSkinStyle]::None
+
+$chartArea = New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea "ChartArea1"
+$chartArea.BackColor                   = $C.BgBase
+$chartArea.BorderColor                 = [Drawing.Color]::Transparent
+$chartArea.AxisX.Enabled               = [System.Windows.Forms.DataVisualization.Charting.AxisEnabled]::False
+$chartArea.AxisX.MajorGrid.Enabled     = $false
+$chartArea.AxisX.MinorGrid.Enabled     = $false
+$chartArea.AxisY.Minimum               = 0
+$chartArea.AxisY.Maximum               = 100
+$chartArea.AxisY.Interval              = 25
+$chartArea.AxisY.LabelStyle.ForeColor  = $C.SubText
+$chartArea.AxisY.LabelStyle.Font       = New-Object Drawing.Font("Segoe UI", 7)
+$chartArea.AxisY.LineColor             = $C.BgCard2
+$chartArea.AxisY.MajorGrid.LineColor   = $C.BgCard2
+$chartArea.AxisY.MajorTickMark.Enabled = $false
+[void]$cpuChart.ChartAreas.Add($chartArea)
+
+$cpuSeries = New-Object System.Windows.Forms.DataVisualization.Charting.Series "CPU"
+$cpuSeries.ChartType         = [System.Windows.Forms.DataVisualization.Charting.SeriesChartType]::Line
+$cpuSeries.Color             = [Drawing.Color]::FromArgb(137, 180, 250)
+$cpuSeries.BorderWidth       = 2
+$cpuSeries.ChartArea         = "ChartArea1"
+$cpuSeries.IsVisibleInLegend = $false
+
+# Pre-fill 60 zero points -- one per 3s tick = 3 minutes of history
+for ($i = 0; $i -lt 60; $i++) { [void]$cpuSeries.Points.AddY(0.0) }
+[void]$cpuChart.Series.Add($cpuSeries)
+$UI["CpuChart"] = $cpuChart
+$tab1.Controls.Add($cpuChart)
+
+# -- Process list (shifted down to make room for the chart) -------------
+$tab1.Controls.Add((New-Lbl "  Top 25 Processes by RAM" 15 268 500 26 11 $true $C.Text))
 
 $pGrid = New-Object Windows.Forms.DataGridView
-$pGrid.Location = [Drawing.Point]::new(15, 174)
-$pGrid.Location = [Drawing.Point]::new(15, 174)
-$pGrid.Size     = [Drawing.Size]::new(940, 420)
+$pGrid.Location = [Drawing.Point]::new(15, 296)
+$pGrid.Size     = [Drawing.Size]::new(940, 300)
 Style-Grid $pGrid
 Add-Col $pGrid "Process Name" 220
 Add-Col $pGrid "RAM (MB)"      80
@@ -311,21 +365,24 @@ $disableCol.DefaultCellStyle.Font      = New-Object Drawing.Font("Segoe UI", 9, 
 $disableCol.DefaultCellStyle.Alignment = [Windows.Forms.DataGridViewContentAlignment]::MiddleCenter
 [void]$sGrid.Columns.Add($disableCol)
 
-# Custom paint Action column -- identical look on every row regardless of selection
 $sGrid.Add_CellPainting({
     param($s2, $ep)
     if ($ep.RowIndex -lt 0 -or $ep.ColumnIndex -lt 0) { return }
-    if ($sGrid.Columns[$ep.ColumnIndex].Name -ne "Action")  { return }
+    if ($sGrid.Columns[$ep.ColumnIndex].Name -ne "Action") { return }
     $ep.Handled = $true
 
-    $cellVal  = if ($ep.Value) { $ep.Value.ToString() } else { "Disable" }
-    $btnColor = if ($cellVal -eq "Disabled!") { $C.DarkGreen } else { $C.DarkRed }
+    $cellVal = if ($ep.Value) { $ep.Value.ToString() } else { "Disable" }
+    $srcVal  = $sGrid.Rows[$ep.RowIndex].Cells["Source"].Value
 
-    # Row background (match alternating style)
+    # Show grayed button for System items when not admin
+    $noAdminSystem = (-not $script:isAdmin -and $srcVal -eq "System")
+    $btnColor = if ($noAdminSystem) { $C.SubText }
+                elseif ($cellVal -eq "Disabled!") { $C.DarkGreen }
+                else { $C.DarkRed }
+
     $rowBg = if ($ep.RowIndex % 2 -eq 0) { $C.BgCard } else { $C.BgCard2 }
     $ep.Graphics.FillRectangle((New-Object Drawing.SolidBrush($rowBg)), $ep.CellBounds)
 
-    # Button rectangle with small padding
     $rect = [Drawing.Rectangle]::new(
         $ep.CellBounds.X + 6,
         $ep.CellBounds.Y + 4,
@@ -333,12 +390,12 @@ $sGrid.Add_CellPainting({
         $ep.CellBounds.Height - 8)
     $ep.Graphics.FillRectangle((New-Object Drawing.SolidBrush($btnColor)), $rect)
 
-    # Centered text
+    $displayText = if ($noAdminSystem) { "Admin req." } else { $cellVal }
     $sf = New-Object Drawing.StringFormat
     $sf.Alignment     = [Drawing.StringAlignment]::Center
     $sf.LineAlignment = [Drawing.StringAlignment]::Center
     $font = New-Object Drawing.Font("Segoe UI", 9, [Drawing.FontStyle]::Bold)
-    $ep.Graphics.DrawString($cellVal, $font, (New-Object Drawing.SolidBrush($C.White)), ([Drawing.RectangleF]$rect), $sf)
+    $ep.Graphics.DrawString($displayText, $font, (New-Object Drawing.SolidBrush($C.White)), ([Drawing.RectangleF]$rect), $sf)
 })
 
 if ($startups.Count -gt 0) {
@@ -356,6 +413,16 @@ $sGrid.Add_CellContentClick({
 
         $item = $startups[$e.RowIndex]
         if (-not $item) { return }
+
+        # Block System items when not running as admin
+        if (-not $script:isAdmin -and $item.Source -eq "System") {
+            [Windows.Forms.MessageBox]::Show(
+                "Disabling System startup items requires Administrator rights.`nRestart the app as Administrator to use this feature.",
+                "Administrator Required",
+                [Windows.Forms.MessageBoxButtons]::OK,
+                [Windows.Forms.MessageBoxIcon]::Warning)
+            return
+        }
 
         $confirm = [Windows.Forms.MessageBox]::Show(
             "Disable '$($item.Name)' from startup?`n`nThis removes it from the registry.`nYou can re-enable it later from Task Manager.",
@@ -417,37 +484,116 @@ $logBox.BorderStyle = [Windows.Forms.BorderStyle]::None
 $logBox.Text        = "Ready. Use the Clean buttons to remove junk files."
 $tab3.Controls.Add($logBox)
 
+# Marquee progress bar shown while async cleanup runs
+$cleanProgress = New-Object Windows.Forms.ProgressBar
+$cleanProgress.Location             = [Drawing.Point]::new(15, 524)
+$cleanProgress.Size                 = [Drawing.Size]::new(940, 12)
+$cleanProgress.Style                = [Windows.Forms.ProgressBarStyle]::Marquee
+$cleanProgress.MarqueeAnimationSpeed = 30
+$cleanProgress.Visible              = $false
+$tab3.Controls.Add($cleanProgress)
+
+# Tooltip for disabled admin-required buttons
+$cleanToolTip = New-Object Windows.Forms.ToolTip
+
 $rY = 103
 foreach ($ji in $junkItems) {
     $rPnl  = New-Pnl 15 $rY 940 56 $C.BgCard
     $sColor = if ($ji.SizeMB -gt 500) {$C.Red} elseif ($ji.SizeMB -gt 100) {$C.Yellow} else {$C.Green}
 
-    $rPnl.Controls.Add((New-Lbl $ji.Name           8   8 230 20 10 $true  $C.Text))
-    $rPnl.Controls.Add((New-Lbl "$($ji.SizeMB) MB" 246  8 100 20 10 $true  $sColor))
-    $rPnl.Controls.Add((New-Lbl "$($ji.Files) files" 353  8  70 20  9 $false $C.SubText))
-    $rPnl.Controls.Add((New-Lbl $ji.Path           8  32 560 16  7 $false $C.SubText))
+    $sizeLbl  = New-Lbl "$($ji.SizeMB) MB"   246  8 100 20 10 $true  $sColor
+    $filesLbl = New-Lbl "$($ji.Files) files"  353  8  70 20  9 $false $C.SubText
+    $rPnl.Controls.Add((New-Lbl $ji.Name      8   8 230 20 10 $true  $C.Text))
+    $rPnl.Controls.Add($sizeLbl)
+    $rPnl.Controls.Add($filesLbl)
+    $rPnl.Controls.Add((New-Lbl $ji.Path      8  32 560 16  7 $false $C.SubText))
 
     $cleanBtn = New-Btn "Clean" 740 10 100 36 $C.DarkRed  $C.White
     $skipBtn  = New-Btn "Skip"  848 10  80 36 $C.BgCard2  $C.SubText
-    $cleanBtn.Tag = $ji.Path
+    # Store all per-row data in Tag to avoid foreach closure capture issues
+    $cleanBtn.Tag = @{ Path = $ji.Path; Name = $ji.Name; SizeLbl = $sizeLbl; FilesLbl = $filesLbl }
+
+    # Disable buttons that require admin rights when not running as admin
+    $needsAdmin = $adminRequiredNames -contains $ji.Name
+    if ($needsAdmin -and -not $script:isAdmin) {
+        $cleanBtn.Enabled   = $false
+        $cleanBtn.BackColor = $C.SubText
+        $cleanToolTip.SetToolTip($cleanBtn, "Requires Administrator")
+    }
 
     $cleanBtn.Add_Click({
-        param($sender, $e)
-        $targetPath      = $sender.Tag
-        $sender.Enabled  = $false
-        $sender.Text     = "..."
-        $sender.BackColor = $C.SubText
-        $logBox.AppendText("`nCleaning: $targetPath")
+        param($s, $e)
+        $tagData    = $s.Tag
+        $targetPath = $tagData.Path
+
+        $s.Enabled   = $false
+        $s.Text      = "..."
+        $s.BackColor = $C.SubText
+        $cleanProgress.Style   = [Windows.Forms.ProgressBarStyle]::Marquee
+        $cleanProgress.Visible = $true
         [Windows.Forms.Application]::DoEvents()
-        $del=0; $err=0
-        Get-ChildItem $targetPath -Recurse -Force -EA SilentlyContinue | ForEach-Object {
-            try   { Remove-Item $_.FullName -Force -Recurse -EA Stop; $del++ }
-            catch { $err++ }
-        }
-        $sender.Text      = "Done"
-        $sender.BackColor = $C.DarkGreen
-        $logBox.AppendText("  Done - removed $del items ($err locked/skipped)")
-        $logBox.ScrollToCaret()
+
+        # Capture all UI references needed inside the runspace
+        $capturedPath     = $targetPath
+        $capturedForm     = $form
+        $capturedSender   = $s
+        $capturedLog      = $logBox
+        $capturedProgress = $cleanProgress
+        $capturedDG       = $C.DarkGreen
+        $capturedSizeLbl  = $tagData.SizeLbl
+        $capturedFilesLbl = $tagData.FilesLbl
+        $capturedGreen    = $C.Green
+        $capturedName     = $tagData.Name
+
+        $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+        $rs.ApartmentState = "STA"
+        $rs.ThreadOptions  = "ReuseThread"
+        $rs.Open()
+
+        $ps = [System.Management.Automation.PowerShell]::Create()
+        $ps.Runspace = $rs
+
+        [void]$ps.AddScript({
+            param($path, $formObj, $btn, $log, $prog, $dg, $szLbl, $fLbl, $green, $name)
+            $del = 0; $errCount = 0
+
+            $formObj.Invoke([Action]{ $log.AppendText("`nCleaning: $path") })
+
+            # Delete only the CONTENTS of the folder - never the folder root itself
+            Get-ChildItem $path -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                try   { Remove-Item $_.FullName -Recurse -Force -ErrorAction Stop; $del++ }
+                catch { $errCount++ }
+            }
+
+            $msg = "  Done - removed $del items ($errCount locked/skipped)"
+            $formObj.Invoke([Action]{
+                $btn.Text        = "Done"
+                $btn.BackColor   = $dg
+                $log.AppendText($msg)
+                $log.ScrollToCaret()
+                $prog.Visible    = $false
+                $szLbl.Text      = "0 MB"
+                $szLbl.ForeColor = $green
+                $fLbl.Text       = "0 files"
+                [System.Windows.Forms.MessageBox]::Show(
+                    "All files in '$name' have been successfully removed.",
+                    "Cleanup Complete",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Information)
+            })
+        })
+        [void]$ps.AddParameter("path",    $capturedPath)
+        [void]$ps.AddParameter("formObj", $capturedForm)
+        [void]$ps.AddParameter("btn",     $capturedSender)
+        [void]$ps.AddParameter("log",     $capturedLog)
+        [void]$ps.AddParameter("prog",    $capturedProgress)
+        [void]$ps.AddParameter("dg",      $capturedDG)
+        [void]$ps.AddParameter("szLbl",   $capturedSizeLbl)
+        [void]$ps.AddParameter("fLbl",    $capturedFilesLbl)
+        [void]$ps.AddParameter("green",   $capturedGreen)
+        [void]$ps.AddParameter("name",    $capturedName)
+
+        [void]$ps.BeginInvoke()
     })
 
     $skipBtn.Add_Click({
@@ -474,14 +620,21 @@ $cleanAllBtn.Add_Click({
     if ($r -eq [Windows.Forms.DialogResult]::Yes) {
         $logBox.AppendText("`n--- CLEAN ALL STARTED ---")
         foreach ($ji2 in $junkItems) {
+            # Skip admin-required locations when not running as admin
+            if (($adminRequiredNames -contains $ji2.Name) -and (-not $script:isAdmin)) {
+                $logBox.AppendText("`nSkipped (requires admin): $($ji2.Name)")
+                [Windows.Forms.Application]::DoEvents()
+                continue
+            }
             $logBox.AppendText("`nCleaning: $($ji2.Path)")
             [Windows.Forms.Application]::DoEvents()
-            $del=0; $err=0
-            Get-ChildItem $ji2.Path -Recurse -Force -EA SilentlyContinue | ForEach-Object {
+            $del=0; $errCount=0
+            # Delete only the CONTENTS of the folder - never the folder root itself
+            Get-ChildItem $ji2.Path -Force -EA SilentlyContinue | ForEach-Object {
                 try   { Remove-Item $_.FullName -Force -Recurse -EA Stop; $del++ }
-                catch { $err++ }
+                catch { $errCount++ }
             }
-            $logBox.AppendText("  -> $del removed, $err skipped")
+            $logBox.AppendText("  -> $del removed, $errCount skipped")
         }
         $logBox.AppendText("`n--- DONE ---")
         $logBox.ScrollToCaret()
@@ -499,7 +652,6 @@ $trayIcon.Visible = $true
 try   { $trayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\perfmon.exe") }
 catch { $trayIcon.Icon = [Drawing.SystemIcons]::Application }
 
-# Context menu with dark theme colors
 $trayMenu = New-Object Windows.Forms.ContextMenuStrip
 $trayMenu.BackColor = $C.BgCard
 $trayMenu.ForeColor = $C.Text
@@ -519,7 +671,6 @@ $trayExit.ForeColor = $C.Red
 [void]$trayMenu.Items.Add($trayExit)
 $trayIcon.ContextMenuStrip = $trayMenu
 
-# Double-click tray icon: restore window
 $trayIcon.Add_DoubleClick({
     $form.Show()
     $form.WindowState = [Windows.Forms.FormWindowState]::Normal
@@ -538,11 +689,11 @@ $trayExit.Add_Click({
 })
 
 # -- Alert state variables -----------------------------------------------
-$script:cpuHighTicks  = 0       # consecutive refresh ticks with CPU above 85%
-$script:cpuAlertFired = $false  # prevents repeated balloon for the same high-CPU episode
+$script:cpuHighTicks  = 0
+$script:cpuAlertFired = $false
 $script:lastRamAlert  = [DateTime]::MinValue
 $script:lastDiskAlert = [DateTime]::MinValue
-$script:trayHintShown = $false  # show the "minimized to tray" hint only once
+$script:trayHintShown = $false
 
 # ========================================================================
 # LIVE REFRESH LOGIC
@@ -554,22 +705,22 @@ function Do-Refresh {
         $d = Get-LiveData
 
         # CPU card
-        $UI["CpuValLbl"].Text  = "$($d.CpuPct)%"
-        $UI["CpuPb"].Value     = [math]::Min($d.CpuPct, 100)
-        $UI["CpuPctLbl"].Text  = "$($d.CpuPct)%"
+        $UI["CpuValLbl"].Text      = "$($d.CpuPct)%"
+        $UI["CpuPb"].Value         = [math]::Min($d.CpuPct, 100)
+        $UI["CpuPctLbl"].Text      = "$($d.CpuPct)%"
         $UI["CpuPctLbl"].ForeColor = Pct-Color $d.CpuPct
 
         # RAM card
-        $UI["RamValLbl"].Text  = "$($d.UsedRAM) GB / $script:totalRAM GB"
-        $UI["RamPb"].Value     = [math]::Min($d.RamPct, 100)
-        $UI["RamPctLbl"].Text  = "$($d.RamPct)%"
+        $UI["RamValLbl"].Text      = "$($d.UsedRAM) GB / $script:totalRAM GB"
+        $UI["RamPb"].Value         = [math]::Min($d.RamPct, 100)
+        $UI["RamPctLbl"].Text      = "$($d.RamPct)%"
         $UI["RamPctLbl"].ForeColor = Pct-Color $d.RamPct
 
         # Disk card (every 5 ticks = ~15 sec)
         if ($script:tickCount % 5 -eq 0) {
-            $UI["DiskValLbl"].Text = "$($d.DUsed) GB used  |  $($d.DFree) GB free"
-            $UI["DiskPb"].Value    = [math]::Min($d.DPct, 100)
-            $UI["DiskPctLbl"].Text = "$($d.DPct)%"
+            $UI["DiskValLbl"].Text      = "$($d.DUsed) GB used  |  $($d.DFree) GB free"
+            $UI["DiskPb"].Value         = [math]::Min($d.DPct, 100)
+            $UI["DiskPctLbl"].Text      = "$($d.DPct)%"
             $UI["DiskPctLbl"].ForeColor = Pct-Color $d.DPct
         }
 
@@ -578,10 +729,15 @@ function Do-Refresh {
             Refresh-ProcessGrid
         }
 
+        # Add new CPU data point to the live chart, keep last 60 points
+        [void]$UI["CpuChart"].Series[0].Points.AddY([double]$d.CpuPct)
+        if ($UI["CpuChart"].Series[0].Points.Count -gt 60) {
+            $UI["CpuChart"].Series[0].Points.RemoveAt(0)
+        }
+
         $lastUpdLbl.Text = "Updated: $(Get-Date -Format 'HH:mm:ss')"
 
-        # -- Smart tray alerts -------------------------------------------
-        # CPU: balloon after ~12 seconds of sustained load above 85% (4 ticks x 3s)
+        # CPU alert: balloon after ~12 seconds of sustained load above 85%
         if ($d.CpuPct -gt 85) {
             $script:cpuHighTicks++
             if ($script:cpuHighTicks -ge 4 -and -not $script:cpuAlertFired) {
@@ -595,7 +751,7 @@ function Do-Refresh {
             $script:cpuAlertFired = $false
         }
 
-        # RAM: balloon when above 85%, cooldown 5 minutes between alerts
+        # RAM alert: balloon when above 85%, cooldown 5 minutes
         if ($d.RamPct -gt 85) {
             if (([DateTime]::Now - $script:lastRamAlert).TotalMinutes -gt 5) {
                 $script:lastRamAlert = [DateTime]::Now
@@ -605,7 +761,7 @@ function Do-Refresh {
             }
         }
 
-        # Disk: balloon when above 90%, cooldown 10 minutes between alerts
+        # Disk alert: balloon when above 90%, cooldown 10 minutes
         if ($d.DPct -gt 90) {
             if (([DateTime]::Now - $script:lastDiskAlert).TotalMinutes -gt 10) {
                 $script:lastDiskAlert = [DateTime]::Now
@@ -625,13 +781,10 @@ $timer.Interval = 3000
 $timer.Add_Tick({ Do-Refresh })
 $timer.Start()
 
-# Refresh button: immediate refresh
 $refreshBtn.Add_Click({ Do-Refresh })
 
-# -- Tray exit flag: true only when "Exit" is chosen from the tray menu
 $script:realExit = $false
 
-# X button hides the window to tray; only "Exit" from the tray menu truly closes
 $form.Add_FormClosing({
     param($sender, $e)
     if (-not $script:realExit) {
