@@ -17,25 +17,32 @@ No installation required. No third-party dependencies. Just run and go.
 ## Preview
 
 <div align="center">
-
 <table>
   <tr>
-    <td colspan="2" align="center">
-      <strong>📊 Real-Time Dashboard</strong><br/><br/>
-      <img src="screenshots/dashboard.png" width="780" alt="Dashboard - Live CPU, RAM, Disk monitoring with process list and CPU chart"/>
-    </td>
+    <th align="center">📊 Dashboard</th>
+    <th align="center">🚀 Startup Manager</th>
+    <th align="center">🧹 Junk File Cleaner</th>
   </tr>
   <tr>
-    <td align="center" width="50%">
-      <br/><strong>🚀 Startup Manager</strong><br/><br/>
-      <img src="screenshots/startup.png" width="370" alt="Startup Manager - disable startup programs from registry"/>
+    <td align="center">
+      <a href="screenshots/dashboard.png">
+        <img src="screenshots/dashboard.png" width="220" alt="Dashboard - Live CPU, RAM and Disk monitoring"/>
+      </a>
     </td>
-    <td align="center" width="50%">
-      <br/><strong>🧹 Junk File Cleaner</strong><br/><br/>
-      <img src="screenshots/cleanup.png" width="370" alt="Cleanup - scan and remove junk files from 6 locations"/>
+    <td align="center">
+      <a href="screenshots/startup.png">
+        <img src="screenshots/startup.png" width="220" alt="Startup Manager - disable startup programs"/>
+      </a>
+    </td>
+    <td align="center">
+      <a href="screenshots/cleanup.png">
+        <img src="screenshots/cleanup.png" width="220" alt="Junk File Cleaner - scan 6 locations"/>
+      </a>
     </td>
   </tr>
 </table>
+
+*Click any image to view full size*
 
 </div>
 
