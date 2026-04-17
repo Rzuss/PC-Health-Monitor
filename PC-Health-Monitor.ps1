@@ -519,7 +519,7 @@ $totalJunkGB = [math]::Round(($junkItems | Measure-Object SizeMB -Sum).Sum / 102
 $adminRequiredNames = @("Windows Temp", "WU Download Cache")
 
 function Invoke-KillProcess {
-    param([int]$Pid, [string]$ProcessName)
+    param([int]$ProcessId, [string]$ProcessName)
 
     # 1. BLACKLIST CHECK
     if ($script:ProtectedProcesses -contains $ProcessName.ToLower()) {
@@ -534,7 +534,7 @@ function Invoke-KillProcess {
 
     # 2. CONFIRMATION DIALOG (default button = No)
     $confirm = [System.Windows.Forms.MessageBox]::Show(
-        "Terminate process '$ProcessName' (PID: $Pid)?`n`nUnsaved work in this process will be lost.",
+        "Terminate process '$ProcessName' (PID: $ProcessId)?`n`nUnsaved work in this process will be lost.",
         "Confirm End Task",
         [System.Windows.Forms.MessageBoxButtons]::YesNo,
         [System.Windows.Forms.MessageBoxIcon]::Warning,
@@ -544,12 +544,12 @@ function Invoke-KillProcess {
 
     # 3. ATTEMPT TERMINATION
     try {
-        Stop-Process -Id $Pid -Force -ErrorAction Stop
-        Write-Log -Message "Process terminated: $ProcessName (PID: $Pid)" -Level INFO
+        Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+        Write-Log -Message "Process terminated: $ProcessName (PID: $ProcessId)" -Level INFO
         # 4. IMMEDIATE REFRESH on success
         Refresh-ProcessGrid
     } catch [System.ComponentModel.Win32Exception] {
-        Write-Log -Message "Failed to terminate $ProcessName (PID: $Pid) -- Win32 permission error" -Level ERROR -ExceptionRecord $_
+        Write-Log -Message "Failed to terminate $ProcessName (PID: $ProcessId) -- Win32 permission error" -Level ERROR -ExceptionRecord $_
         $msg = if (-not $script:isAdmin) {
             "Cannot terminate '$ProcessName'.`n`nReason: Insufficient privileges.`nTip: Restart PC Health Monitor as Administrator."
         } else {
@@ -561,7 +561,7 @@ function Invoke-KillProcess {
             [System.Windows.Forms.MessageBoxIcon]::Error
         ) | Out-Null
     } catch {
-        Write-Log -Message "Failed to terminate $ProcessName (PID: $Pid) -- process may have already exited" -Level WARN -ExceptionRecord $_
+        Write-Log -Message "Failed to terminate $ProcessName (PID: $ProcessId) -- process may have already exited" -Level WARN -ExceptionRecord $_
         [System.Windows.Forms.MessageBox]::Show(
             "Could not terminate '$ProcessName'. It may have already exited.`n`n$($_.Exception.Message)",
             "Termination Failed",
