@@ -15,22 +15,55 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install PSScriptAnalyzer
+      - name: Ensure PSScriptAnalyzer is available
         shell: pwsh
-        run: Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+        run: |
+          # PSScriptAnalyzer is pre-installed on windows-latest runners.
+          # Import it directly; only install if genuinely missing.
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+              Write-Host "PSScriptAnalyzer not found — installing..." -ForegroundColor Yellow
+              Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
+          } else {
+              Write-Host "PSScriptAnalyzer available: $(
+                  (Get-Module -ListAvailable PSScriptAnalyzer | Select-Object -First 1).Version
+              )" -ForegroundColor Green
+          }
 
       - name: Analyze PC-Health-Monitor.ps1
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer .\PC-Health-Monitor.ps1 -Severity Error,Warning
+          # Rules intentionally excluded (internal helper naming conventions):
+          #   PSUseApprovedVerbs  — Style-Grid, Draw-*, Pct-Color, Temp-Color, Refresh-*, Do-Refresh
+          #                         are internal helpers, not exported cmdlets.
+          $excludeRules = @(
+              'PSUseApprovedVerbs'
+          )
+
+          $results = Invoke-ScriptAnalyzer `
+              -Path .\PC-Health-Monitor.ps1 `
+              -Severity Error, Warning `
+              -ExcludeRule $excludeRules
+
           if ($results) {
-              $results | Format-Table -AutoSize
-              $errors = $results | Where-Object { $_.Severity -eq 'Error' }
-              if ($errors) {
-                  Write-Error "PSScriptAnalyzer found $($errors.Count) Error-level finding(s). Build failed."
+              $results | Format-Table RuleName, Severity, Line, Message -AutoSize
+
+              $errors   = $results | Where-Object { $_.Severity -eq 'Error' }
+              $warnings = $results | Where-Object { $_.Severity -eq 'Warning' }
+
+              Write-Host ""
+              Write-Host "── Summary ──────────────────────────────────" -ForegroundColor Cyan
+              Write-Host "  Errors  : $($errors.Count)"   -ForegroundColor $(if ($errors.Count   -gt 0) {'Red'}    else {'Green'})
+              Write-Host "  Warnings: $($warnings.Count)" -ForegroundColor $(if ($warnings.Count -gt 0) {'Yellow'} else {'Green'})
+
+              if ($errors.Count -gt 0) {
+                  Write-Host ""
+                  Write-Host "Build FAILED — $($errors.Count) Error-level finding(s) must be fixed." -ForegroundColor Red
                   exit 1
               }
-              Write-Warning "PSScriptAnalyzer found $($results.Count) Warning(s)."
+
+              Write-Host ""
+              Write-Host "Build PASSED — $($warnings.Count) warning(s) noted (non-blocking)." -ForegroundColor Green
+
           } else {
               Write-Host "PSScriptAnalyzer: no issues found." -ForegroundColor Green
           }

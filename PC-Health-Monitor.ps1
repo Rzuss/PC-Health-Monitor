@@ -246,9 +246,9 @@ function Get-HardwareTemps {
     # Queries LibreHardwareMonitor WMI namespace (LHM must be running).
     # Returns @{Available=$false} gracefully when LHM is not running or not installed.
     try {
-        $sensors = Get-WmiObject -Namespace root\LibreHardwareMonitor `
-                                 -Class Sensor -Filter "SensorType='Temperature'" `
-                                 -ErrorAction Stop
+        $sensors = Get-CimInstance -Namespace root\LibreHardwareMonitor `
+                                  -ClassName Sensor -Filter "SensorType='Temperature'" `
+                                  -ErrorAction Stop
         if (-not $sensors) { return @{Available=$false; CPU=$null; GPU=$null} }
 
         $cpu = $sensors | Where-Object { $_.Name -match 'CPU' } |
@@ -323,20 +323,20 @@ function Get-SecurityAudit {
             LastScan     = $mp.QuickScanEndTime
             SignatureAge = $mp.AntivirusSignatureAge
         }
-    } catch { Write-Log 'Defender query failed' ERROR -ExceptionRecord $_ }
+    } catch { Write-Log -Message 'Defender query failed' -Level ERROR -ExceptionRecord $_ }
 
     # Firewall (stores boolean Enabled per profile)
     try {
         $fw = Get-NetFirewallProfile -ErrorAction Stop
         foreach ($p in $fw) { $audit.Firewall[$p.Name] = $p.Enabled }
-    } catch { Write-Log 'Firewall query failed' ERROR -ExceptionRecord $_ }
+    } catch { Write-Log -Message 'Firewall query failed' -Level ERROR -ExceptionRecord $_ }
 
     # Pending Updates via COM (may be slow; wrapped in try/catch)
     try {
         $searcher = New-Object -ComObject Microsoft.Update.Searcher -ErrorAction Stop
         $result   = $searcher.Search('IsInstalled=0 and Type=Software')
         $audit.Updates = $result.Updates.Count
-    } catch { Write-Log 'Windows Update query failed' WARN -ExceptionRecord $_ }
+    } catch { Write-Log -Message 'Windows Update query failed' -Level WARN -ExceptionRecord $_ }
 
     # Listening Ports (top 30, sorted by port)
     try {
@@ -348,7 +348,7 @@ function Get-SecurityAudit {
                 @{N='Process'; E={if ($pm[$_.OwningProcess]) { $pm[$_.OwningProcess] } else { 'System' }}},
                 @{N='PID';     E={$_.OwningProcess}} |
             Sort-Object LocalPort | Select-Object -First 30
-    } catch { Write-Log 'Listening ports query failed' WARN -ExceptionRecord $_ }
+    } catch { Write-Log -Message 'Listening ports query failed' -Level WARN -ExceptionRecord $_ }
 
     return $audit
 }
@@ -398,7 +398,7 @@ $(if ($sec.Defender.Enabled) {'<tr><td>Defender</td><td class=ok>PROTECTED</td><
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
     } catch {
-        Write-Log 'Export failed' ERROR -ExceptionRecord $_
+        Write-Log -Message 'Export failed' -Level ERROR -ExceptionRecord $_
         [System.Windows.Forms.MessageBox]::Show(
             "Export failed: $($_.Exception.Message)", 'Error',
             [System.Windows.Forms.MessageBoxButtons]::OK,
@@ -1284,4 +1284,499 @@ foreach ($ji in $junkItems) {
                 $btn.Text        = "Done"
                 $btn.BackColor   = $dg
                 $log.AppendText($msg)
-       
+                $log.ScrollToCaret()
+                $prog.Visible    = $false
+                $szLbl.Text      = "0 MB"
+                $szLbl.ForeColor = $green
+                $fLbl.Text       = "0 files"
+                [System.Windows.Forms.MessageBox]::Show(
+                    "All files in '$name' have been successfully removed.",
+                    "Cleanup Complete",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Information)
+            })
+        })
+        [void]$ps.AddParameter("path",    $capturedPath)
+        [void]$ps.AddParameter("formObj", $capturedForm)
+        [void]$ps.AddParameter("btn",     $capturedSender)
+        [void]$ps.AddParameter("log",     $capturedLog)
+        [void]$ps.AddParameter("prog",    $capturedProgress)
+        [void]$ps.AddParameter("dg",      $capturedDG)
+        [void]$ps.AddParameter("szLbl",   $capturedSizeLbl)
+        [void]$ps.AddParameter("fLbl",    $capturedFilesLbl)
+        [void]$ps.AddParameter("green",   $capturedGreen)
+        [void]$ps.AddParameter("name",    $capturedName)
+
+        [void]$ps.BeginInvoke()
+    })
+
+    $skipBtn.Add_Click({
+        param($sender, $e)
+        $sender.Enabled = $false
+        $sender.Text    = "Skipped"
+        $logBox.AppendText("`nSkipped.")
+        $logBox.ScrollToCaret()
+    })
+
+    $rPnl.Controls.AddRange(@($cleanBtn, $skipBtn))
+    $tab3.Controls.Add($rPnl)
+    $rY += 62
+}
+
+$cleanAllBtn = New-Object Windows.Forms.Button
+$cleanAllBtn.Text      = "Clean All"
+$cleanAllBtn.Location  = [Drawing.Point]::new(890, 638)
+$cleanAllBtn.Size      = [Drawing.Size]::new(120, 36)
+$cleanAllBtn.BackColor = $C.DarkRed
+$cleanAllBtn.ForeColor = $C.White
+$cleanAllBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+$cleanAllBtn.FlatAppearance.BorderSize = 0
+$cleanAllBtn.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+$cleanAllBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+$cleanAllBtn.Add_MouseEnter({ $cleanAllBtn.BackColor = [Drawing.Color]::FromArgb(215, 60, 80) })
+$cleanAllBtn.Add_MouseLeave({ $cleanAllBtn.BackColor = $C.DarkRed })
+$tab3.Controls.Add($cleanAllBtn)
+
+$cleanAllBtn.Add_Click({
+    $r = [Windows.Forms.MessageBox]::Show(
+        "This will clean ALL junk locations at once.`nAre you sure?",
+        "Confirm Clean All",
+        [Windows.Forms.MessageBoxButtons]::YesNo,
+        [Windows.Forms.MessageBoxIcon]::Warning)
+    if ($r -eq [Windows.Forms.DialogResult]::Yes) {
+        $logBox.AppendText("`n--- CLEAN ALL STARTED ---")
+        foreach ($ji2 in $junkItems) {
+            if (($adminRequiredNames -contains $ji2.Name) -and (-not $script:isAdmin)) {
+                $logBox.AppendText("`nSkipped (requires admin): $($ji2.Name)")
+                [Windows.Forms.Application]::DoEvents()
+                continue
+            }
+            $logBox.AppendText("`nCleaning: $($ji2.Path)")
+            [Windows.Forms.Application]::DoEvents()
+            $del=0; $errCount=0
+            Get-ChildItem $ji2.Path -Force -EA SilentlyContinue | ForEach-Object {
+                try   { Remove-Item $_.FullName -Force -Recurse -EA Stop; $del++ }
+                catch {
+                    Write-Log -Message "Clean All: failed to remove item from $($ji2.Name)" -Level WARN -ExceptionRecord $_
+                    $errCount++
+                }
+            }
+            $logBox.AppendText("  -> $del removed, $errCount skipped")
+        }
+        $logBox.AppendText("`n--- DONE ---")
+        $logBox.ScrollToCaret()
+    }
+})
+
+$tabs.TabPages.Add($tab3)
+
+# ========================================================================
+# TAB 4 -- NETWORK INTELLIGENCE (Sprint 3 official)
+# ========================================================================
+$netTab = New-Object Windows.Forms.TabPage
+$netTab.Text      = "  NET  "
+$netTab.BackColor = $C.BgBase
+
+# -- Bandwidth banner panel (36px) ---------------------------------------
+$netBandwidthPanel = New-Pnl 0 0 1060 36 $C.BgCard
+
+$script:netSentLbl = New-Object Windows.Forms.Label
+$script:netSentLbl.Text      = "OUT: 0.0 KB/s"
+$script:netSentLbl.Location  = [Drawing.Point]::new(15, 7)
+$script:netSentLbl.Size      = [Drawing.Size]::new(210, 22)
+$script:netSentLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+$script:netSentLbl.ForeColor = $C.Purple
+$script:netSentLbl.BackColor = [Drawing.Color]::Transparent
+$netBandwidthPanel.Controls.Add($script:netSentLbl)
+
+$script:netRecvLbl = New-Object Windows.Forms.Label
+$script:netRecvLbl.Text      = "IN: 0.0 KB/s"
+$script:netRecvLbl.Location  = [Drawing.Point]::new(240, 7)
+$script:netRecvLbl.Size      = [Drawing.Size]::new(210, 22)
+$script:netRecvLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+$script:netRecvLbl.ForeColor = $C.Blue
+$script:netRecvLbl.BackColor = [Drawing.Color]::Transparent
+$netBandwidthPanel.Controls.Add($script:netRecvLbl)
+
+$netLegendLbl = New-Object Windows.Forms.Label
+$netLegendLbl.Text      = "ESTAB  LISTEN  CLOSE_WAIT  TIME_WAIT  [orange] = external IP"
+$netLegendLbl.Location  = [Drawing.Point]::new(670, 10)
+$netLegendLbl.Size      = [Drawing.Size]::new(370, 16)
+$netLegendLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$netLegendLbl.ForeColor = $C.Dim
+$netLegendLbl.BackColor = [Drawing.Color]::Transparent
+$netBandwidthPanel.Controls.Add($netLegendLbl)
+
+$netTab.Controls.Add($netBandwidthPanel)
+
+# -- Connection DataGridView (5 cols, AutoSizeColumnsMode = Fill) ---------
+$script:netGrid = New-Object Windows.Forms.DataGridView
+$script:netGrid.Location            = [Drawing.Point]::new(0, 38)
+$script:netGrid.Size                = [Drawing.Size]::new(1040, 552)
+$script:netGrid.AutoSizeColumnsMode = [Windows.Forms.DataGridViewAutoSizeColumnsMode]::Fill
+Style-Grid $script:netGrid
+$script:netGrid.ColumnHeadersHeight = 28
+$script:netGrid.RowTemplate.Height  = 22
+$script:netGrid.DoubleBuffered      = $true
+
+foreach ($nc in @(
+    @{Name="Process";  Header="PROCESS";   FillWeight=20},
+    @{Name="PID";      Header="PID";       FillWeight=8 },
+    @{Name="Port";     Header="PORT";      FillWeight=8 },
+    @{Name="RemoteIP"; Header="REMOTE IP"; FillWeight=20},
+    @{Name="State";    Header="STATE";     FillWeight=14}
+)) {
+    $col = New-Object Windows.Forms.DataGridViewTextBoxColumn
+    $col.Name       = $nc.Name
+    $col.HeaderText = $nc.Header
+    $col.FillWeight = $nc.FillWeight
+    $col.SortMode   = [Windows.Forms.DataGridViewColumnSortMode]::NotSortable
+    [void]$script:netGrid.Columns.Add($col)
+}
+
+$netTab.Controls.Add($script:netGrid)
+$tabs.TabPages.Add($netTab)
+
+# ========================================================================
+# TAB 5 -- SECURITY AUDIT (Sprint 4 official)
+# ========================================================================
+$secTab = New-Object Windows.Forms.TabPage
+$secTab.Text      = "  Security  "
+$secTab.BackColor = $C.BgBase
+
+# -- 3 top cards (200px wide each) ---------------------------------------
+# Defender Card
+$defCard = New-Pnl 15 10 200 130 $C.BgCard
+$defCard.Controls.Add((New-Lbl "DEFENDER" 10 8 178 16 8 $false $C.SubText))
+$script:defStatusLbl = New-Lbl "--" 10 28 178 30 13 $true $C.SubText
+$defCard.Controls.Add($script:defStatusLbl)
+$script:defScanLbl = New-Lbl "Last scan: --" 10 64 178 16 7 $false $C.Dim
+$defCard.Controls.Add($script:defScanLbl)
+$secTab.Controls.Add($defCard)
+
+# Updates Card
+$updCard = New-Pnl 230 10 200 130 $C.BgCard
+$updCard.Controls.Add((New-Lbl "UPDATES" 10 8 178 16 8 $false $C.SubText))
+$script:updCountLbl = New-Lbl "--" 10 28 178 48 22 $true $C.SubText
+$secTab.Controls.Add($updCard)
+$updCard.Controls.Add($script:updCountLbl)
+$updCard.Controls.Add((New-Lbl "pending updates" 10 80 178 16 7 $false $C.Dim))
+
+# Firewall Card
+$fwCard = New-Pnl 445 10 200 130 $C.BgCard
+$fwCard.Controls.Add((New-Lbl "FIREWALL" 10 8 178 16 8 $false $C.SubText))
+$script:fwLabels = @{}
+$script:fwLabels['Domain']  = New-Lbl "Domain : --"  10 32 178 18 9 $false $C.SubText
+$script:fwLabels['Private'] = New-Lbl "Private : --" 10 54 178 18 9 $false $C.SubText
+$script:fwLabels['Public']  = New-Lbl "Public : --"  10 76 178 18 9 $false $C.SubText
+$fwCard.Controls.AddRange(@($script:fwLabels['Domain'], $script:fwLabels['Private'], $script:fwLabels['Public']))
+$secTab.Controls.Add($fwCard)
+
+# -- Open Ports DataGridView ---------------------------------------------
+$secTab.Controls.Add((New-Lbl "  Open Listening Ports" 15 150 400 22 10 $true $C.Blue))
+$secTab.Controls.Add((New-Pnl 17 172 200 1 $C.Blue))
+
+$script:portsGrid = New-Object Windows.Forms.DataGridView
+$script:portsGrid.Location = [Drawing.Point]::new(15, 176)
+$script:portsGrid.Size     = [Drawing.Size]::new(1020, 315)
+Style-Grid $script:portsGrid
+$script:portsGrid.ColumnHeadersHeight = 28
+$script:portsGrid.RowTemplate.Height  = 22
+foreach ($spc in @(
+    @{N="Port";    H="PORT";    W=80 },
+    @{N="Process"; H="PROCESS"; W=180},
+    @{N="PID";     H="PID";     W=60 }
+)) {
+    $sc = New-Object Windows.Forms.DataGridViewTextBoxColumn
+    $sc.Name = $spc.N; $sc.HeaderText = $spc.H; $sc.Width = $spc.W
+    $sc.SortMode = [Windows.Forms.DataGridViewColumnSortMode]::NotSortable
+    [void]$script:portsGrid.Columns.Add($sc)
+}
+$secTab.Controls.Add($script:portsGrid)
+
+# -- Bottom button row ---------------------------------------------------
+$scanNowBtn = New-Btn "SCAN NOW"      15  502 140 36 $C.BgCard2 $C.Blue
+$exportBtn  = New-Btn "EXPORT REPORT" 875 502 160 36 $C.Purple  $C.White
+
+$scanNowBtn.Add_Click({ Update-SecurityCards (Get-SecurityAudit) })
+$exportBtn.Add_Click({  Export-SystemReport })
+
+$secTab.Controls.AddRange(@($scanNowBtn, $exportBtn))
+$tabs.TabPages.Add($secTab)
+#endregion
+
+#region 6 - Event Handlers & Timer
+# Auto-trigger first security scan when user navigates to Security tab
+$tabs.Add_SelectedIndexChanged({
+    if ($tabs.SelectedTab -eq $netTab) { Refresh-NetGrid }
+})
+
+# Tab owner-draw event (added after all tabs are registered)
+$tabs.Add_DrawItem({
+    param($s2, $de)
+    try {
+        $tab      = $tabs.TabPages[$de.Index]
+        $isSel    = ($de.Index -eq $tabs.SelectedIndex)
+        $bgColor  = if ($isSel) { $C.BgCard2 } else { $C.BgBase }
+        $fgColor  = if ($isSel) { $C.Blue    } else { $C.Dim    }
+        $de.Graphics.FillRectangle((New-Object Drawing.SolidBrush($bgColor)), $de.Bounds)
+        if ($isSel) {
+            $accentPen = New-Object Drawing.Pen($C.Blue, 2)
+            $de.Graphics.DrawLine($accentPen,
+                $de.Bounds.Left, $de.Bounds.Bottom - 1,
+                $de.Bounds.Right, $de.Bounds.Bottom - 1)
+        }
+        $font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+        $sf   = New-Object Drawing.StringFormat
+        $sf.Alignment      = [Drawing.StringAlignment]::Center
+        $sf.LineAlignment  = [Drawing.StringAlignment]::Center
+        $de.Graphics.DrawString($tab.Text.Trim(), $font,
+            (New-Object Drawing.SolidBrush($fgColor)), [Drawing.RectangleF]$de.Bounds, $sf)
+    } catch {
+        Write-Log -Message "Tab DrawItem paint error at index $($de.Index)" -Level WARN -ExceptionRecord $_
+        # Fallback: tab label not rendered this frame
+    }
+})
+
+# ========================================================================
+# SYSTEM TRAY ICON
+# ========================================================================
+$trayIcon = New-Object Windows.Forms.NotifyIcon
+$trayIcon.Text    = "PC Health Monitor"
+$trayIcon.Visible = $true
+try   { $trayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\perfmon.exe") }
+catch {
+    Write-Log -Message "Failed to load tray icon from perfmon.exe, using system default" -Level WARN -ExceptionRecord $_
+    $trayIcon.Icon = [Drawing.SystemIcons]::Application
+}
+
+$trayMenu = New-Object Windows.Forms.ContextMenuStrip
+$trayMenu.BackColor = $C.BgCard
+$trayMenu.ForeColor = $C.Text
+
+$trayOpen = New-Object Windows.Forms.ToolStripMenuItem "Open"
+$trayOpen.BackColor = $C.BgCard
+$trayOpen.ForeColor = $C.Blue
+
+$traySep  = New-Object Windows.Forms.ToolStripSeparator
+
+$trayExit = New-Object Windows.Forms.ToolStripMenuItem "Exit"
+$trayExit.BackColor = $C.BgCard
+$trayExit.ForeColor = $C.Red
+
+[void]$trayMenu.Items.Add($trayOpen)
+[void]$trayMenu.Items.Add($traySep)
+[void]$trayMenu.Items.Add($trayExit)
+$trayIcon.ContextMenuStrip = $trayMenu
+
+$trayIcon.Add_DoubleClick({
+    $form.Show()
+    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
+    $form.Activate()
+})
+
+$trayOpen.Add_Click({
+    $form.Show()
+    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
+    $form.Activate()
+})
+
+$trayExit.Add_Click({
+    $script:realExit = $true
+    $form.Close()
+})
+
+# -- Alert state variables -----------------------------------------------
+$script:cpuHighTicks       = 0
+$script:cpuAlertFired      = $false
+$script:lastRamAlert       = [DateTime]::MinValue
+$script:TempRefreshCounter = 0
+$script:NetRefreshCounter  = 0
+$script:lastDiskAlert = [DateTime]::MinValue
+$script:trayHintShown = $false
+
+# ========================================================================
+# LIVE REFRESH LOGIC
+# ========================================================================
+$script:tickCount = 0
+
+function Do-Refresh {
+    try {
+        $d = Get-LiveData
+
+        # CPU card
+        $UI["CpuValLbl"].Text      = "$($d.CpuPct)%"
+        $UI["CpuPctLbl"].Text      = "$($d.CpuPct)%"
+        $UI["CpuPctLbl"].ForeColor = Pct-Color $d.CpuPct
+        $UI["CpuCard"].Tag.Pct     = $d.CpuPct
+        $UI["CpuCard"].Invalidate()
+        $fw = [math]::Max(0, [math]::Min(112, [int](($d.CpuPct / 100.0) * 112)))
+        $UI["CpuBarFill"].Width     = $fw
+        $UI["CpuBarFill"].BackColor = Pct-Color $d.CpuPct
+
+        # RAM card
+        $UI["RamValLbl"].Text      = "$($d.UsedRAM) GB / $script:totalRAM GB"
+        $UI["RamPctLbl"].Text      = "$($d.RamPct)%"
+        $UI["RamPctLbl"].ForeColor = Pct-Color $d.RamPct
+        $UI["RamCard"].Tag.Pct     = $d.RamPct
+        $UI["RamCard"].Invalidate()
+        $fw2 = [math]::Max(0, [math]::Min(112, [int](($d.RamPct / 100.0) * 112)))
+        $UI["RamBarFill"].Width     = $fw2
+        $UI["RamBarFill"].BackColor = Pct-Color $d.RamPct
+
+        # Disk card (every 5 ticks = ~15 sec)
+        if ($script:tickCount % 5 -eq 0) {
+            $UI["DiskValLbl"].Text      = "$($d.DUsed) GB used  |  $($d.DFree) GB free"
+            $UI["DiskPctLbl"].Text      = "$($d.DPct)%"
+            $UI["DiskPctLbl"].ForeColor = Pct-Color $d.DPct
+            $UI["DiskCard"].Tag.Pct     = $d.DPct
+            $UI["DiskCard"].Invalidate()
+            $fw3 = [math]::Max(0, [math]::Min(112, [int](($d.DPct / 100.0) * 112)))
+            $UI["DiskBarFill"].Width     = $fw3
+            $UI["DiskBarFill"].BackColor = Pct-Color $d.DPct
+        }
+
+        # Temp card (every 2 ticks = ~6 sec, independent TempRefreshCounter)
+        $script:TempRefreshCounter++
+        if ($script:TempRefreshCounter % 2 -eq 0) {
+            $temps = Get-HardwareTemps
+            if ($temps.Available) {
+                $script:tempStatus.Visible = $false
+                $cVal = $temps.CPU
+                $gVal = $temps.GPU
+                $script:tempCPULbl.Text = if ($cVal) { "CPU: $cVal deg C" } else { 'CPU: N/A' }
+                $script:tempCPULbl.ForeColor = if ($cVal -ge 80)   { $C.Red    }
+                                               elseif ($cVal -ge 60){ $C.Yellow }
+                                               else                  { $C.Green  }
+                $script:tempGPULbl.Text = if ($gVal) { "GPU: $gVal deg C" } else { 'GPU: N/A' }
+                $script:tempGPULbl.ForeColor = if ($gVal -ge 80)   { $C.Red    }
+                                               elseif ($gVal -ge 60){ $C.Yellow }
+                                               else                  { $C.Green  }
+            } else {
+                $script:tempCPULbl.Text      = ''
+                $script:tempGPULbl.Text      = ''
+                $script:tempStatus.Text      = 'Install LibreHardwareMonitor'
+                $script:tempStatus.ForeColor = $C.Dim
+                $script:tempStatus.Visible   = $true
+            }
+        }
+
+        # Net tab (every 2 ticks = ~6 sec, only when tab is visible)
+        $script:NetRefreshCounter++
+        if ($script:NetRefreshCounter % 2 -eq 0 -and $script:tabs.SelectedTab -eq $netTab) {
+            Refresh-NetGrid
+        }
+
+        # Security tab (every 10 ticks = ~30 sec, only when tab is visible)
+        if ($script:tickCount % 10 -eq 0 -and $script:tabs.SelectedTab -eq $secTab) {
+            Update-SecurityCards (Get-SecurityAudit)
+        }
+
+        # Process grid (every 2 ticks = ~6 sec)
+        if ($script:tickCount % 2 -eq 0) {
+            Refresh-ProcessGrid
+        }
+
+        # Add new CPU data point to the live chart, keep last 60 points
+        [void]$UI["CpuChart"].Series[0].Points.AddY([double]$d.CpuPct)
+        if ($UI["CpuChart"].Series[0].Points.Count -gt 60) {
+            $UI["CpuChart"].Series[0].Points.RemoveAt(0)
+        }
+
+        $lastUpdLbl.Text = "  Updated: $(Get-Date -Format 'HH:mm:ss')"
+
+        # Blinking dot
+        $script:blinkState = -not $script:blinkState
+        $blinkDot.BackColor = if ($script:blinkState) { $C.Green } else { $C.BgCard }
+
+        # CPU alert: balloon after ~12 seconds of sustained load above 85%
+        if ($d.CpuPct -gt 85) {
+            $script:cpuHighTicks++
+            if ($script:cpuHighTicks -ge 4 -and -not $script:cpuAlertFired) {
+                $script:cpuAlertFired = $true
+                $trayIcon.ShowBalloonTip(6000, "High CPU Usage",
+                    "CPU has been above 85% for over 10 seconds ($($d.CpuPct)%)",
+                    [Windows.Forms.ToolTipIcon]::Warning)
+            }
+        } else {
+            $script:cpuHighTicks  = 0
+            $script:cpuAlertFired = $false
+        }
+
+        # RAM alert: balloon when above 85%, cooldown 5 minutes
+        if ($d.RamPct -gt 85) {
+            if (([DateTime]::Now - $script:lastRamAlert).TotalMinutes -gt 5) {
+                $script:lastRamAlert = [DateTime]::Now
+                $trayIcon.ShowBalloonTip(6000, "High RAM Usage",
+                    "RAM usage is at $($d.RamPct)% ($($d.UsedRAM) GB / $script:totalRAM GB)",
+                    [Windows.Forms.ToolTipIcon]::Warning)
+            }
+        }
+
+        # Disk alert: balloon when above 90%, cooldown 10 minutes
+        if ($d.DPct -gt 90) {
+            if (([DateTime]::Now - $script:lastDiskAlert).TotalMinutes -gt 10) {
+                $script:lastDiskAlert = [DateTime]::Now
+                $trayIcon.ShowBalloonTip(6000, "Low Disk Space",
+                    "Drive C: is $($d.DPct)% full - only $($d.DFree) GB free",
+                    [Windows.Forms.ToolTipIcon]::Warning)
+            }
+        }
+
+        $script:tickCount++
+    } catch {
+        Write-Log -Message "Do-Refresh failed during live data update" -Level ERROR -ExceptionRecord $_
+        $d = $null    # graceful fallback -- UI retains last-known-good values
+    }
+}
+
+# Timer: fires every 3 seconds
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 3000
+$timer.Add_Tick({ Do-Refresh })
+$timer.Start()
+
+$refreshBtn.Add_Click({ Do-Refresh })
+
+$pGrid.Add_CellClick({
+    param($sender, $e)
+
+    # Only act on the Kill column (index 4), not header row
+    if ($e.RowIndex -lt 0 -or $e.ColumnIndex -ne 4) { return }
+
+    $row         = $sender.Rows[$e.RowIndex]
+    $processName = $row.Cells[0].Value.ToString().Trim()
+    $pid         = [int]$row.Cells[3].Value
+
+    Invoke-KillProcess -Pid $pid -ProcessName $processName
+})
+
+$script:realExit = $false
+
+$form.Add_FormClosing({
+    param($sender, $e)
+    if (-not $script:realExit) {
+        $e.Cancel = $true
+        $form.Hide()
+        if (-not $script:trayHintShown) {
+            $script:trayHintShown = $true
+            $trayIcon.ShowBalloonTip(3000, "PC Health Monitor",
+                "Still running in the background. Right-click the tray icon to restore or exit.",
+                [Windows.Forms.ToolTipIcon]::Info)
+        }
+    } else {
+        $timer.Stop()
+        $timer.Dispose()
+        $trayIcon.Visible = $false
+        $trayIcon.Dispose()
+    }
+})
+#endregion
+
+#region 7 - Execution
+# Session start log entry
+Write-Log -Message "Session started. Privileges: $(if ($script:isAdmin) {'Administrator'} else {'Standard User'})" -Level INFO
+
+# -- Launch --------------------------------------------------------------
+[void]$form.ShowDialog()
+#endregion
