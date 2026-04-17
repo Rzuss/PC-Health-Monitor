@@ -39,6 +39,33 @@ function Write-Log {
     }
 
     $entry | Out-File -FilePath $script:LogPath -Append -Encoding UTF8 -ErrorAction SilentlyContinue
+
+    # TELEMETRY: append metric snapshot to CSV when real data is available
+    $TelemetryPath = Join-Path $env:TEMP 'PCHealth-Telemetry.csv'
+    if ($Script:LastCPU -ne $null -and ($Script:LastCPU -gt 0 -or $Script:LastRAM -gt 0)) {
+        if (-not (Test-Path $TelemetryPath)) {
+            'timestamp,metric,value,process,pid' |
+                Out-File $TelemetryPath -Encoding UTF8 -ErrorAction SilentlyContinue
+        } else {
+            $csvFile = Get-Item $TelemetryPath -ErrorAction SilentlyContinue
+            if ($csvFile -and $csvFile.Length -gt 614400) {
+                $lines = Get-Content $TelemetryPath -ErrorAction SilentlyContinue
+                if ($lines -and $lines.Count -gt 2001) {
+                    (@($lines[0]) + @($lines[2001..($lines.Count - 1)])) |
+                        Out-File $TelemetryPath -Encoding UTF8 -ErrorAction SilentlyContinue
+                }
+            }
+        }
+        $ts = Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'
+        @(
+            "$ts,CPU%,$Script:LastCPU,,",
+            "$ts,RAM%,$Script:LastRAM,,",
+            "$ts,DiskFree_GB,$Script:LastDiskFree,,"
+        ) | Out-File $TelemetryPath -Append -Encoding UTF8 -ErrorAction SilentlyContinue
+    } elseif (-not (Test-Path $TelemetryPath)) {
+        'timestamp,metric,value,process,pid' |
+            Out-File $TelemetryPath -Encoding UTF8 -ErrorAction SilentlyContinue
+    }
 }
 #endregion
 
@@ -78,6 +105,7 @@ $C = @{
     DarkRed    = [Drawing.Color]::FromArgb(185, 40,  60)
     DarkGreen  = [Drawing.Color]::FromArgb(30,  140, 70)
     Border     = [Drawing.Color]::FromArgb(30,  50,  80)
+    Anomaly    = [Drawing.Color]::FromArgb(232, 121, 249)
 }
 
 # -- Protected Process Blacklist -----------------------------------------
@@ -86,6 +114,29 @@ $script:ProtectedProcesses = @(
     'services','svchost','system','registry','dwm','fontdrvhost',
     'SecurityHealthService','MsMpEng'
 )
+#endregion
+
+#region 2.5 - Plugin Loader
+$Script:PluginsDir    = Join-Path $PSScriptRoot 'plugins'
+$Script:LoadedPlugins = @()
+
+if (Test-Path $Script:PluginsDir) {
+    $psm1Files = Get-ChildItem -Path $Script:PluginsDir -Filter '*.psm1' -ErrorAction SilentlyContinue
+    foreach ($psm1 in $psm1Files) {
+        try {
+            Import-Module -Name $psm1.FullName -Force -ErrorAction Stop -WarningAction SilentlyContinue
+            $manifest                 = Get-PluginManifest
+            $manifest['_Initialize'] = ${function:Initialize-Plugin}
+            $manifest['_Refresh']    = ${function:Refresh-Plugin}
+            $Script:LoadedPlugins   += $manifest
+            Write-Log -Message "Plugin loaded: $($manifest.Name) v$($manifest.Version) by $($manifest.Author)" -Level INFO
+        } catch {
+            Write-Log -Message "Failed to load plugin: $($psm1.Name)" -Level WARN -ExceptionRecord $_
+        }
+    }
+} else {
+    Write-Log -Message "Plugins directory not found, skipping plugin discovery: $Script:PluginsDir" -Level INFO
+}
 #endregion
 
 #region 3 - UI Helper Functions
@@ -275,15 +326,31 @@ function Get-NetworkConnections {
         foreach ($p in $procs) { $procMap[$p.Id] = $p.ProcessName }
 
         $result = foreach ($c in $conns) {
+            $remoteIP  = if ($c.RemoteAddress) { $c.RemoteAddress.ToString() } else { '--' }
+            $isSuspect = ($c.State -ne 'Listen') -and
+                         ($remoteIP -notmatch
+                          '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|::1|$)')
+            $isThreat     = $false
+            $threatFamily = ''
+            $threatType   = ''
+            if ($isSuspect -and $Script:ThreatIntel -and $remoteIP -ne '--') {
+                $iocEntry = $Script:ThreatIntel.PSObject.Properties[$remoteIP]
+                if ($iocEntry) {
+                    $isThreat     = $true
+                    $threatFamily = $iocEntry.Value.family
+                    $threatType   = $iocEntry.Value.type
+                }
+            }
             [PSCustomObject]@{
-                Process   = if ($procMap[$c.OwningProcess]) { $procMap[$c.OwningProcess] } else { 'System' }
-                PID       = $c.OwningProcess
-                LocalPort = $c.LocalPort
-                RemoteIP  = if ($c.RemoteAddress) { $c.RemoteAddress.ToString() } else { '--' }
-                State     = $c.State.ToString()
-                IsSuspect = ($c.State -ne 'Listen') -and
-                            ($c.RemoteAddress -notmatch
-                            '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|::1|$)')
+                Process      = if ($procMap[$c.OwningProcess]) { $procMap[$c.OwningProcess] } else { 'System' }
+                PID          = $c.OwningProcess
+                LocalPort    = $c.LocalPort
+                RemoteIP     = $remoteIP
+                State        = $c.State.ToString()
+                IsSuspect    = $isSuspect
+                IsThreat     = $isThreat
+                ThreatFamily = $threatFamily
+                ThreatType   = $threatType
             }
         }
         return $result |
@@ -407,6 +474,11 @@ $(if ($sec.Defender.Enabled) {'<tr><td>Defender</td><td class=ok>PROTECTED</td><
 }
 
 $live = Get-LiveData
+
+# Telemetry snapshot variables — updated each Do-Refresh tick
+$Script:LastCPU      = $live.CpuPct
+$Script:LastRAM      = $live.RamPct
+$Script:LastDiskFree = $live.DFree
 
 # Startup items
 $startups = @()
@@ -774,9 +846,82 @@ $tempCard.Controls.Add($script:tempStatus)
 $UI["TempCard"] = $tempCard
 $tab1.Controls.Add($tempCard)
 
+# -- Health Score Card (Sprint 6) ----------------------------------------
+$scoreCard = New-Pnl 15 128 1020 70 $C.BgCard
+$scoreCard.Add_Paint({
+    param($s2, $pe)
+    try {
+        $g = $pe.Graphics
+        $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.FillRectangle((New-Object Drawing.SolidBrush($C.BgCard)), 0, 0, $s2.Width, $s2.Height)
+        Draw-GlowBorder $g $s2.Width $s2.Height $C.Blue 2
+    } catch {
+        Write-Log -Message "Score card Paint error" -Level WARN -ExceptionRecord $_
+    }
+})
+
+$script:scoreNumLbl = New-Object Windows.Forms.Label
+$script:scoreNumLbl.Text      = '--'
+$script:scoreNumLbl.Location  = [Drawing.Point]::new(10, 8)
+$script:scoreNumLbl.Size      = [Drawing.Size]::new(82, 54)
+$script:scoreNumLbl.Font      = New-Object Drawing.Font("Consolas", 20, [Drawing.FontStyle]::Bold)
+$script:scoreNumLbl.ForeColor = $C.Dim
+$script:scoreNumLbl.BackColor = [Drawing.Color]::Transparent
+$scoreCard.Controls.Add($script:scoreNumLbl)
+
+$script:scoreGradeLbl = New-Object Windows.Forms.Label
+$script:scoreGradeLbl.Text      = 'HEALTH SCORE'
+$script:scoreGradeLbl.Location  = [Drawing.Point]::new(98, 6)
+$script:scoreGradeLbl.Size      = [Drawing.Size]::new(150, 22)
+$script:scoreGradeLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+$script:scoreGradeLbl.ForeColor = $C.Dim
+$script:scoreGradeLbl.BackColor = [Drawing.Color]::Transparent
+$scoreCard.Controls.Add($script:scoreGradeLbl)
+
+$script:scoreTrendLbl = New-Object Windows.Forms.Label
+$script:scoreTrendLbl.Text      = ''
+$script:scoreTrendLbl.Location  = [Drawing.Point]::new(256, 4)
+$script:scoreTrendLbl.Size      = [Drawing.Size]::new(36, 26)
+$script:scoreTrendLbl.Font      = New-Object Drawing.Font("Segoe UI", 12, [Drawing.FontStyle]::Bold)
+$script:scoreTrendLbl.ForeColor = $C.Dim
+$script:scoreTrendLbl.BackColor = [Drawing.Color]::Transparent
+$scoreCard.Controls.Add($script:scoreTrendLbl)
+
+$script:scoreMsg1Lbl = New-Object Windows.Forms.Label
+$script:scoreMsg1Lbl.Text      = 'Analytics not yet run -- install Python & run Register-HealthTask.ps1'
+$script:scoreMsg1Lbl.Location  = [Drawing.Point]::new(98, 32)
+$script:scoreMsg1Lbl.Size      = [Drawing.Size]::new(900, 16)
+$script:scoreMsg1Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
+$script:scoreMsg1Lbl.ForeColor = $C.Dim
+$script:scoreMsg1Lbl.BackColor = [Drawing.Color]::Transparent
+$scoreCard.Controls.Add($script:scoreMsg1Lbl)
+
+$script:scoreMsg2Lbl = New-Object Windows.Forms.Label
+$script:scoreMsg2Lbl.Text      = ''
+$script:scoreMsg2Lbl.Location  = [Drawing.Point]::new(98, 48)
+$script:scoreMsg2Lbl.Size      = [Drawing.Size]::new(900, 16)
+$script:scoreMsg2Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
+$script:scoreMsg2Lbl.ForeColor = $C.SubText
+$script:scoreMsg2Lbl.BackColor = [Drawing.Color]::Transparent
+$script:scoreMsg2Lbl.Visible   = $false
+$scoreCard.Controls.Add($script:scoreMsg2Lbl)
+
+$script:scoreMsg3Lbl = New-Object Windows.Forms.Label
+$script:scoreMsg3Lbl.Text      = ''
+$script:scoreMsg3Lbl.Location  = [Drawing.Point]::new(98, 54)
+$script:scoreMsg3Lbl.Size      = [Drawing.Size]::new(900, 14)
+$script:scoreMsg3Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
+$script:scoreMsg3Lbl.ForeColor = $C.SubText
+$script:scoreMsg3Lbl.BackColor = [Drawing.Color]::Transparent
+$script:scoreMsg3Lbl.Visible   = $false
+$scoreCard.Controls.Add($script:scoreMsg3Lbl)
+
+$UI["ScoreCard"] = $scoreCard
+$tab1.Controls.Add($scoreCard)
+
 # -- CPU History Chart ---------------------------------------------------
 $cpuChart = New-Object System.Windows.Forms.DataVisualization.Charting.Chart
-$cpuChart.Location        = [Drawing.Point]::new(15, 140)
+$cpuChart.Location        = [Drawing.Point]::new(15, 205)
 $cpuChart.Size            = [Drawing.Size]::new(1020, 120)
 $cpuChart.BackColor       = $C.BgBase
 $cpuChart.BorderlineColor = [Drawing.Color]::Transparent
@@ -815,25 +960,38 @@ $tab1.Controls.Add($cpuChart)
 # -- Section label + underline -------------------------------------------
 $procTitleLbl = New-Object Windows.Forms.Label
 $procTitleLbl.Text      = "  Top 25 Processes by RAM"
-$procTitleLbl.Location  = [Drawing.Point]::new(15, 268)
+$procTitleLbl.Location  = [Drawing.Point]::new(15, 333)
 $procTitleLbl.Size      = [Drawing.Size]::new(500, 26)
 $procTitleLbl.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
 $procTitleLbl.ForeColor = $C.Blue
 $procTitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab1.Controls.Add($procTitleLbl)
 
-$underlinePnl = New-Pnl 17 294 220 1 $C.Blue
+$underlinePnl = New-Pnl 17 359 220 1 $C.Blue
 $tab1.Controls.Add($underlinePnl)
 
 # -- Process list --------------------------------------------------------
 $pGrid = New-Object Windows.Forms.DataGridView
-$pGrid.Location = [Drawing.Point]::new(15, 298)
-$pGrid.Size     = [Drawing.Size]::new(1020, 300)
+$pGrid.Location = [Drawing.Point]::new(15, 363)
+$pGrid.Size     = [Drawing.Size]::new(1020, 235)
 Style-Grid $pGrid
 Add-Col $pGrid "Process Name" 220
 Add-Col $pGrid "RAM (MB)"      80
 Add-Col $pGrid "CPU (sec)"     80
 Add-Col $pGrid "PID"           60
+
+# -- ANOMALY column (index 4) — inserted before Kill so Kill shifts to index 5
+$anomalyCol = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+$anomalyCol.Name       = "Anomaly"
+$anomalyCol.HeaderText = "ANOMALY"
+$anomalyCol.Width      = 90
+$anomalyCol.ReadOnly   = $true
+$anomalyCol.DefaultCellStyle.Alignment = [Windows.Forms.DataGridViewContentAlignment]::MiddleCenter
+$anomalyCol.DefaultCellStyle.Font      = $script:MonoFont
+[void]$pGrid.Columns.Add($anomalyCol)
+$anomalyCol.HeaderCell.Style.ForeColor = $C.Anomaly
+$anomalyCol.HeaderCell.Style.BackColor = $C.BgCard3
+$anomalyCol.HeaderCell.Style.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
 
 $killCol = New-Object System.Windows.Forms.DataGridViewButtonColumn
 $killCol.Name            = "Kill"
@@ -848,50 +1006,121 @@ $killCol.DefaultCellStyle.Alignment  = "MiddleCenter"
 [void]$pGrid.Columns.Add($killCol)
 $killCol.HeaderCell.Style.ForeColor = $C.Red
 
+$Script:Anomalies = @{}
+
 function Refresh-ProcessGrid {
     $procs = Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 25 `
         Name, Id,
         @{N="RAM MB"; E={[math]::Round($_.WorkingSet64/1MB,1)}},
         @{N="CPU sec";E={[math]::Round($_.CPU,1)}}
 
+    # Load anomaly data (index 4 = ANOMALY col, index 5 = Kill col)
+    $anomalyPath = Join-Path $env:LOCALAPPDATA 'PC-Health-Monitor\PCHealth-Anomalies.json'
+    $Script:Anomalies = @{}
+    if (Test-Path $anomalyPath) {
+        try {
+            $aData = Get-Content $anomalyPath -Raw -ErrorAction Stop | ConvertFrom-Json
+            foreach ($a in @($aData)) {
+                if ($a.metric -eq 'process_ram_mb' -and $a.process) {
+                    $Script:Anomalies[$a.process] = @{
+                        pct     = [int]$a.pct_above
+                        z       = [double]$a.z_score
+                        current = [double]$a.current
+                        mean    = [double]$a.mean
+                        std     = [double]$a.std
+                    }
+                }
+            }
+        } catch { }
+    }
+
     $pGrid.SuspendLayout()
     $pGrid.Rows.Clear()
     foreach ($p in $procs) {
-        $ri  = $pGrid.Rows.Add($p.Name, $p.'RAM MB', $p.'CPU sec', $p.Id)
+        $ri  = $pGrid.Rows.Add($p.Name, $p.'RAM MB', $p.'CPU sec', $p.Id, '')
         $row = $pGrid.Rows[$ri]
         if ($p.'RAM MB' -gt 500)     { $row.DefaultCellStyle.ForeColor = $C.Red }
         elseif ($p.'RAM MB' -gt 200) { $row.DefaultCellStyle.ForeColor = $C.Yellow }
+
+        # Protected process — mark Kill cell (now index 5)
         $pName = $row.Cells[0].Value.ToString().ToLower()
         if ($script:ProtectedProcesses -contains $pName) {
-            $row.Cells[4].Value           = "--"
-            $row.Cells[4].Style.ForeColor = $C.Dim
-            $row.Cells[4].Style.BackColor = $C.BgCard
-            $row.Cells[4].ReadOnly        = $true
-            $row.Cells[4].ToolTipText     = "System process - protected"
+            $row.Cells[5].Value           = "--"
+            $row.Cells[5].Style.ForeColor = $C.Dim
+            $row.Cells[5].Style.BackColor = $C.BgCard
+            $row.Cells[5].ReadOnly        = $true
+            $row.Cells[5].ToolTipText     = "System process - protected"
+        }
+
+        # Anomaly marking (index 4)
+        if ($Script:Anomalies.ContainsKey($p.Name)) {
+            $a = $Script:Anomalies[$p.Name]
+            $row.Cells[4].Value           = [char]0x26A0 + " +$($a.pct)%"
+            $row.Cells[4].Style.ForeColor = $C.Anomaly
+            $row.DefaultCellStyle.Font    = $script:MonoBold
         }
     }
     $pGrid.ResumeLayout()
+
+    # Process-level telemetry append
+    $TelemetryPath = Join-Path $env:TEMP 'PCHealth-Telemetry.csv'
+    if (Test-Path $TelemetryPath) {
+        try {
+            $csvFile = Get-Item $TelemetryPath -ErrorAction SilentlyContinue
+            if ($csvFile -and $csvFile.Length -gt 614400) {
+                $lines = Get-Content $TelemetryPath -ErrorAction SilentlyContinue
+                if ($lines -and $lines.Count -gt 2001) {
+                    (@($lines[0]) + @($lines[2001..($lines.Count - 1)])) |
+                        Out-File $TelemetryPath -Encoding UTF8 -ErrorAction SilentlyContinue
+                }
+            }
+            $ts   = Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'
+            $rows = foreach ($p in $procs) {
+                $pn = $p.Name -replace ',', ''
+                "$ts,process_ram_mb,$($p.'RAM MB'),$pn,$($p.Id)"
+                "$ts,process_cpu_pct,$($p.'CPU sec'),$pn,$($p.Id)"
+            }
+            $rows | Out-File $TelemetryPath -Append -Encoding UTF8 -ErrorAction SilentlyContinue
+        } catch { }
+    }
 }
 Refresh-ProcessGrid
 
 function Refresh-NetGrid {
+    # Explicitly capture $C from script scope to ensure availability inside the loop
+    $localC = $C
+    if ($null -eq $localC) { return }   # safety guard — $C not yet initialized
+
     $conns = Get-NetworkConnections
     $script:netGrid.SuspendLayout()
     $script:netGrid.Rows.Clear()
     foreach ($c in $conns) {
         $idx = $script:netGrid.Rows.Add(
-            $c.Process, $c.PID, $c.LocalPort, $c.RemoteIP, $c.State)
+            $c.Process, $c.PID, $c.LocalPort, $c.RemoteIP, $c.State, '')
         $row = $script:netGrid.Rows[$idx]
+
+        # State column (index 4) color-coding — unchanged
         $stateColor = switch ($c.State) {
-            'Established' { $C.Blue   }
-            'Listen'      { $C.Green  }
-            'CloseWait'   { $C.Yellow }
-            'TimeWait'    { $C.Dim    }
-            default       { $C.SubText }
+            'Established' { $localC.Blue    }
+            'Listen'      { $localC.Green   }
+            'CloseWait'   { $localC.Yellow  }
+            'TimeWait'    { $localC.Dim     }
+            default       { $localC.SubText }
         }
-        $row.Cells[4].Style.ForeColor = $stateColor
-        if ($c.IsSuspect) {
-            $row.DefaultCellStyle.ForeColor = $C.Orange
+        if ($null -ne $stateColor) {
+            $row.Cells[4].Style.ForeColor = $stateColor
+        }
+
+        # Row-level coloring for suspicious / threat connections
+        if ($c.IsThreat -and $null -ne $localC.Red) {
+            $row.DefaultCellStyle.ForeColor = $localC.Red
+            $row.Cells[5].Value           = "$($c.ThreatType): $($c.ThreatFamily)"
+            $row.Cells[5].Style.ForeColor = $localC.Red
+            $row.Cells[5].Style.Font      = $script:MonoBold
+        } elseif ($c.IsSuspect -and $null -ne $localC.Orange) {
+            $row.DefaultCellStyle.ForeColor = $localC.Orange
+            $row.Cells[5].Value           = 'Suspicious'
+            $row.Cells[5].Style.ForeColor = $localC.Yellow
         }
     }
     $script:netGrid.ResumeLayout()
@@ -930,6 +1159,20 @@ function Update-SecurityCards($audit) {
     foreach ($p in $audit.Ports) {
         $script:portsGrid.Rows.Add($p.LocalPort, $p.Process, $p.PID)
     }
+
+    # Export security snapshot for Python health analytics
+    try {
+        $secExport = [ordered]@{
+            defender_enabled = [bool]($audit.Defender.Enabled -eq $true)
+            firewall_domain  = [bool]($audit.Firewall.Domain  -eq $true)
+            firewall_private = [bool]($audit.Firewall.Private -eq $true)
+            firewall_public  = [bool]($audit.Firewall.Public  -eq $true)
+            pending_updates  = [int]($audit.Updates)
+            exported_at      = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
+        }
+        $secExport | ConvertTo-Json |
+            Out-File (Join-Path $env:TEMP 'PCHealth-Security.json') -Encoding UTF8 -ErrorAction SilentlyContinue
+    } catch { }
 }
 
 $tab1.Controls.Add($pGrid)
@@ -1417,22 +1660,42 @@ $script:netGrid.AutoSizeColumnsMode = [Windows.Forms.DataGridViewAutoSizeColumns
 Style-Grid $script:netGrid
 $script:netGrid.ColumnHeadersHeight = 28
 $script:netGrid.RowTemplate.Height  = 22
-$script:netGrid.DoubleBuffered      = $true
+# DoubleBuffered is a protected property on DataGridView -- must set via Reflection
+([Windows.Forms.DataGridView].GetProperty(
+    'DoubleBuffered',
+    [System.Reflection.BindingFlags]'Instance,NonPublic'
+)).SetValue($script:netGrid, $true, $null)
 
 foreach ($nc in @(
-    @{Name="Process";  Header="PROCESS";   FillWeight=20},
-    @{Name="PID";      Header="PID";       FillWeight=8 },
-    @{Name="Port";     Header="PORT";      FillWeight=8 },
-    @{Name="RemoteIP"; Header="REMOTE IP"; FillWeight=20},
-    @{Name="State";    Header="STATE";     FillWeight=14}
+    @{Name="Process";     Header="PROCESS";      FillWeight=20},
+    @{Name="PID";         Header="PID";          FillWeight=8 },
+    @{Name="Port";        Header="PORT";         FillWeight=8 },
+    @{Name="RemoteIP";    Header="REMOTE IP";    FillWeight=20},
+    @{Name="State";       Header="STATE";        FillWeight=14},
+    @{Name="ThreatIntel"; Header="THREAT INTEL"; FillWeight=30}
 )) {
     $col = New-Object Windows.Forms.DataGridViewTextBoxColumn
     $col.Name       = $nc.Name
     $col.HeaderText = $nc.Header
     $col.FillWeight = $nc.FillWeight
     $col.SortMode   = [Windows.Forms.DataGridViewColumnSortMode]::NotSortable
+    $col.ReadOnly   = $true
     [void]$script:netGrid.Columns.Add($col)
 }
+# Style the THREAT INTEL header distinctively
+$script:netGrid.Columns["ThreatIntel"].HeaderCell.Style.ForeColor = $C.Red
+$script:netGrid.Columns["ThreatIntel"].HeaderCell.Style.Font      = `
+    New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+
+# -- Threat Intel status label (below the grid) --------------------------
+$script:threatStatusLbl = New-Object Windows.Forms.Label
+$script:threatStatusLbl.Location  = [Drawing.Point]::new(6, 594)
+$script:threatStatusLbl.Size      = [Drawing.Size]::new(1034, 18)
+$script:threatStatusLbl.Font      = New-Object Drawing.Font("Segoe UI", 7, [Drawing.FontStyle]::Italic)
+$script:threatStatusLbl.ForeColor = $C.Dim
+$script:threatStatusLbl.BackColor = [Drawing.Color]::Transparent
+$script:threatStatusLbl.Text      = 'Threat Intel: not installed -- run install.ps1 to update'
+$netTab.Controls.Add($script:threatStatusLbl)
 
 $netTab.Controls.Add($script:netGrid)
 $tabs.TabPages.Add($netTab)
@@ -1503,6 +1766,27 @@ $exportBtn.Add_Click({  Export-SystemReport })
 
 $secTab.Controls.AddRange(@($scanNowBtn, $exportBtn))
 $tabs.TabPages.Add($secTab)
+
+# -- Plugin Tabs ---------------------------------------------------------
+foreach ($manifest in $Script:LoadedPlugins) {
+    try {
+        $pluginTab           = New-Object Windows.Forms.TabPage
+        $pluginTab.Text      = $manifest.TabName
+        $pluginTab.BackColor = $C.BgBase
+
+        $pluginPanel = New-Pnl 0 0 1040 600 $C.BgBase
+        $pluginTab.Controls.Add($pluginPanel)
+        $manifest['_Panel']   = $pluginPanel
+        $manifest['_TabPage'] = $pluginTab
+
+        & $manifest['_Initialize'] -ParentPanel $pluginPanel -Colors $C
+
+        $tabs.TabPages.Add($pluginTab)
+        Write-Log -Message "Plugin tab created: $($manifest.TabName)" -Level INFO
+    } catch {
+        Write-Log -Message "Failed to initialize plugin tab: $($manifest.Name)" -Level WARN -ExceptionRecord $_
+    }
+}
 #endregion
 
 #region 6 - Event Handlers & Timer
@@ -1516,267 +1800,4 @@ $tabs.Add_DrawItem({
     param($s2, $de)
     try {
         $tab      = $tabs.TabPages[$de.Index]
-        $isSel    = ($de.Index -eq $tabs.SelectedIndex)
-        $bgColor  = if ($isSel) { $C.BgCard2 } else { $C.BgBase }
-        $fgColor  = if ($isSel) { $C.Blue    } else { $C.Dim    }
-        $de.Graphics.FillRectangle((New-Object Drawing.SolidBrush($bgColor)), $de.Bounds)
-        if ($isSel) {
-            $accentPen = New-Object Drawing.Pen($C.Blue, 2)
-            $de.Graphics.DrawLine($accentPen,
-                $de.Bounds.Left, $de.Bounds.Bottom - 1,
-                $de.Bounds.Right, $de.Bounds.Bottom - 1)
-        }
-        $font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
-        $sf   = New-Object Drawing.StringFormat
-        $sf.Alignment      = [Drawing.StringAlignment]::Center
-        $sf.LineAlignment  = [Drawing.StringAlignment]::Center
-        $de.Graphics.DrawString($tab.Text.Trim(), $font,
-            (New-Object Drawing.SolidBrush($fgColor)), [Drawing.RectangleF]$de.Bounds, $sf)
-    } catch {
-        Write-Log -Message "Tab DrawItem paint error at index $($de.Index)" -Level WARN -ExceptionRecord $_
-        # Fallback: tab label not rendered this frame
-    }
-})
-
-# ========================================================================
-# SYSTEM TRAY ICON
-# ========================================================================
-$trayIcon = New-Object Windows.Forms.NotifyIcon
-$trayIcon.Text    = "PC Health Monitor"
-$trayIcon.Visible = $true
-try   { $trayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\perfmon.exe") }
-catch {
-    Write-Log -Message "Failed to load tray icon from perfmon.exe, using system default" -Level WARN -ExceptionRecord $_
-    $trayIcon.Icon = [Drawing.SystemIcons]::Application
-}
-
-$trayMenu = New-Object Windows.Forms.ContextMenuStrip
-$trayMenu.BackColor = $C.BgCard
-$trayMenu.ForeColor = $C.Text
-
-$trayOpen = New-Object Windows.Forms.ToolStripMenuItem "Open"
-$trayOpen.BackColor = $C.BgCard
-$trayOpen.ForeColor = $C.Blue
-
-$traySep  = New-Object Windows.Forms.ToolStripSeparator
-
-$trayExit = New-Object Windows.Forms.ToolStripMenuItem "Exit"
-$trayExit.BackColor = $C.BgCard
-$trayExit.ForeColor = $C.Red
-
-[void]$trayMenu.Items.Add($trayOpen)
-[void]$trayMenu.Items.Add($traySep)
-[void]$trayMenu.Items.Add($trayExit)
-$trayIcon.ContextMenuStrip = $trayMenu
-
-$trayIcon.Add_DoubleClick({
-    $form.Show()
-    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
-    $form.Activate()
-})
-
-$trayOpen.Add_Click({
-    $form.Show()
-    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
-    $form.Activate()
-})
-
-$trayExit.Add_Click({
-    $script:realExit = $true
-    $form.Close()
-})
-
-# -- Alert state variables -----------------------------------------------
-$script:cpuHighTicks       = 0
-$script:cpuAlertFired      = $false
-$script:lastRamAlert       = [DateTime]::MinValue
-$script:TempRefreshCounter = 0
-$script:NetRefreshCounter  = 0
-$script:lastDiskAlert = [DateTime]::MinValue
-$script:trayHintShown = $false
-
-# ========================================================================
-# LIVE REFRESH LOGIC
-# ========================================================================
-$script:tickCount = 0
-
-function Do-Refresh {
-    try {
-        $d = Get-LiveData
-
-        # CPU card
-        $UI["CpuValLbl"].Text      = "$($d.CpuPct)%"
-        $UI["CpuPctLbl"].Text      = "$($d.CpuPct)%"
-        $UI["CpuPctLbl"].ForeColor = Pct-Color $d.CpuPct
-        $UI["CpuCard"].Tag.Pct     = $d.CpuPct
-        $UI["CpuCard"].Invalidate()
-        $fw = [math]::Max(0, [math]::Min(112, [int](($d.CpuPct / 100.0) * 112)))
-        $UI["CpuBarFill"].Width     = $fw
-        $UI["CpuBarFill"].BackColor = Pct-Color $d.CpuPct
-
-        # RAM card
-        $UI["RamValLbl"].Text      = "$($d.UsedRAM) GB / $script:totalRAM GB"
-        $UI["RamPctLbl"].Text      = "$($d.RamPct)%"
-        $UI["RamPctLbl"].ForeColor = Pct-Color $d.RamPct
-        $UI["RamCard"].Tag.Pct     = $d.RamPct
-        $UI["RamCard"].Invalidate()
-        $fw2 = [math]::Max(0, [math]::Min(112, [int](($d.RamPct / 100.0) * 112)))
-        $UI["RamBarFill"].Width     = $fw2
-        $UI["RamBarFill"].BackColor = Pct-Color $d.RamPct
-
-        # Disk card (every 5 ticks = ~15 sec)
-        if ($script:tickCount % 5 -eq 0) {
-            $UI["DiskValLbl"].Text      = "$($d.DUsed) GB used  |  $($d.DFree) GB free"
-            $UI["DiskPctLbl"].Text      = "$($d.DPct)%"
-            $UI["DiskPctLbl"].ForeColor = Pct-Color $d.DPct
-            $UI["DiskCard"].Tag.Pct     = $d.DPct
-            $UI["DiskCard"].Invalidate()
-            $fw3 = [math]::Max(0, [math]::Min(112, [int](($d.DPct / 100.0) * 112)))
-            $UI["DiskBarFill"].Width     = $fw3
-            $UI["DiskBarFill"].BackColor = Pct-Color $d.DPct
-        }
-
-        # Temp card (every 2 ticks = ~6 sec, independent TempRefreshCounter)
-        $script:TempRefreshCounter++
-        if ($script:TempRefreshCounter % 2 -eq 0) {
-            $temps = Get-HardwareTemps
-            if ($temps.Available) {
-                $script:tempStatus.Visible = $false
-                $cVal = $temps.CPU
-                $gVal = $temps.GPU
-                $script:tempCPULbl.Text = if ($cVal) { "CPU: $cVal deg C" } else { 'CPU: N/A' }
-                $script:tempCPULbl.ForeColor = if ($cVal -ge 80)   { $C.Red    }
-                                               elseif ($cVal -ge 60){ $C.Yellow }
-                                               else                  { $C.Green  }
-                $script:tempGPULbl.Text = if ($gVal) { "GPU: $gVal deg C" } else { 'GPU: N/A' }
-                $script:tempGPULbl.ForeColor = if ($gVal -ge 80)   { $C.Red    }
-                                               elseif ($gVal -ge 60){ $C.Yellow }
-                                               else                  { $C.Green  }
-            } else {
-                $script:tempCPULbl.Text      = ''
-                $script:tempGPULbl.Text      = ''
-                $script:tempStatus.Text      = 'Install LibreHardwareMonitor'
-                $script:tempStatus.ForeColor = $C.Dim
-                $script:tempStatus.Visible   = $true
-            }
-        }
-
-        # Net tab (every 2 ticks = ~6 sec, only when tab is visible)
-        $script:NetRefreshCounter++
-        if ($script:NetRefreshCounter % 2 -eq 0 -and $script:tabs.SelectedTab -eq $netTab) {
-            Refresh-NetGrid
-        }
-
-        # Security tab (every 10 ticks = ~30 sec, only when tab is visible)
-        if ($script:tickCount % 10 -eq 0 -and $script:tabs.SelectedTab -eq $secTab) {
-            Update-SecurityCards (Get-SecurityAudit)
-        }
-
-        # Process grid (every 2 ticks = ~6 sec)
-        if ($script:tickCount % 2 -eq 0) {
-            Refresh-ProcessGrid
-        }
-
-        # Add new CPU data point to the live chart, keep last 60 points
-        [void]$UI["CpuChart"].Series[0].Points.AddY([double]$d.CpuPct)
-        if ($UI["CpuChart"].Series[0].Points.Count -gt 60) {
-            $UI["CpuChart"].Series[0].Points.RemoveAt(0)
-        }
-
-        $lastUpdLbl.Text = "  Updated: $(Get-Date -Format 'HH:mm:ss')"
-
-        # Blinking dot
-        $script:blinkState = -not $script:blinkState
-        $blinkDot.BackColor = if ($script:blinkState) { $C.Green } else { $C.BgCard }
-
-        # CPU alert: balloon after ~12 seconds of sustained load above 85%
-        if ($d.CpuPct -gt 85) {
-            $script:cpuHighTicks++
-            if ($script:cpuHighTicks -ge 4 -and -not $script:cpuAlertFired) {
-                $script:cpuAlertFired = $true
-                $trayIcon.ShowBalloonTip(6000, "High CPU Usage",
-                    "CPU has been above 85% for over 10 seconds ($($d.CpuPct)%)",
-                    [Windows.Forms.ToolTipIcon]::Warning)
-            }
-        } else {
-            $script:cpuHighTicks  = 0
-            $script:cpuAlertFired = $false
-        }
-
-        # RAM alert: balloon when above 85%, cooldown 5 minutes
-        if ($d.RamPct -gt 85) {
-            if (([DateTime]::Now - $script:lastRamAlert).TotalMinutes -gt 5) {
-                $script:lastRamAlert = [DateTime]::Now
-                $trayIcon.ShowBalloonTip(6000, "High RAM Usage",
-                    "RAM usage is at $($d.RamPct)% ($($d.UsedRAM) GB / $script:totalRAM GB)",
-                    [Windows.Forms.ToolTipIcon]::Warning)
-            }
-        }
-
-        # Disk alert: balloon when above 90%, cooldown 10 minutes
-        if ($d.DPct -gt 90) {
-            if (([DateTime]::Now - $script:lastDiskAlert).TotalMinutes -gt 10) {
-                $script:lastDiskAlert = [DateTime]::Now
-                $trayIcon.ShowBalloonTip(6000, "Low Disk Space",
-                    "Drive C: is $($d.DPct)% full - only $($d.DFree) GB free",
-                    [Windows.Forms.ToolTipIcon]::Warning)
-            }
-        }
-
-        $script:tickCount++
-    } catch {
-        Write-Log -Message "Do-Refresh failed during live data update" -Level ERROR -ExceptionRecord $_
-        $d = $null    # graceful fallback -- UI retains last-known-good values
-    }
-}
-
-# Timer: fires every 3 seconds
-$timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 3000
-$timer.Add_Tick({ Do-Refresh })
-$timer.Start()
-
-$refreshBtn.Add_Click({ Do-Refresh })
-
-$pGrid.Add_CellClick({
-    param($sender, $e)
-
-    # Only act on the Kill column (index 4), not header row
-    if ($e.RowIndex -lt 0 -or $e.ColumnIndex -ne 4) { return }
-
-    $row         = $sender.Rows[$e.RowIndex]
-    $processName = $row.Cells[0].Value.ToString().Trim()
-    $pid         = [int]$row.Cells[3].Value
-
-    Invoke-KillProcess -Pid $pid -ProcessName $processName
-})
-
-$script:realExit = $false
-
-$form.Add_FormClosing({
-    param($sender, $e)
-    if (-not $script:realExit) {
-        $e.Cancel = $true
-        $form.Hide()
-        if (-not $script:trayHintShown) {
-            $script:trayHintShown = $true
-            $trayIcon.ShowBalloonTip(3000, "PC Health Monitor",
-                "Still running in the background. Right-click the tray icon to restore or exit.",
-                [Windows.Forms.ToolTipIcon]::Info)
-        }
-    } else {
-        $timer.Stop()
-        $timer.Dispose()
-        $trayIcon.Visible = $false
-        $trayIcon.Dispose()
-    }
-})
-#endregion
-
-#region 7 - Execution
-# Session start log entry
-Write-Log -Message "Session started. Privileges: $(if ($script:isAdmin) {'Administrator'} else {'Standard User'})" -Level INFO
-
-# -- Launch --------------------------------------------------------------
-[void]$form.ShowDialog()
-#endregion
+        $

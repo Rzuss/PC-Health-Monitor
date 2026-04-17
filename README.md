@@ -9,9 +9,11 @@
 ![Install](https://img.shields.io/badge/Install-One--Liner-38bdf8?logo=powershell)
 ![EXE](https://img.shields.io/badge/Download-.exe-a855f7?logo=windows)
 ![CI](https://img.shields.io/github/actions/workflow/status/Rzuss/PC-Health-Monitor/validate.yml?label=CI&logo=github)
+![Plugins](https://img.shields.io/badge/Plugins-Supported-a855f7?logo=powershell)
+![ThreatIntel](https://img.shields.io/badge/Threat%20Intel-7%2C607%20IOCs-f97316?logo=shield)
 
-**A lightweight, real-time PC monitoring and cleanup tool built entirely in PowerShell.**  
-No installation required. No third-party dependencies. Just run and go.
+**A lightweight, real-time PC monitoring, security, and intelligence tool built entirely in PowerShell.**  
+No installation required. No third-party dependencies. Plugin-extensible. Just run and go.
 
 </div>
 
@@ -46,9 +48,11 @@ Most PC optimizers are bloated with ads, telemetry, and unnecessary dependencies
 
 - **Zero dependencies** — pure PowerShell + Windows Forms, nothing to install
 - **100% transparent** — open source, what you see is what runs
-- **Privacy first** — no background data collection, everything stays local
+- **Privacy first** — no background data collection, all threat intelligence stays local
 - **Cyber-HUD dark theme** — obsidian background, electric blue + neon purple accents, GDI+ circular gauges
 - **System tray integration** — minimize and monitor from taskbar with smart threshold alerts
+- **Plugin architecture** — extend with community `.psm1` plugins, no core code changes needed
+- **Offline threat intelligence** — 7,600+ C2/botnet IOCs checked locally, zero cloud API calls
 
 > The project is actively developed. New features are being added regularly!
 
@@ -62,7 +66,22 @@ Most PC optimizers are bloated with ads, telemetry, and unnecessary dependencies
 - Auto-refresh every 3 seconds with last-updated timestamp
 - Live CPU history SplineArea chart (last 60 seconds)
 - **Top 25 processes by RAM** with color-coded severity and **END button** per process
+- **Anomaly detection column** — processes deviating >2.5σ from their 30-day baseline highlighted in magenta
 - Runspace-based async refresh — UI never freezes
+
+### 📊 Predictive Health Score *(new in v3.0)*
+- Composite **Health Score (0–100)** updated daily via Python analytics engine
+- **Predictive alerts**: "Disk C: fills in ~14 days at current rate"
+- RAM trend analysis: detects slow memory leaks over weeks
+- Weighted scoring: disk fill rate (30%), RAM trend (20%), security posture (25%), startup impact (15%), anomaly count (10%)
+- Powered by `health_analyzer.py` — runs as a Windows Scheduled Task at 03:00 AM
+
+### 🧠 Behavioral Baseline Engine *(new in v3.0)*
+- Builds a **personal behavioral profile** of every process over 30 days
+- Detects anomalies using Z-score statistics — flags processes that deviate from their own normal baseline
+- `svchost.exe using 487 MB — +241% above its 30-day average of 143 MB`
+- Anomaly column in process grid with one-click detail popup: current vs. baseline, Z-score, suggested causes
+- Powered by `baseline_engine.py` — runs as a Windows Scheduled Task at 03:05 AM
 
 ### ☠️ Process Manager (Kill)
 - **END button** on every process row for one-click termination
@@ -73,10 +92,25 @@ Most PC optimizers are bloated with ads, telemetry, and unnecessary dependencies
 
 ### 🌐 Network Intelligence Tab
 - Live view of all active TCP connections
-- Columns: Process, PID, Local Port, Remote IP, State
+- Columns: Process, PID, Local Port, Remote IP, State, **THREAT INTEL** *(new)*
 - **State color coding**: ESTABLISHED (blue), LISTEN (green), CLOSE_WAIT (yellow), TIME_WAIT (dim)
 - **Suspicious connection highlighting**: non-RFC1918 remote IPs flagged in orange
+- **Offline C2 detection** — connections to known botnet/C2 IPs flagged in red with malware family name
 - Refreshes every 6 seconds when tab is active — no wasted CPU when hidden
+
+### 🛡️ Offline Threat Intelligence *(new in v3.0)*
+- **7,607 C2/botnet IP indicators** sourced from AbuseCH Feodo Tracker and URLhaus
+- Covers families: Emotet, Dridex, TrickBot, QakBot, and more
+- **Zero runtime API calls** — all lookups are local JSON file checks
+- GitHub Actions workflow refreshes the IOC database every Monday at 03:00 UTC automatically
+- Status bar shows IOC count and last update date
+
+### 🔌 Plugin Architecture *(new in v3.0)*
+- Drop any `.psm1` file into the `/plugins` folder — a new tab appears automatically
+- Plugins receive the full Cyber-HUD color palette and a dedicated UI panel
+- Included reference plugin: **💾 Disk Health** — S.M.A.R.T. status for all drives via WMI
+- Community plugin API documented in `plugins/PLUGIN-API.md`
+- Broken plugins never crash the main app — errors are caught and logged
 
 ### 🔒 Security Audit Tab
 - **Windows Defender** status + last scan date (green/red/yellow indicator)
@@ -110,6 +144,7 @@ Most PC optimizers are bloated with ads, telemetry, and unnecessary dependencies
 - Format: `[YYYY-MM-DD HH:mm:ss] [LEVEL] Message`
 - Automatic log rotation at 512 KB
 - Session header with OS version, PowerShell version, and privilege level
+- Telemetry CSV at `%TEMP%\PCHealth-Telemetry.csv` — feeds the analytics engine
 - All error paths log to file — attach log when opening GitHub Issues
 
 ---
@@ -121,6 +156,7 @@ Most PC optimizers are bloated with ads, telemetry, and unnecessary dependencies
 | OS          | Windows 10 or 11                                  |
 | PowerShell  | 5.1 or higher (built into Windows)                |
 | Permissions | Standard user (Admin recommended for full access) |
+| Python      | 3.8+ with `pandas`, `numpy` (for analytics engine — optional) |
 | Optional    | [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) running for CPU/GPU temps |
 
 ---
@@ -150,6 +186,31 @@ Double-click `Create-Desktop-Shortcut.bat` to create the launcher, then run the 
 
 Output: `dist\PC-Health-Monitor.exe` — run directly, no PowerShell window required.
 
+**Enable Analytics Engine (optional)**
+
+```powershell
+pip install pandas numpy
+.\Register-HealthTask.ps1
+```
+
+Registers two daily Scheduled Tasks: health scoring at 03:00 AM and baseline profiling at 03:05 AM.
+
+---
+
+## Plugin Development
+
+Drop a `.psm1` file into the `plugins/` folder. The tool auto-discovers it on next launch.
+
+Every plugin must export three functions:
+
+```powershell
+function Get-PluginManifest  { @{ Name='My Plugin'; TabName='🔌 My Tab'; Version='1.0'; Author='You' } }
+function Initialize-Plugin   { param([System.Windows.Forms.Panel]$ParentPanel, [hashtable]$Colors) }
+function Refresh-Plugin      { param([System.Windows.Forms.Panel]$DataPanel) }
+```
+
+See `plugins/PLUGIN-API.md` for the full contract and `plugins/smart-disk.psm1` as a reference implementation.
+
 ---
 
 ## Troubleshooting
@@ -169,18 +230,29 @@ The log includes OS info, PowerShell version, privilege level, and the full erro
 ```
 PC-Health-Monitor/
 |
-|-- PC-Health-Monitor.ps1          # Main GUI application (1286 lines, 7 regions)
+|-- PC-Health-Monitor.ps1          # Main GUI application (~1,844 lines, 8 regions)
 |-- install.ps1                    # One-liner installer (irm | iex)
 |-- Build-Exe.ps1                  # Compile to .exe via PS2EXE
 |-- PC-Cleanup-Rotem.ps1           # Standalone cleanup script
+|-- health_analyzer.py             # Predictive health score engine (Sprint 6)
+|-- baseline_engine.py             # Behavioral anomaly detection (Sprint 7)
+|-- Register-HealthTask.ps1        # Register analytics Scheduled Tasks
+|-- threat_intel.json              # Offline IOC database (7,600+ C2/botnet IPs)
 |-- Create-Desktop-Shortcut.bat    # Legacy shortcut setup
 |-- Launch-Monitor.vbs             # Silent launcher (auto-generated)
 |-- dist/                          # Compiled .exe output (git-ignored)
 |-- screenshots/                   # App screenshots for README
+|-- plugins/
+|   |-- PLUGIN-API.md              # Plugin development contract
+|   |-- smart-disk.psm1            # Reference plugin: S.M.A.R.T. disk health
+|-- scripts/
+|   |-- build_ioc_db.py            # IOC database builder (used by CI)
 |-- .github/
 |   |-- workflows/
 |       |-- validate.yml           # PSScriptAnalyzer CI on push & PR
-|-- PC-Health-Monitor-Roadmap.docx # Development roadmap & sprint plans
+|       |-- update-threat-intel.yml # Weekly IOC refresh via GitHub Actions
+|-- PC-Health-Monitor-Roadmap.docx # Development roadmap
+|-- PC-Health-Monitor-Vision-Sprints.docx  # Sprint 5-8 Claude Code prompt playbook
 |-- README.md
 |-- CLAUDE.md                      # Project architecture & AI guidelines
 |-- .gitignore
@@ -194,13 +266,19 @@ PC-Health-Monitor/
 - Runspace-based async execution prevents UI freezing during heavy operations
 - CIM queries optimized with property filters for minimal overhead
 - Tab-aware refresh: Network and Security tabs only refresh when visible
-- 3-second refresh cycle with separate counters for expensive operations (temps: 6s, security: 30s)
+- 3-second refresh cycle with separate counters for expensive operations (temps: 6s, security: 30s, plugins: 6s)
+
+**Intelligence Layer**
+- `health_analyzer.py`: pandas + linear regression on 30-day telemetry CSV → Health Score JSON
+- `baseline_engine.py`: per-process Z-score profiling → anomaly detection JSON
+- Both Python scripts run offline as Scheduled Tasks — zero network dependency
+- `threat_intel.json`: 7,607 C2/botnet indicators refreshed weekly via GitHub Actions CI pipeline
 
 **Code Quality**
-- **7 `#region` blocks** for logical separation: Logging Engine → Styles → Helpers → Core Logic → UI Init → Events → Execution
+- **8 `#region` blocks**: Logging → Styles → Plugin Loader → Helpers → Core Logic → UI Init → Events → Execution
 - Centralized `Write-Log` function with rotation, session headers, and ExceptionRecord capture
-- Helper functions for consistent UI styling (`New-Lbl`, `New-Btn`, `New-Pnl`, `Style-Grid`, etc.)
-- GDI+ custom painting: `Draw-CircleGauge`, `Draw-GlowBorder`, `Temp-Color`
+- Plugin loader is fully isolated — broken plugins never crash the host
+- `DoubleBuffered` set via .NET Reflection (protected property — cannot be set directly in PowerShell)
 - 100% ASCII-safe PowerShell — no em-dashes, no Unicode encoding issues
 
 **Safety**
@@ -211,19 +289,31 @@ PC-Health-Monitor/
 - Registry operations use native `reg.exe` for reliability
 
 **CI/CD**
-- GitHub Actions workflow validates every push and PR with `PSScriptAnalyzer`
-- Fails on Error-level findings — keeps the codebase clean
+- `validate.yml` — PSScriptAnalyzer on every push and PR, fails on Error-level findings
+- `update-threat-intel.yml` — weekly IOC database refresh from AbuseCH feeds, auto-commits to `main`
+
+---
+
+## Competitive Advantage
+
+| Feature | Task Manager | winutil | HWiNFO | **PC Health Monitor** |
+|---------|:---:|:---:|:---:|:---:|
+| Live Dashboard | ✅ | ❌ | ✅ | ✅ |
+| Zero Install | ✅ | ✅ | ❌ | ✅ |
+| Behavioral Baseline | ❌ | ❌ | ❌ | ✅ |
+| C2 Threat Intel (Offline) | ❌ | ❌ | ❌ | ✅ |
+| Predictive Health Score | ❌ | ❌ | ❌ | ✅ |
+| Plugin Ecosystem | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
 ## Planned Features
 
-- [ ] Network Intelligence Tab enhancements — GeoIP lookup, C2 detection signatures
-- [ ] Predictive Maintenance — time-series anomaly detection for disk fill rates
-- [ ] Smart Startup Classifier — AI-powered risk assessment with community database
-- [ ] S.M.A.R.T. Disk Health Monitor — drive health status and failure prediction
+- [ ] GeoIP lookup for network connections
 - [ ] Fleet Management — cloud agent for monitoring multiple machines
 - [ ] Duplicate File Scanner — intelligent duplicate detection across drives
+- [ ] S.M.A.R.T. enhanced view with failure prediction timeline
+- [ ] Smart Startup Classifier — AI-powered risk assessment
 
 ---
 
