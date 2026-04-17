@@ -1,0 +1,152 @@
+name: Build Installer
+
+# Triggers on version tags: v3.0, v3.1.0, etc.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g. v3.1.0)'
+        required: true
+        default: 'v3.0'
+
+permissions:
+  contents: write   # Required to create GitHub Releases and upload assets
+
+jobs:
+  build-installer:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Checkout ───────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── 2. Resolve version ────────────────────────────────────────────────
+      - name: Resolve version string
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ github.event.inputs.tag }}"
+          } else {
+            $tag = "${{ github.ref_name }}"
+          }
+          $ver = $tag.TrimStart('v')
+          echo "TAG=$tag"   >> $env:GITHUB_OUTPUT
+          echo "VER=$ver"   >> $env:GITHUB_OUTPUT
+          Write-Host "Building version: $ver (tag: $tag)"
+
+      # ── 3. Install Inno Setup ─────────────────────────────────────────────
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          $url  = "https://jrsoftware.org/download.php/is.exe"
+          $dest = "$env:TEMP\innosetup.exe"
+          Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+          Start-Process -FilePath $dest -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
+          # Add iscc.exe to PATH for subsequent steps
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6"
+          echo "$isccPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Host "Inno Setup installed at: $isccPath"
+
+      # ── 4. Patch version in .iss ──────────────────────────────────────────
+      - name: Patch AppVersion in installer.iss
+        shell: pwsh
+        run: |
+          $ver  = "${{ steps.version.outputs.VER }}"
+          $iss  = Get-Content installer.iss -Raw
+          $iss  = $iss -replace '#define AppVersion\s+"[^"]+"', "#define AppVersion   `"$ver`""
+          Set-Content installer.iss $iss -Encoding UTF8
+          Write-Host "AppVersion set to: $ver"
+
+      # ── 5. Create dist/ folder ────────────────────────────────────────────
+      - name: Create dist directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+      # ── 6. Build installer ────────────────────────────────────────────────
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          iscc installer.iss
+          $exe = Get-Item "dist\PC-Health-Monitor-Setup.exe"
+          Write-Host "Built: $($exe.Name) ($([math]::Round($exe.Length / 1MB, 2)) MB)"
+
+      # ── 7. Rename artifact with version ──────────────────────────────────
+      - name: Rename installer artifact
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.VER }}"
+          Rename-Item "dist\PC-Health-Monitor-Setup.exe" "dist\PC-Health-Monitor-$ver-Setup.exe"
+          Write-Host "Renamed to: PC-Health-Monitor-$ver-Setup.exe"
+
+      # ── 8. Generate release notes ─────────────────────────────────────────
+      - name: Generate release notes
+        id: release_notes
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.VER }}"
+          $notes = @"
+          ## PC Health Monitor v$ver
+
+          ### Installation
+          1. Download \`PC-Health-Monitor-$ver-Setup.exe\` below
+          2. Run the installer (no admin required for personal install)
+          3. Launch from Desktop shortcut or Start Menu
+
+          ### Requirements
+          - Windows 10 or 11
+          - PowerShell 5.1+ (built into Windows)
+          - Python 3.8+ with \`pandas\` and \`numpy\` (optional — for analytics engine)
+
+          ### What's Included
+          - Real-time CPU / RAM / Disk dashboard with GDI+ circular gauges
+          - Offline threat intelligence (7,600+ C2/botnet IOCs — no cloud calls)
+          - Predictive Health Score powered by Python analytics
+          - Behavioral Baseline Engine with Z-score anomaly detection
+          - Plugin architecture — drop \`.psm1\` files to add tabs
+          - Security audit, startup manager, junk file cleaner
+
+          ### Quick Start After Install
+          \`\`\`powershell
+          # Optional: enable analytics engine
+          pip install pandas numpy
+          .\Register-HealthTask.ps1
+          \`\`\`
+
+          ---
+          *Zero dependencies. No telemetry. 100% open source.*
+          "@
+          # Write to file to avoid escaping issues
+          $notes | Out-File -FilePath "RELEASE_NOTES.md" -Encoding UTF8
+          echo "notes_file=RELEASE_NOTES.md" >> $env:GITHUB_OUTPUT
+
+      # ── 9. Create GitHub Release + upload asset ───────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: PC Health Monitor v${{ steps.version.outputs.VER }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.TAG, '-') }}
+          files: dist/PC-Health-Monitor-${{ steps.version.outputs.VER }}-Setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 10. Summary ───────────────────────────────────────────────────────
+      - name: Job summary
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.VER }}"
+          $exe = Get-Item "dist\PC-Health-Monitor-$ver-Setup.exe"
+          $sizeMB = [math]::Round($exe.Length / 1MB, 2)
+          Write-Host "✅ Release PC Health Monitor v$ver published"
+          Write-Host "   Installer size: $sizeMB MB"
+          Write-Host "   Asset: PC-Health-Monitor-$ver-Setup.exe"
