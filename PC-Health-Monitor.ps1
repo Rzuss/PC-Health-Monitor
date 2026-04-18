@@ -380,7 +380,14 @@ function Get-BandwidthStats {
 }
 
 function Get-SecurityAudit {
-    $audit = @{ Defender = @{}; Firewall = @{}; Updates = 0; Ports = @() }
+    # Fast portions: Defender + Firewall + Registry update date (< 1 second)
+    $audit = @{
+        Defender          = @{}
+        Firewall          = @{}
+        Updates           = -1      # -1 = not yet checked via COM
+        UpdateLastInstall = ''
+        UpdateServiceOK   = $true
+    }
 
     # Defender
     try {
@@ -398,24 +405,32 @@ function Get-SecurityAudit {
         foreach ($p in $fw) { $audit.Firewall[$p.Name] = $p.Enabled }
     } catch { Write-Log -Message 'Firewall query failed' -Level ERROR -ExceptionRecord $_ }
 
-    # Pending Updates via COM (may be slow; wrapped in try/catch)
+    # Last successful update install date (registry — fast, no COM needed)
     try {
-        $searcher = New-Object -ComObject Microsoft.Update.Searcher -ErrorAction Stop
-        $result   = $searcher.Search('IsInstalled=0 and Type=Software')
-        $audit.Updates = $result.Updates.Count
-    } catch { Write-Log -Message 'Windows Update query failed' -Level WARN -ExceptionRecord $_ }
+        $wuKey  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install'
+        $lastTs = (Get-ItemProperty $wuKey -ErrorAction Stop).LastSuccessTime
+        if ($lastTs) {
+            $audit.UpdateLastInstall = [datetime]::ParseExact(
+                $lastTs, 'yyyy-MM-dd HH:mm:ss', $null).ToString('dd MMM yyyy')
+        }
+    } catch { $audit.UpdateLastInstall = 'Unknown' }
 
-    # Listening Ports (top 30, sorted by port)
+    # Windows Update service health (fast)
     try {
-        $listeners = Get-NetTCPConnection -State Listen -ErrorAction Stop
-        $procs = Get-Process | Select-Object Id, ProcessName
-        $pm = @{}; foreach ($p in $procs) { $pm[$p.Id] = $p.ProcessName }
-        $audit.Ports = $listeners |
-            Select-Object LocalPort,
-                @{N='Process'; E={if ($pm[$_.OwningProcess]) { $pm[$_.OwningProcess] } else { 'System' }}},
-                @{N='PID';     E={$_.OwningProcess}} |
-            Sort-Object LocalPort | Select-Object -First 30
-    } catch { Write-Log -Message 'Listening ports query failed' -Level WARN -ExceptionRecord $_ }
+        $svc = Get-Service -Name wuauserv -ErrorAction Stop
+        $audit.UpdateServiceOK = ($svc.Status -eq 'Running' -or $svc.StartType -ne 'Disabled')
+    } catch { $audit.UpdateServiceOK = $false }
+
+    # Pending update count via COM (slow — only called on explicit SCAN NOW)
+    # Auto-refresh (Do-Refresh) skips this by passing $SkipSlowCheck=$true
+    param([switch]$SkipSlowCheck)
+    if (-not $SkipSlowCheck) {
+        try {
+            $searcher      = New-Object -ComObject Microsoft.Update.Searcher -ErrorAction Stop
+            $result        = $searcher.Search('IsInstalled=0 and Type=Software')
+            $audit.Updates = $result.Updates.Count
+        } catch { Write-Log -Message 'Windows Update COM query failed' -Level WARN -ExceptionRecord $_ }
+    }
 
     return $audit
 }
@@ -424,10 +439,7 @@ function Export-SystemReport {
     $ts   = Get-Date -Format 'yyyy-MM-dd_HH-mm'
     $path = Join-Path $env:USERPROFILE "Desktop\PCHealth-Report-$ts.html"
     $live = Get-LiveData
-    $sec  = Get-SecurityAudit
-    $portsHtml = ($sec.Ports | ForEach-Object {
-        "<tr><td>$($_.LocalPort)</td><td>$($_.Process)</td><td>$($_.PID)</td></tr>"
-    }) -join "`n"
+    $sec  = Get-SecurityAudit -SkipSlowCheck
     $html = @"
 <!DOCTYPE html><html><head><meta charset='utf-8'>
 <title>PC Health Report</title>
@@ -452,8 +464,11 @@ $(if ($sec.Defender.Enabled) {'<tr><td>Defender</td><td class=ok>PROTECTED</td><
 <tr><td>Firewall (Private)</td><td $(if ($sec.Firewall.Private) {'class=ok>ON'} else {'class=crit>OFF'})></td></tr>
 <tr><td>Firewall (Public)</td><td $(if ($sec.Firewall.Public)  {'class=ok>ON'} else {'class=crit>OFF'})></td></tr>
 </table>
-<h2>Open Listening Ports</h2><table>
-<tr><th>PORT</th><th>PROCESS</th><th>PID</th></tr>$portsHtml
+<h2>Windows Update</h2><table>
+<tr><th>Item</th><th>Status</th></tr>
+<tr><td>Last Installed</td><td>$($sec.UpdateLastInstall)</td></tr>
+<tr><td>Pending Updates</td><td>$(if ($sec.Updates -ge 0) { $sec.Updates } else { 'Not checked' })</td></tr>
+<tr><td>Update Service</td><td>$(if ($sec.UpdateServiceOK) {'OK'} else {'CHECK REQUIRED'})</td></tr>
 </table>
 <div style='color:#475569;font-size:0.8em;margin-top:24px'>PC Health Monitor -- https://github.com/Rzuss/PC-Health-Monitor</div>
 </body></html>
@@ -1141,10 +1156,16 @@ function Update-SecurityCards($audit) {
 
     # Updates card
     $upd = $audit.Updates
-    $script:updCountLbl.Text      = $upd.ToString()
-    $script:updCountLbl.ForeColor = if ($upd -eq 0) { $C.Green }
-                                    elseif ($upd -le 5) { $C.Yellow }
-                                    else { $C.Red }
+    if ($upd -eq -1) {
+        $script:updCountLbl.Text      = '--'
+        $script:updCountLbl.ForeColor = $C.Dim
+    } elseif ($upd -eq 0) {
+        $script:updCountLbl.Text      = 'UP TO DATE'
+        $script:updCountLbl.ForeColor = $C.Green
+    } else {
+        $script:updCountLbl.Text      = "$upd PENDING"
+        $script:updCountLbl.ForeColor = if ($upd -le 5) { $C.Yellow } else { $C.Red }
+    }
 
     # Firewall card labels (Domain / Private / Public)
     foreach ($profile in @('Domain', 'Private', 'Public')) {
@@ -1154,10 +1175,11 @@ function Update-SecurityCards($audit) {
         $lbl.ForeColor = if ($on) { $C.Green } else { $C.Red }
     }
 
-    # Ports grid
-    $script:portsGrid.Rows.Clear()
-    foreach ($p in $audit.Ports) {
-        $script:portsGrid.Rows.Add($p.LocalPort, $p.Process, $p.PID)
+    # Windows Update status panel
+    if ($null -ne $script:wuStatusLbl) {
+        $script:wuLastLbl.Text    = "Last installed: $($audit.UpdateLastInstall)"
+        $script:wuSvcLbl.Text     = "Service: $(if ($audit.UpdateServiceOK) {'Running'} else {'CHECK REQUIRED'})"
+        $script:wuSvcLbl.ForeColor = if ($audit.UpdateServiceOK) { $C.Green } else { $C.Red }
     }
 
     # Export security snapshot for Python health analytics
@@ -1735,34 +1757,106 @@ $script:fwLabels['Public']  = New-Lbl "Public : --"  10 76 178 18 9 $false $C.Su
 $fwCard.Controls.AddRange(@($script:fwLabels['Domain'], $script:fwLabels['Private'], $script:fwLabels['Public']))
 $secTab.Controls.Add($fwCard)
 
-# -- Open Ports DataGridView ---------------------------------------------
-$secTab.Controls.Add((New-Lbl "  Open Listening Ports" 15 150 400 22 10 $true $C.Blue))
-$secTab.Controls.Add((New-Pnl 17 172 200 1 $C.Blue))
+# -- Windows Update Status Panel -----------------------------------------
+$secTab.Controls.Add((New-Lbl "  Windows Update Status" 15 150 400 22 10 $true $C.Blue))
+$secTab.Controls.Add((New-Pnl 17 172 1018 1 $C.Blue))
 
-$script:portsGrid = New-Object Windows.Forms.DataGridView
-$script:portsGrid.Location = [Drawing.Point]::new(15, 176)
-$script:portsGrid.Size     = [Drawing.Size]::new(1020, 315)
-Style-Grid $script:portsGrid
-$script:portsGrid.ColumnHeadersHeight = 28
-$script:portsGrid.RowTemplate.Height  = 22
-foreach ($spc in @(
-    @{N="Port";    H="PORT";    W=80 },
-    @{N="Process"; H="PROCESS"; W=180},
-    @{N="PID";     H="PID";     W=60 }
-)) {
-    $sc = New-Object Windows.Forms.DataGridViewTextBoxColumn
-    $sc.Name = $spc.N; $sc.HeaderText = $spc.H; $sc.Width = $spc.W
-    $sc.SortMode = [Windows.Forms.DataGridViewColumnSortMode]::NotSortable
-    [void]$script:portsGrid.Columns.Add($sc)
-}
-$secTab.Controls.Add($script:portsGrid)
+$wuPanel = New-Pnl 15 180 1020 180 $C.BgCard
+$script:wuStatusLbl = New-Lbl "-- CHECKING --" 20 20 600 42 18 $true $C.SubText
+$script:wuLastLbl   = New-Lbl "Last installed: --" 20 72 500 20 9 $false $C.Dim
+$script:wuSvcLbl    = New-Lbl "Service: --"        20 96 500 20 9 $false $C.Dim
+$wuPanel.Controls.AddRange(@($script:wuStatusLbl, $script:wuLastLbl, $script:wuSvcLbl))
+$secTab.Controls.Add($wuPanel)
+
+# Override updCountLbl to also update wuStatusLbl in sync
+# (wuStatusLbl is the large status in the panel, updCountLbl is the card)
+# We hook Update-SecurityCards to keep both in sync via the audit data
 
 # -- Bottom button row ---------------------------------------------------
-$scanNowBtn = New-Btn "SCAN NOW"      15  502 140 36 $C.BgCard2 $C.Blue
-$exportBtn  = New-Btn "EXPORT REPORT" 875 502 160 36 $C.Purple  $C.White
+$scanNowBtn = New-Btn "SCAN NOW"      15  375 140 36 $C.BgCard2 $C.Blue
+$exportBtn  = New-Btn "EXPORT REPORT" 875 375 160 36 $C.Purple  $C.White
 
-$scanNowBtn.Add_Click({ Update-SecurityCards (Get-SecurityAudit) })
-$exportBtn.Add_Click({  Export-SystemReport })
+$scanNowBtn.Add_Click({
+    $scanNowBtn.Enabled             = $false
+    $scanNowBtn.Text                = "SCANNING..."
+    $script:wuStatusLbl.Text        = "SCANNING..."
+    $script:wuStatusLbl.ForeColor   = $C.Yellow
+    [Windows.Forms.Application]::DoEvents()
+
+    # Run full audit (including slow COM update check) in background Runspace
+    $capturedForm  = $form
+    $capturedScan  = $scanNowBtn
+
+    $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+    $rs.ApartmentState = 'STA'; $rs.ThreadOptions = 'ReuseThread'; $rs.Open()
+    $ps = [System.Management.Automation.PowerShell]::Create()
+    $ps.Runspace = $rs
+
+    [void]$ps.AddScript({
+        # Re-run security audit including slow COM check
+        $a = @{ Defender = @{}; Firewall = @{}; Updates = -1; UpdateLastInstall = ''; UpdateServiceOK = $true }
+        try {
+            $mp = Get-MpComputerStatus -ErrorAction Stop
+            $a.Defender = @{ Enabled = $mp.AntivirusEnabled; LastScan = $mp.QuickScanEndTime; SignatureAge = $mp.AntivirusSignatureAge }
+        } catch {}
+        try {
+            $fw = Get-NetFirewallProfile -ErrorAction Stop
+            foreach ($p in $fw) { $a.Firewall[$p.Name] = $p.Enabled }
+        } catch {}
+        try {
+            $wuKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install'
+            $lastTs = (Get-ItemProperty $wuKey -ErrorAction Stop).LastSuccessTime
+            if ($lastTs) { $a.UpdateLastInstall = [datetime]::ParseExact($lastTs,'yyyy-MM-dd HH:mm:ss',$null).ToString('dd MMM yyyy') }
+        } catch { $a.UpdateLastInstall = 'Unknown' }
+        try {
+            $svc = Get-Service -Name wuauserv -ErrorAction Stop
+            $a.UpdateServiceOK = ($svc.Status -eq 'Running' -or $svc.StartType -ne 'Disabled')
+        } catch { $a.UpdateServiceOK = $false }
+        try {
+            $searcher = New-Object -ComObject Microsoft.Update.Searcher -ErrorAction Stop
+            $result   = $searcher.Search('IsInstalled=0 and Type=Software')
+            $a.Updates = $result.Updates.Count
+        } catch { $a.Updates = -1 }
+        return $a
+    })
+
+    $null = $ps.BeginInvoke($null, (New-Object System.Management.Automation.PSDataCollection[psobject]), $null,
+        [System.AsyncCallback]{
+            param($asyncResult)
+            try {
+                $auditResult = $ps.EndInvoke($asyncResult)[0]
+                $capturedForm.Invoke([Action]{
+                    Update-SecurityCards $auditResult
+
+                    # Update large status label
+                    $upd = $auditResult.Updates
+                    if ($upd -eq -1) {
+                        $script:wuStatusLbl.Text      = 'COULD NOT CHECK'
+                        $script:wuStatusLbl.ForeColor = $C.Yellow
+                    } elseif ($upd -eq 0) {
+                        $script:wuStatusLbl.Text      = 'SYSTEM UP TO DATE'
+                        $script:wuStatusLbl.ForeColor = $C.Green
+                    } else {
+                        $script:wuStatusLbl.Text      = "$upd UPDATE$(if($upd -gt 1){'S'}) AVAILABLE"
+                        $script:wuStatusLbl.ForeColor = if ($upd -le 5) { $C.Yellow } else { $C.Red }
+                    }
+                    $capturedScan.Enabled = $true
+                    $capturedScan.Text    = 'SCAN NOW'
+                })
+            } catch {
+                $capturedForm.Invoke([Action]{
+                    $script:wuStatusLbl.Text      = 'SCAN ERROR'
+                    $script:wuStatusLbl.ForeColor = $C.Red
+                    $capturedScan.Enabled = $true
+                    $capturedScan.Text    = 'SCAN NOW'
+                })
+            } finally {
+                $ps.Dispose(); $rs.Dispose()
+            }
+        }, $null)
+})
+
+$exportBtn.Add_Click({ Export-SystemReport })
 
 $secTab.Controls.AddRange(@($scanNowBtn, $exportBtn))
 $tabs.TabPages.Add($secTab)
@@ -1952,8 +2046,10 @@ function Do-Refresh {
         }
 
         # Security tab (every 10 ticks = ~30 sec, only when tab is visible)
+        # SkipSlowCheck: omits the COM Windows Update query (done only on SCAN NOW)
         if ($script:tickCount % 10 -eq 0 -and $script:tabs.SelectedTab -eq $secTab) {
-            Update-SecurityCards (Get-SecurityAudit)
+            $fastAudit = Get-SecurityAudit -SkipSlowCheck
+            Update-SecurityCards $fastAudit
         }
 
         # Process grid (every 2 ticks = ~6 sec)
