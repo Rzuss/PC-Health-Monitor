@@ -530,6 +530,109 @@ function Invoke-KillProcess {
 }
 #endregion
 
+# ── DataEngine: persistent background runspace — all blocking I/O lives here ──
+$script:DataEngineRS = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+$script:DataEngineRS.ApartmentState = 'MTA'
+$script:DataEngineRS.ThreadOptions  = 'Default'
+$script:DataEngineRS.Open()
+
+$script:DataEnginePS = [System.Management.Automation.PowerShell]::Create()
+$script:DataEnginePS.Runspace = $script:DataEngineRS
+
+[void]$script:DataEnginePS.AddScript({
+    param($cache, $totalRAMGB)
+    $tick = 0
+    while ($true) {
+        # ── CPU + RAM (every cycle, ~3 sec) ─────────────────────────────────
+        try {
+            $osNow  = Get-CimInstance Win32_OperatingSystem -Property FreePhysicalMemory -ErrorAction Stop
+            $cpuNow = Get-CimInstance Win32_Processor -Property LoadPercentage -ErrorAction Stop
+            $freeRAM = [math]::Round($osNow.FreePhysicalMemory / 1MB, 1)
+            $usedRAM = [math]::Round($totalRAMGB - $freeRAM, 1)
+            $cache['CpuPct']  = [int]$cpuNow.LoadPercentage
+            $cache['RamPct']  = [int]([math]::Round(($usedRAM / $totalRAMGB) * 100))
+            $cache['UsedRAM'] = $usedRAM
+        } catch { }
+
+        # ── Disk C: (every 5 cycles = ~15 sec) ──────────────────────────────
+        if ($tick % 5 -eq 0) {
+            try {
+                $dInfo  = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'" `
+                          -Property Size, FreeSpace -ErrorAction Stop
+                $dTotal = [math]::Round($dInfo.Size / 1GB, 1)
+                $dFree  = [math]::Round($dInfo.FreeSpace / 1GB, 1)
+                $dUsed  = [math]::Round($dTotal - $dFree, 1)
+                $cache['DPct']  = [int]([math]::Round(($dUsed / $dTotal) * 100))
+                $cache['DUsed'] = $dUsed
+                $cache['DFree'] = $dFree
+                $cache['DTotal']= $dTotal
+            } catch { }
+        }
+
+        # ── Hardware temps — LibreHardwareMonitor WMI (every 2 cycles = ~6 sec) ──
+        if ($tick % 2 -eq 0) {
+            try {
+                $sensors = Get-CimInstance -Namespace root\LibreHardwareMonitor `
+                           -ClassName Sensor -Filter "SensorType='Temperature'" -ErrorAction Stop
+                $cpuT = ($sensors | Where-Object { $_.Name -match 'CPU' } |
+                         Sort-Object Value -Descending | Select-Object -First 1).Value
+                $gpuT = ($sensors | Where-Object { $_.Name -match 'GPU' } |
+                         Sort-Object Value -Descending | Select-Object -First 1).Value
+                $cache['Temps'] = @{
+                    Available = $true
+                    CPU = if ($cpuT) { [math]::Round($cpuT, 1) } else { $null }
+                    GPU = if ($gpuT) { [math]::Round($gpuT, 1) } else { $null }
+                }
+            } catch {
+                $cache['Temps'] = @{ Available = $false; CPU = $null; GPU = $null }
+            }
+        }
+
+        # ── Process list (every 2 cycles = ~6 sec) ──────────────────────────
+        if ($tick % 2 -eq 0) {
+            try {
+                $procs = Get-Process -ErrorAction SilentlyContinue |
+                         Sort-Object WorkingSet64 -Descending |
+                         Select-Object -First 25 Name, Id,
+                             @{N='RamMB';  E={[math]::Round($_.WorkingSet64 / 1MB, 1)}},
+                             @{N='CpuSec'; E={[math]::Round($_.CPU, 1)}}
+                $cache['Procs'] = @($procs)
+            } catch { $cache['Procs'] = @() }
+        }
+
+        # ── Security audit fast (every 10 cycles = ~30 sec) ─────────────────
+        if ($tick % 10 -eq 1) {
+            try {
+                $mp    = Get-MpComputerStatus -ErrorAction Stop
+                $fw    = Get-NetFirewallProfile -ErrorAction Stop
+                $wuKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install'
+                $lastTs = (Get-ItemProperty $wuKey -ErrorAction Stop).LastSuccessTime
+                $lastInstall = if ($lastTs) {
+                    [datetime]::ParseExact($lastTs, 'yyyy-MM-dd HH:mm:ss', $null).ToString('dd MMM yyyy')
+                } else { 'Unknown' }
+                $svcOK = (Get-Service wuauserv -ErrorAction Stop).Status -eq 'Running'
+                $fwHash = @{}
+                foreach ($p in $fw) { $fwHash[$p.Name] = $p.Enabled }
+                $cache['SecAudit'] = @{
+                    Defender          = @{ Enabled = $mp.AntivirusEnabled; LastScan = $mp.QuickScanEndTime }
+                    Firewall          = $fwHash
+                    Updates           = -1
+                    UpdateLastInstall = $lastInstall
+                    UpdateServiceOK   = $svcOK
+                }
+            } catch { }
+        }
+
+        $cache['LastUpdated'] = [DateTime]::Now
+        $cache['Ready']       = $true
+        $tick++
+        Start-Sleep -Seconds 3
+    }
+}).AddArgument($script:DataCache).AddArgument($script:totalRAM)
+
+$script:DataEngineHandle = $script:DataEnginePS.BeginInvoke()
+Write-Log -Message "DataEngine background worker started (MTA runspace)" -Level INFO
+
 #region 5 - UI Initialization
 # -- MAIN FORM -----------------------------------------------------------
 $form = New-Object Windows.Forms.Form
@@ -964,6 +1067,78 @@ $killCol.DefaultCellStyle.Alignment  = "MiddleCenter"
 $killCol.HeaderCell.Style.ForeColor = $C.Red
 
 $Script:Anomalies = @{}
+
+# Update-ProcessGrid: reads from DataEngine cache — zero blocking, UI thread only
+function Update-ProcessGrid($procs) {
+    if ($null -eq $procs -or $procs.Count -eq 0) { return }
+
+    # Anomaly data (file read — fast, local JSON)
+    $anomalyPath = Join-Path $env:LOCALAPPDATA 'PC-Health-Monitor\PCHealth-Anomalies.json'
+    $Script:Anomalies = @{}
+    if (Test-Path $anomalyPath) {
+        try {
+            $aData = Get-Content $anomalyPath -Raw -ErrorAction Stop | ConvertFrom-Json
+            foreach ($a in @($aData)) {
+                if ($a.metric -eq 'process_ram_mb' -and $a.process) {
+                    $Script:Anomalies[$a.process] = @{
+                        pct = [int]$a.pct_above; z = [double]$a.z_score
+                        current = [double]$a.current; mean = [double]$a.mean; std = [double]$a.std
+                    }
+                }
+            }
+        } catch { }
+    }
+
+    $pGrid.SuspendLayout()
+    $pGrid.Rows.Clear()
+    foreach ($p in $procs) {
+        $ramVal = if ($p.PSObject.Properties['RamMB'])  { $p.RamMB  } else { $p.'RAM MB' }
+        $cpuVal = if ($p.PSObject.Properties['CpuSec']) { $p.CpuSec } else { $p.'CPU sec' }
+        $ri  = $pGrid.Rows.Add($p.Name, $ramVal, $cpuVal, $p.Id, '')
+        $row = $pGrid.Rows[$ri]
+        if ($ramVal -gt 500)     { $row.DefaultCellStyle.ForeColor = $C.Red }
+        elseif ($ramVal -gt 200) { $row.DefaultCellStyle.ForeColor = $C.Yellow }
+        $pName = $row.Cells[0].Value.ToString().ToLower()
+        if ($script:ProtectedProcesses -contains $pName) {
+            $row.Cells[5].Value           = "--"
+            $row.Cells[5].Style.ForeColor = $C.Dim
+            $row.Cells[5].Style.BackColor = $C.BgCard
+            $row.Cells[5].ReadOnly        = $true
+            $row.Cells[5].ToolTipText     = "System process - protected"
+        }
+        if ($Script:Anomalies.ContainsKey($p.Name)) {
+            $a = $Script:Anomalies[$p.Name]
+            $row.Cells[4].Value           = [char]0x26A0 + " +$($a.pct)%"
+            $row.Cells[4].Style.ForeColor = $C.Anomaly
+            $row.DefaultCellStyle.Font    = $script:MonoBold
+        }
+    }
+    $pGrid.ResumeLayout()
+
+    # Telemetry CSV append
+    $TelemetryPath = Join-Path $env:TEMP 'PCHealth-Telemetry.csv'
+    if (Test-Path $TelemetryPath) {
+        try {
+            $csvFile = Get-Item $TelemetryPath -ErrorAction SilentlyContinue
+            if ($csvFile -and $csvFile.Length -gt 614400) {
+                $lines = Get-Content $TelemetryPath -ErrorAction SilentlyContinue
+                if ($lines -and $lines.Count -gt 2001) {
+                    (@($lines[0]) + @($lines[2001..($lines.Count - 1)])) |
+                        Out-File $TelemetryPath -Encoding UTF8 -ErrorAction SilentlyContinue
+                }
+            }
+            $ts   = Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'
+            $rows = foreach ($p in $procs) {
+                $pn  = $p.Name -replace ',', ''
+                $ram = if ($p.PSObject.Properties['RamMB'])  { $p.RamMB  } else { $p.'RAM MB' }
+                $cpu = if ($p.PSObject.Properties['CpuSec']) { $p.CpuSec } else { $p.'CPU sec' }
+                "$ts,process_ram_mb,$ram,$pn,$($p.Id)"
+                "$ts,process_cpu_pct,$cpu,$pn,$($p.Id)"
+            }
+            $rows | Out-File $TelemetryPath -Append -Encoding UTF8 -ErrorAction SilentlyContinue
+        } catch { }
+    }
+}
 
 function Refresh-ProcessGrid {
     $procs = Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 25 `
@@ -1594,83 +1769,82 @@ $scanNowBtn = New-Btn "SCAN NOW"      15  375 140 36 $C.BgCard2 $C.Blue
 $exportBtn  = New-Btn "EXPORT REPORT" 875 375 160 36 $C.Purple  $C.White
 
 $scanNowBtn.Add_Click({
+    # BUG 3 FIX: polling timer replaces unreliable BeginInvoke callback
     $scanNowBtn.Enabled             = $false
-    $scanNowBtn.Text                = "SCANNING..."
-    $script:wuStatusLbl.Text        = "SCANNING..."
+    $scanNowBtn.Text                = 'SCANNING...'
+    $script:wuStatusLbl.Text        = 'SCANNING...'
     $script:wuStatusLbl.ForeColor   = $C.Yellow
-    [Windows.Forms.Application]::DoEvents()
 
-    # Run full audit (including slow COM update check) in background Runspace
-    $capturedForm  = $form
-    $capturedScan  = $scanNowBtn
-
-    $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
-    $rs.ApartmentState = 'STA'; $rs.ThreadOptions = 'ReuseThread'; $rs.Open()
-    $ps = [System.Management.Automation.PowerShell]::Create()
-    $ps.Runspace = $rs
-
-    [void]$ps.AddScript({
-        # Re-run security audit including slow COM check
-        $a = @{ Defender = @{}; Firewall = @{}; Updates = -1; UpdateLastInstall = ''; UpdateServiceOK = $true }
+    # Background runspace runs slow COM Update query only
+    $scanRS = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+    $scanRS.ApartmentState = 'STA'; $scanRS.ThreadOptions = 'ReuseThread'; $scanRS.Open()
+    $scanPS = [System.Management.Automation.PowerShell]::Create()
+    $scanPS.Runspace = $scanRS
+    [void]$scanPS.AddScript({
+        $count = -1
         try {
-            $mp = Get-MpComputerStatus -ErrorAction Stop
-            $a.Defender = @{ Enabled = $mp.AntivirusEnabled; LastScan = $mp.QuickScanEndTime; SignatureAge = $mp.AntivirusSignatureAge }
-        } catch {}
-        try {
-            $fw = Get-NetFirewallProfile -ErrorAction Stop
-            foreach ($p in $fw) { $a.Firewall[$p.Name] = $p.Enabled }
-        } catch {}
-        try {
-            $wuKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install'
-            $lastTs = (Get-ItemProperty $wuKey -ErrorAction Stop).LastSuccessTime
-            if ($lastTs) { $a.UpdateLastInstall = [datetime]::ParseExact($lastTs,'yyyy-MM-dd HH:mm:ss',$null).ToString('dd MMM yyyy') }
-        } catch { $a.UpdateLastInstall = 'Unknown' }
-        try {
-            $svc = Get-Service -Name wuauserv -ErrorAction Stop
-            $a.UpdateServiceOK = ($svc.Status -eq 'Running' -or $svc.StartType -ne 'Disabled')
-        } catch { $a.UpdateServiceOK = $false }
-        try {
-            $searcher = New-Object -ComObject Microsoft.Update.Searcher -ErrorAction Stop
-            $result   = $searcher.Search('IsInstalled=0 and Type=Software')
-            $a.Updates = $result.Updates.Count
-        } catch { $a.Updates = -1 }
-        return $a
+            $s     = New-Object -ComObject Microsoft.Update.Searcher -ErrorAction Stop
+            $count = $s.Search('IsInstalled=0 and Type=Software').Updates.Count
+        } catch { }
+        return $count
     })
+    $script:_ScanPS     = $scanPS
+    $script:_ScanRS     = $scanRS
+    $script:_ScanHandle = $scanPS.BeginInvoke()
 
-    $null = $ps.BeginInvoke($null, (New-Object System.Management.Automation.PSDataCollection[psobject]), $null,
-        [System.AsyncCallback]{
-            param($asyncResult)
-            try {
-                $auditResult = $ps.EndInvoke($asyncResult)[0]
-                $capturedForm.Invoke([Action]{
-                    Update-SecurityCards $auditResult
+    # Poll every 500ms — never blocks the UI thread
+    $script:_ScanPollTimer = New-Object Windows.Forms.Timer
+    $script:_ScanPollTimer.Interval = 500
+    $script:_ScanPollTimer.Add_Tick({
+        $state = $script:_ScanPS.InvocationStateInfo.State
+        if ($state -eq [System.Management.Automation.PSInvocationState]::Running) { return }
 
-                    # Update large status label
-                    $upd = $auditResult.Updates
-                    if ($upd -eq -1) {
-                        $script:wuStatusLbl.Text      = 'COULD NOT CHECK'
-                        $script:wuStatusLbl.ForeColor = $C.Yellow
-                    } elseif ($upd -eq 0) {
-                        $script:wuStatusLbl.Text      = 'SYSTEM UP TO DATE'
-                        $script:wuStatusLbl.ForeColor = $C.Green
-                    } else {
-                        $script:wuStatusLbl.Text      = "$upd UPDATE$(if($upd -gt 1){'S'}) AVAILABLE"
-                        $script:wuStatusLbl.ForeColor = if ($upd -le 5) { $C.Yellow } else { $C.Red }
-                    }
-                    $capturedScan.Enabled = $true
-                    $capturedScan.Text    = 'SCAN NOW'
-                })
-            } catch {
-                $capturedForm.Invoke([Action]{
-                    $script:wuStatusLbl.Text      = 'SCAN ERROR'
-                    $script:wuStatusLbl.ForeColor = $C.Red
-                    $capturedScan.Enabled = $true
-                    $capturedScan.Text    = 'SCAN NOW'
-                })
-            } finally {
-                $ps.Dispose(); $rs.Dispose()
+        $script:_ScanPollTimer.Stop()
+        $script:_ScanPollTimer.Dispose()
+
+        try {
+            $updCount = [int]($script:_ScanPS.EndInvoke($script:_ScanHandle)[0])
+
+            # Merge with current DataEngine cache for full audit object
+            $audit = if ($null -ne $script:DataCache['SecAudit']) {
+                @{
+                    Defender          = $script:DataCache['SecAudit'].Defender
+                    Firewall          = $script:DataCache['SecAudit'].Firewall
+                    Updates           = $updCount
+                    UpdateLastInstall = $script:DataCache['SecAudit'].UpdateLastInstall
+                    UpdateServiceOK   = $script:DataCache['SecAudit'].UpdateServiceOK
+                }
+            } else {
+                $fa = Get-SecurityAudit -SkipSlowCheck
+                $fa['Updates'] = $updCount
+                $fa
             }
-        }, $null)
+
+            Update-SecurityCards $audit
+
+            # Large status label
+            if ($updCount -eq -1) {
+                $script:wuStatusLbl.Text      = 'COULD NOT CHECK'
+                $script:wuStatusLbl.ForeColor = $C.Yellow
+            } elseif ($updCount -eq 0) {
+                $script:wuStatusLbl.Text      = 'SYSTEM UP TO DATE'
+                $script:wuStatusLbl.ForeColor = $C.Green
+            } else {
+                $script:wuStatusLbl.Text      = "$updCount UPDATE$(if($updCount -gt 1){'S'}) AVAILABLE"
+                $script:wuStatusLbl.ForeColor = if ($updCount -le 5) { $C.Yellow } else { $C.Red }
+            }
+        } catch {
+            $script:wuStatusLbl.Text      = 'SCAN ERROR'
+            $script:wuStatusLbl.ForeColor = $C.Red
+            Write-Log -Message 'SCAN NOW polling failed' -Level ERROR -ExceptionRecord $_
+        } finally {
+            $script:_ScanPS.Dispose()
+            $script:_ScanRS.Dispose()
+            $scanNowBtn.Enabled = $true
+            $scanNowBtn.Text    = 'SCAN NOW'
+        }
+    })
+    $script:_ScanPollTimer.Start()
 })
 
 $exportBtn.Add_Click({ Export-SystemReport })
@@ -1784,7 +1958,7 @@ $trayExit.Add_Click({
 $script:cpuHighTicks       = 0
 $script:cpuAlertFired      = $false
 $script:lastRamAlert       = [DateTime]::MinValue
-$script:TempRefreshCounter = 0
+# (TempRefreshCounter removed — Do-Refresh now reads from DataEngine cache)
 $script:lastDiskAlert = [DateTime]::MinValue
 $script:trayHintShown = $false
 
@@ -1795,76 +1969,74 @@ $script:tickCount = 0
 
 function Do-Refresh {
     try {
-        $d = Get-LiveData
+        # Read from DataEngine cache — zero blocking calls on UI thread
+        $d = $script:DataCache
+        if (-not $d['Ready']) { return }   # Engine still warming up — skip this tick
 
         # CPU card
-        $UI["CpuValLbl"].Text      = "$($d.CpuPct)%"
-        $UI["CpuPctLbl"].Text      = "$($d.CpuPct)%"
-        $UI["CpuPctLbl"].ForeColor = Pct-Color $d.CpuPct
-        $UI["CpuCard"].Tag.Pct     = $d.CpuPct
+        $UI["CpuValLbl"].Text      = "$($d['CpuPct'])%"
+        $UI["CpuPctLbl"].Text      = "$($d['CpuPct'])%"
+        $UI["CpuPctLbl"].ForeColor = Pct-Color $d['CpuPct']
+        $UI["CpuCard"].Tag.Pct     = $d['CpuPct']
         $UI["CpuCard"].Invalidate()
-        $fw = [math]::Max(0, [math]::Min(112, [int](($d.CpuPct / 100.0) * 112)))
+        $fw = [math]::Max(0, [math]::Min(112, [int](($d['CpuPct'] / 100.0) * 112)))
         $UI["CpuBarFill"].Width     = $fw
-        $UI["CpuBarFill"].BackColor = Pct-Color $d.CpuPct
+        $UI["CpuBarFill"].BackColor = Pct-Color $d['CpuPct']
 
         # RAM card
-        $UI["RamValLbl"].Text      = "$($d.UsedRAM) GB / $script:totalRAM GB"
-        $UI["RamPctLbl"].Text      = "$($d.RamPct)%"
-        $UI["RamPctLbl"].ForeColor = Pct-Color $d.RamPct
-        $UI["RamCard"].Tag.Pct     = $d.RamPct
+        $UI["RamValLbl"].Text      = "$($d['UsedRAM']) GB / $script:totalRAM GB"
+        $UI["RamPctLbl"].Text      = "$($d['RamPct'])%"
+        $UI["RamPctLbl"].ForeColor = Pct-Color $d['RamPct']
+        $UI["RamCard"].Tag.Pct     = $d['RamPct']
         $UI["RamCard"].Invalidate()
-        $fw2 = [math]::Max(0, [math]::Min(112, [int](($d.RamPct / 100.0) * 112)))
+        $fw2 = [math]::Max(0, [math]::Min(112, [int](($d['RamPct'] / 100.0) * 112)))
         $UI["RamBarFill"].Width     = $fw2
-        $UI["RamBarFill"].BackColor = Pct-Color $d.RamPct
+        $UI["RamBarFill"].BackColor = Pct-Color $d['RamPct']
 
         # Disk card (every 5 ticks = ~15 sec)
         if ($script:tickCount % 5 -eq 0) {
-            $UI["DiskValLbl"].Text      = "$($d.DUsed) GB used  |  $($d.DFree) GB free"
-            $UI["DiskPctLbl"].Text      = "$($d.DPct)%"
-            $UI["DiskPctLbl"].ForeColor = Pct-Color $d.DPct
-            $UI["DiskCard"].Tag.Pct     = $d.DPct
+            $UI["DiskValLbl"].Text      = "$($d['DUsed']) GB used  |  $($d['DFree']) GB free"
+            $UI["DiskPctLbl"].Text      = "$($d['DPct'])%"
+            $UI["DiskPctLbl"].ForeColor = Pct-Color $d['DPct']
+            $UI["DiskCard"].Tag.Pct     = $d['DPct']
             $UI["DiskCard"].Invalidate()
-            $fw3 = [math]::Max(0, [math]::Min(112, [int](($d.DPct / 100.0) * 112)))
+            $fw3 = [math]::Max(0, [math]::Min(112, [int](($d['DPct'] / 100.0) * 112)))
             $UI["DiskBarFill"].Width     = $fw3
-            $UI["DiskBarFill"].BackColor = Pct-Color $d.DPct
+            $UI["DiskBarFill"].BackColor = Pct-Color $d['DPct']
         }
 
-        # Temp card (every 2 ticks = ~6 sec, independent TempRefreshCounter)
-        $script:TempRefreshCounter++
-        if ($script:TempRefreshCounter % 2 -eq 0) {
-            $temps = Get-HardwareTemps
-            if ($temps.Available) {
-                $script:tempStatus.Visible = $false
-                $cVal = $temps.CPU
-                $gVal = $temps.GPU
-                $script:tempCPULbl.Text = if ($cVal) { "CPU: $cVal deg C" } else { 'CPU: N/A' }
-                $script:tempCPULbl.ForeColor = if ($cVal -ge 80)   { $C.Red    }
-                                               elseif ($cVal -ge 60){ $C.Yellow }
-                                               else                  { $C.Green  }
-                $script:tempGPULbl.Text = if ($gVal) { "GPU: $gVal deg C" } else { 'GPU: N/A' }
-                $script:tempGPULbl.ForeColor = if ($gVal -ge 80)   { $C.Red    }
-                                               elseif ($gVal -ge 60){ $C.Yellow }
-                                               else                  { $C.Green  }
-            } else {
-                $script:tempCPULbl.Text      = ''
-                $script:tempGPULbl.Text      = ''
-                $script:tempStatus.Text      = 'Install LibreHardwareMonitor'
-                $script:tempStatus.ForeColor = $C.Dim
-                $script:tempStatus.Visible   = $true
+        # Temp card — reads from DataEngine cache (no WMI on UI thread)
+        $temps = $d['Temps']
+        if ($temps.Available) {
+            $script:tempStatus.Visible = $false
+            $cVal = $temps.CPU
+            $gVal = $temps.GPU
+            $script:tempCPULbl.Text = if ($cVal) { "CPU: $cVal deg C" } else { 'CPU: N/A' }
+            $script:tempCPULbl.ForeColor = if ($cVal -ge 80)   { $C.Red    }
+                                           elseif ($cVal -ge 60){ $C.Yellow }
+                                           else                  { $C.Green  }
+            $script:tempGPULbl.Text = if ($gVal) { "GPU: $gVal deg C" } else { 'GPU: N/A' }
+            $script:tempGPULbl.ForeColor = if ($gVal -ge 80)   { $C.Red    }
+                                           elseif ($gVal -ge 60){ $C.Yellow }
+                                           else                  { $C.Green  }
+        } else {
+            $script:tempCPULbl.Text      = ''
+            $script:tempGPULbl.Text      = ''
+            $script:tempStatus.Text      = 'Install LibreHardwareMonitor'
+            $script:tempStatus.ForeColor = $C.Dim
+            $script:tempStatus.Visible   = $true
+        }
+
+        # Security tab — reads from DataEngine cache (every 10 ticks when visible)
+        if ($script:tickCount % 10 -eq 0 -and $script:tabs.SelectedTab -eq $secTab) {
+            if ($null -ne $d['SecAudit']) {
+                Update-SecurityCards $d['SecAudit']
             }
         }
 
-
-        # Security tab (every 10 ticks = ~30 sec, only when tab is visible)
-        # SkipSlowCheck: omits the COM Windows Update query (done only on SCAN NOW)
-        if ($script:tickCount % 10 -eq 0 -and $script:tabs.SelectedTab -eq $secTab) {
-            $fastAudit = Get-SecurityAudit -SkipSlowCheck
-            Update-SecurityCards $fastAudit
-        }
-
-        # Process grid (every 2 ticks = ~6 sec)
+        # Process grid — reads from DataEngine cache (every 2 ticks = ~6 sec)
         if ($script:tickCount % 2 -eq 0) {
-            Refresh-ProcessGrid
+            Update-ProcessGrid $d['Procs']
         }
 
         # Add new CPU data point to the live chart, keep last 60 points
@@ -1959,6 +2131,13 @@ $form.Add_FormClosing({
         $timer.Dispose()
         $trayIcon.Visible = $false
         $trayIcon.Dispose()
+        # Shut down DataEngine background runspace cleanly
+        try {
+            $script:DataEnginePS.Stop()
+            $script:DataEnginePS.Dispose()
+            $script:DataEngineRS.Close()
+            $script:DataEngineRS.Dispose()
+        } catch { <# best-effort cleanup #> }
     }
 })
 #endregion
