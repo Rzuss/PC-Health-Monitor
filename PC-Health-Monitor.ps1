@@ -293,30 +293,6 @@ function Get-LiveData {
     }
 }
 
-function Get-HardwareTemps {
-    # Queries LibreHardwareMonitor WMI namespace (LHM must be running).
-    # Returns @{Available=$false} gracefully when LHM is not running or not installed.
-    try {
-        $sensors = Get-CimInstance -Namespace root\LibreHardwareMonitor `
-                                  -ClassName Sensor -Filter "SensorType='Temperature'" `
-                                  -ErrorAction Stop
-        if (-not $sensors) { return @{Available=$false; CPU=$null; GPU=$null} }
-
-        $cpu = $sensors | Where-Object { $_.Name -match 'CPU' } |
-               Sort-Object Value -Descending | Select-Object -First 1
-        $gpu = $sensors | Where-Object { $_.Name -match 'GPU' } |
-               Sort-Object Value -Descending | Select-Object -First 1
-
-        return @{
-            Available = $true
-            CPU       = if ($cpu) { [math]::Round($cpu.Value, 1) } else { $null }
-            GPU       = if ($gpu) { [math]::Round($gpu.Value, 1) } else { $null }
-        }
-    } catch {
-        Write-Log -Message 'LHM WMI not available' -Level WARN -ExceptionRecord $_
-        return @{Available=$false; CPU=$null; GPU=$null}
-    }
-}
 
 
 
@@ -523,7 +499,6 @@ $script:DataCache = [System.Collections.Hashtable]::Synchronized(@{
     DUsed        = '0'
     DFree        = '0'
     DTotal       = '0'
-    Temps        = @{ Available = $false; CPU = $null; GPU = $null }
     Procs        = @()
     TopFolders   = @()
     LastUpdated  = [DateTime]::MinValue
@@ -569,25 +544,6 @@ $script:DataEnginePS.Runspace = $script:DataEngineRS
                 $cache['DFree'] = $dFree
                 $cache['DTotal']= $dTotal
             } catch { }
-        }
-
-        # ── Hardware temps — LibreHardwareMonitor WMI (every 2 cycles = ~6 sec) ──
-        if ($tick % 2 -eq 0) {
-            try {
-                $sensors = Get-CimInstance -Namespace root\LibreHardwareMonitor `
-                           -ClassName Sensor -Filter "SensorType='Temperature'" -ErrorAction Stop
-                $cpuT = ($sensors | Where-Object { $_.Name -match 'CPU' } |
-                         Sort-Object Value -Descending | Select-Object -First 1).Value
-                $gpuT = ($sensors | Where-Object { $_.Name -match 'GPU' } |
-                         Sort-Object Value -Descending | Select-Object -First 1).Value
-                $cache['Temps'] = @{
-                    Available = $true
-                    CPU = if ($cpuT) { [math]::Round($cpuT, 1) } else { $null }
-                    GPU = if ($gpuT) { [math]::Round($gpuT, 1) } else { $null }
-                }
-            } catch {
-                $cache['Temps'] = @{ Available = $false; CPU = $null; GPU = $null }
-            }
         }
 
         # ── Process list (every 2 cycles = ~6 sec) ──────────────────────────
@@ -833,60 +789,6 @@ foreach ($cd in $cardDefs) {
     $tab1.Controls.Add($cp)
 }
 
-# -- Temperature Card (Sprint 2 - LHM WMI) ------------------------------
-$tempCard = New-Pnl 810 15 220 110 $C.BgCard
-
-$tempCard.Add_Paint({
-    param($s2, $pe)
-    try {
-        $g = $pe.Graphics
-        $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $g.FillRectangle((New-Object Drawing.SolidBrush($C.BgCard)), 0, 0, $s2.Width, $s2.Height)
-        Draw-GlowBorder $g $s2.Width $s2.Height $C.Orange 2
-    } catch {
-        Write-Log -Message "Temp card Paint error" -Level WARN -ExceptionRecord $_
-    }
-})
-
-$tempTitleLbl = New-Object Windows.Forms.Label
-$tempTitleLbl.Text      = "TEMPS"
-$tempTitleLbl.Location  = [Drawing.Point]::new(12, 12)
-$tempTitleLbl.Size      = [Drawing.Size]::new(196, 18)
-$tempTitleLbl.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
-$tempTitleLbl.ForeColor = $C.Orange
-$tempTitleLbl.BackColor = [Drawing.Color]::Transparent
-$tempCard.Controls.Add($tempTitleLbl)
-
-$script:tempCPULbl = New-Object Windows.Forms.Label
-$script:tempCPULbl.Text      = "CPU: --"
-$script:tempCPULbl.Location  = [Drawing.Point]::new(12, 34)
-$script:tempCPULbl.Size      = [Drawing.Size]::new(196, 22)
-$script:tempCPULbl.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
-$script:tempCPULbl.ForeColor = $C.SubText
-$script:tempCPULbl.BackColor = [Drawing.Color]::Transparent
-$tempCard.Controls.Add($script:tempCPULbl)
-
-$script:tempGPULbl = New-Object Windows.Forms.Label
-$script:tempGPULbl.Text      = "GPU: --"
-$script:tempGPULbl.Location  = [Drawing.Point]::new(12, 58)
-$script:tempGPULbl.Size      = [Drawing.Size]::new(196, 20)
-$script:tempGPULbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Regular)
-$script:tempGPULbl.ForeColor = $C.SubText
-$script:tempGPULbl.BackColor = [Drawing.Color]::Transparent
-$tempCard.Controls.Add($script:tempGPULbl)
-
-$script:tempStatus = New-Object Windows.Forms.Label
-$script:tempStatus.Text      = "Install LibreHardwareMonitor"
-$script:tempStatus.Location  = [Drawing.Point]::new(12, 82)
-$script:tempStatus.Size      = [Drawing.Size]::new(196, 16)
-$script:tempStatus.Font      = New-Object Drawing.Font("Segoe UI", 7)
-$script:tempStatus.ForeColor = $C.Dim
-$script:tempStatus.BackColor = [Drawing.Color]::Transparent
-$script:tempStatus.Visible   = $true
-$tempCard.Controls.Add($script:tempStatus)
-
-$UI["TempCard"] = $tempCard
-$tab1.Controls.Add($tempCard)
 
 # -- Health Score Card (Sprint 6) ----------------------------------------
 $scoreCard = New-Pnl 15 128 1020 70 $C.BgCard
@@ -1943,28 +1845,6 @@ function Do-Refresh {
             $fw3 = [math]::Max(0, [math]::Min(112, [int](($d['DPct'] / 100.0) * 112)))
             $UI["DiskBarFill"].Width     = $fw3
             $UI["DiskBarFill"].BackColor = Pct-Color $d['DPct']
-        }
-
-        # Temp card — reads from DataEngine cache (no WMI on UI thread)
-        $temps = $d['Temps']
-        if ($temps.Available) {
-            $script:tempStatus.Visible = $false
-            $cVal = $temps.CPU
-            $gVal = $temps.GPU
-            $script:tempCPULbl.Text = if ($cVal) { "CPU: $cVal deg C" } else { 'CPU: N/A' }
-            $script:tempCPULbl.ForeColor = if ($cVal -ge 80)   { $C.Red    }
-                                           elseif ($cVal -ge 60){ $C.Yellow }
-                                           else                  { $C.Green  }
-            $script:tempGPULbl.Text = if ($gVal) { "GPU: $gVal deg C" } else { 'GPU: N/A' }
-            $script:tempGPULbl.ForeColor = if ($gVal -ge 80)   { $C.Red    }
-                                           elseif ($gVal -ge 60){ $C.Yellow }
-                                           else                  { $C.Green  }
-        } else {
-            $script:tempCPULbl.Text      = ''
-            $script:tempGPULbl.Text      = ''
-            $script:tempStatus.Text      = 'Install LibreHardwareMonitor'
-            $script:tempStatus.ForeColor = $C.Dim
-            $script:tempStatus.Visible   = $true
         }
 
         # Process grid — reads from DataEngine cache (every 2 ticks = ~6 sec)
