@@ -321,7 +321,9 @@ function Get-HardwareTemps {
 
 
 function Get-SecurityAudit {
-    # Fast portions: Defender + Firewall + Registry update date (< 1 second)
+    # param MUST be first statement in function — was incorrectly placed below, causing SkipSlowCheck to be ignored
+    param([switch]$SkipSlowCheck)
+
     $audit = @{
         Defender          = @{}
         Firewall          = @{}
@@ -330,7 +332,7 @@ function Get-SecurityAudit {
         UpdateServiceOK   = $true
     }
 
-    # Defender
+    # Defender (fast WMI — < 200ms)
     try {
         $mp = Get-MpComputerStatus -ErrorAction Stop
         $audit.Defender = @{
@@ -340,13 +342,13 @@ function Get-SecurityAudit {
         }
     } catch { Write-Log -Message 'Defender query failed' -Level ERROR -ExceptionRecord $_ }
 
-    # Firewall (stores boolean Enabled per profile)
+    # Firewall (fast — < 100ms)
     try {
         $fw = Get-NetFirewallProfile -ErrorAction Stop
         foreach ($p in $fw) { $audit.Firewall[$p.Name] = $p.Enabled }
     } catch { Write-Log -Message 'Firewall query failed' -Level ERROR -ExceptionRecord $_ }
 
-    # Last successful update install date (registry — fast, no COM needed)
+    # Last successful update date — registry read, instant
     try {
         $wuKey  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\Results\Install'
         $lastTs = (Get-ItemProperty $wuKey -ErrorAction Stop).LastSuccessTime
@@ -356,15 +358,14 @@ function Get-SecurityAudit {
         }
     } catch { $audit.UpdateLastInstall = 'Unknown' }
 
-    # Windows Update service health (fast)
+    # Windows Update service status — instant
     try {
         $svc = Get-Service -Name wuauserv -ErrorAction Stop
         $audit.UpdateServiceOK = ($svc.Status -eq 'Running' -or $svc.StartType -ne 'Disabled')
     } catch { $audit.UpdateServiceOK = $false }
 
-    # Pending update count via COM (slow — only called on explicit SCAN NOW)
-    # Auto-refresh (Do-Refresh) skips this by passing $SkipSlowCheck=$true
-    param([switch]$SkipSlowCheck)
+    # COM pending update count — SLOW (30-60 sec). Only runs on explicit SCAN NOW.
+    # Auto-refresh always passes -SkipSlowCheck to keep UI thread responsive.
     if (-not $SkipSlowCheck) {
         try {
             $searcher      = New-Object -ComObject Microsoft.Update.Searcher -ErrorAction Stop
