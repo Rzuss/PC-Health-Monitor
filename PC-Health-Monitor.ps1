@@ -1260,9 +1260,22 @@ function Update-SecurityCards($audit) {
 
     # Windows Update status panel
     if ($null -ne $script:wuStatusLbl) {
-        $script:wuLastLbl.Text    = "Last installed: $($audit.UpdateLastInstall)"
-        $script:wuSvcLbl.Text     = "Service: $(if ($audit.UpdateServiceOK) {'Running'} else {'CHECK REQUIRED'})"
+        $script:wuLastLbl.Text     = "Last installed: $($audit.UpdateLastInstall)"
+        $script:wuSvcLbl.Text      = "Service: $(if ($audit.UpdateServiceOK) {'Running'} else {'CHECK REQUIRED'})"
         $script:wuSvcLbl.ForeColor = if ($audit.UpdateServiceOK) { $C.Green } else { $C.Red }
+
+        # Update the large status label based on what we know without the slow COM check
+        if ($audit.Updates -eq -1) {
+            # Fast audit (SkipSlowCheck): show instruction instead of "-- CHECKING --"
+            $script:wuStatusLbl.Text      = 'CLICK  SCAN NOW  FOR UPDATE COUNT'
+            $script:wuStatusLbl.ForeColor = $C.Dim
+        } elseif ($audit.Updates -eq 0) {
+            $script:wuStatusLbl.Text      = 'SYSTEM UP TO DATE'
+            $script:wuStatusLbl.ForeColor = $C.Green
+        } else {
+            $script:wuStatusLbl.Text      = "$($audit.Updates) UPDATE$(if($audit.Updates -gt 1){'S'}) AVAILABLE"
+            $script:wuStatusLbl.ForeColor = if ($audit.Updates -le 5) { $C.Yellow } else { $C.Red }
+        }
     }
 
     # Export security snapshot for Python health analytics
@@ -1881,7 +1894,37 @@ foreach ($manifest in $Script:LoadedPlugins) {
 
 #region 6 - Event Handlers & Timer
 # Auto-trigger first security scan when user navigates to Security tab
+# Also calls Refresh-Plugin for any plugin tab that becomes active
 $tabs.Add_SelectedIndexChanged({
+    # ── Security tab ─────────────────────────────────────────────────────
+    if ($tabs.SelectedTab -eq $secTab) {
+        if ($null -ne $script:DataCache['SecAudit']) {
+            Update-SecurityCards $script:DataCache['SecAudit']
+        } else {
+            $script:wuStatusLbl.Text      = 'LOADING...'
+            $script:wuStatusLbl.ForeColor = $C.Yellow
+            try {
+                $fastAudit = Get-SecurityAudit -SkipSlowCheck
+                Update-SecurityCards $fastAudit
+                $script:DataCache['SecAudit'] = $fastAudit
+            } catch {
+                $script:wuStatusLbl.Text      = 'LOAD ERROR'
+                $script:wuStatusLbl.ForeColor = $C.Red
+                Write-Log -Message "Security tab initial load failed" -Level ERROR -ExceptionRecord $_
+            }
+        }
+    }
+
+    # ── Plugin tabs ───────────────────────────────────────────────────────
+    foreach ($manifest in $Script:LoadedPlugins) {
+        if ($tabs.SelectedTab -eq $manifest['_TabPage']) {
+            try {
+                & $manifest['_Refresh'] -DataPanel $manifest['_Panel']
+            } catch {
+                Write-Log -Message "Plugin Refresh-Plugin failed: $($manifest.Name)" -Level WARN -ExceptionRecord $_
+            }
+        }
+    }
 })
 
 # Tab owner-draw event (added after all tabs are registered)
