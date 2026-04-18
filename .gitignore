@@ -1,16 +1,29 @@
-# Auto-generated launcher (created by Create-Desktop-Shortcut.bat)
+# Build output
+dist/
+*.exe
+
+# Auto-generated launcher
 Launch-Monitor.vbs
 
-# Windows thumbnail cache
+# Cowork / Claude internal files
+.claude/
+
+# Internal planning documents
+*.docx
+
+# Windows artifacts
 Thumbs.db
 Desktop.ini
-
-# PowerShell history
 $RECYCLE.BIN/
 
-# VS Code settings (optional, remove if you want to share them)
+# Editor
 .vscode/
 
-# Temp files
+# Temp / logs
 *.tmp
 *.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
