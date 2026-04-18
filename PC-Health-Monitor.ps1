@@ -318,66 +318,7 @@ function Get-HardwareTemps {
     }
 }
 
-function Get-NetworkConnections {
-    try {
-        $conns = Get-NetTCPConnection -ErrorAction Stop
-        $procs = Get-Process -ErrorAction SilentlyContinue | Select-Object Id, ProcessName
-        $procMap = @{}
-        foreach ($p in $procs) { $procMap[$p.Id] = $p.ProcessName }
 
-        $result = foreach ($c in $conns) {
-            $remoteIP  = if ($c.RemoteAddress) { $c.RemoteAddress.ToString() } else { '--' }
-            $isSuspect = ($c.State -ne 'Listen') -and
-                         ($remoteIP -notmatch
-                          '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|::1|$)')
-            $isThreat     = $false
-            $threatFamily = ''
-            $threatType   = ''
-            if ($isSuspect -and $Script:ThreatIntel -and $remoteIP -ne '--') {
-                $iocEntry = $Script:ThreatIntel.PSObject.Properties[$remoteIP]
-                if ($iocEntry) {
-                    $isThreat     = $true
-                    $threatFamily = $iocEntry.Value.family
-                    $threatType   = $iocEntry.Value.type
-                }
-            }
-            [PSCustomObject]@{
-                Process      = if ($procMap[$c.OwningProcess]) { $procMap[$c.OwningProcess] } else { 'System' }
-                PID          = $c.OwningProcess
-                LocalPort    = $c.LocalPort
-                RemoteIP     = $remoteIP
-                State        = $c.State.ToString()
-                IsSuspect    = $isSuspect
-                IsThreat     = $isThreat
-                ThreatFamily = $threatFamily
-                ThreatType   = $threatType
-            }
-        }
-        return $result |
-               Sort-Object @{E={if ($_.State -eq 'Established') {0} else {1}}}, Process |
-               Select-Object -First 50
-    } catch {
-        Write-Log 'Failed to query network connections' -Level ERROR -ExceptionRecord $_
-        return @()
-    }
-}
-
-function Get-BandwidthStats {
-    # Queries network bytes/sec via Performance Counters. Graceful locale fallback.
-    try {
-        $sentSamples = (Get-Counter '\Network Interface(*)\Bytes Sent/sec' -ErrorAction Stop).CounterSamples
-        $recvSamples = (Get-Counter '\Network Interface(*)\Bytes Received/sec' -ErrorAction Stop).CounterSamples
-        $sent = ($sentSamples | Measure-Object -Property CookedValue -Sum).Sum
-        $recv = ($recvSamples | Measure-Object -Property CookedValue -Sum).Sum
-        return @{
-            Available = $true
-            SentKBps  = [math]::Round($sent / 1KB, 1)
-            RecvKBps  = [math]::Round($recv / 1KB, 1)
-        }
-    } catch {
-        return @{Available=$false; SentKBps=0; RecvKBps=0}
-    }
-}
 
 function Get-SecurityAudit {
     # Fast portions: Defender + Firewall + Registry update date (< 1 second)
@@ -1101,45 +1042,6 @@ function Refresh-ProcessGrid {
 }
 Refresh-ProcessGrid
 
-function Refresh-NetGrid {
-    # Explicitly capture $C from script scope to ensure availability inside the loop
-    $localC = $C
-    if ($null -eq $localC) { return }   # safety guard — $C not yet initialized
-
-    $conns = Get-NetworkConnections
-    $script:netGrid.SuspendLayout()
-    $script:netGrid.Rows.Clear()
-    foreach ($c in $conns) {
-        $idx = $script:netGrid.Rows.Add(
-            $c.Process, $c.PID, $c.LocalPort, $c.RemoteIP, $c.State, '')
-        $row = $script:netGrid.Rows[$idx]
-
-        # State column (index 4) color-coding — unchanged
-        $stateColor = switch ($c.State) {
-            'Established' { $localC.Blue    }
-            'Listen'      { $localC.Green   }
-            'CloseWait'   { $localC.Yellow  }
-            'TimeWait'    { $localC.Dim     }
-            default       { $localC.SubText }
-        }
-        if ($null -ne $stateColor) {
-            $row.Cells[4].Style.ForeColor = $stateColor
-        }
-
-        # Row-level coloring for suspicious / threat connections
-        if ($c.IsThreat -and $null -ne $localC.Red) {
-            $row.DefaultCellStyle.ForeColor = $localC.Red
-            $row.Cells[5].Value           = "$($c.ThreatType): $($c.ThreatFamily)"
-            $row.Cells[5].Style.ForeColor = $localC.Red
-            $row.Cells[5].Style.Font      = $script:MonoBold
-        } elseif ($c.IsSuspect -and $null -ne $localC.Orange) {
-            $row.DefaultCellStyle.ForeColor = $localC.Orange
-            $row.Cells[5].Value           = 'Suspicious'
-            $row.Cells[5].Style.ForeColor = $localC.Yellow
-        }
-    }
-    $script:netGrid.ResumeLayout()
-}
 
 function Update-SecurityCards($audit) {
     # Defender card
@@ -1635,92 +1537,6 @@ $cleanAllBtn.Add_Click({
 
 $tabs.TabPages.Add($tab3)
 
-# ========================================================================
-# TAB 4 -- NETWORK INTELLIGENCE (Sprint 3 official)
-# ========================================================================
-$netTab = New-Object Windows.Forms.TabPage
-$netTab.Text      = "  NET  "
-$netTab.BackColor = $C.BgBase
-
-# -- Bandwidth banner panel (36px) ---------------------------------------
-$netBandwidthPanel = New-Pnl 0 0 1060 36 $C.BgCard
-
-$script:netSentLbl = New-Object Windows.Forms.Label
-$script:netSentLbl.Text      = "OUT: 0.0 KB/s"
-$script:netSentLbl.Location  = [Drawing.Point]::new(15, 7)
-$script:netSentLbl.Size      = [Drawing.Size]::new(210, 22)
-$script:netSentLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
-$script:netSentLbl.ForeColor = $C.Purple
-$script:netSentLbl.BackColor = [Drawing.Color]::Transparent
-$netBandwidthPanel.Controls.Add($script:netSentLbl)
-
-$script:netRecvLbl = New-Object Windows.Forms.Label
-$script:netRecvLbl.Text      = "IN: 0.0 KB/s"
-$script:netRecvLbl.Location  = [Drawing.Point]::new(240, 7)
-$script:netRecvLbl.Size      = [Drawing.Size]::new(210, 22)
-$script:netRecvLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
-$script:netRecvLbl.ForeColor = $C.Blue
-$script:netRecvLbl.BackColor = [Drawing.Color]::Transparent
-$netBandwidthPanel.Controls.Add($script:netRecvLbl)
-
-$netLegendLbl = New-Object Windows.Forms.Label
-$netLegendLbl.Text      = "ESTAB  LISTEN  CLOSE_WAIT  TIME_WAIT  [orange] = external IP"
-$netLegendLbl.Location  = [Drawing.Point]::new(670, 10)
-$netLegendLbl.Size      = [Drawing.Size]::new(370, 16)
-$netLegendLbl.Font      = New-Object Drawing.Font("Consolas", 7)
-$netLegendLbl.ForeColor = $C.Dim
-$netLegendLbl.BackColor = [Drawing.Color]::Transparent
-$netBandwidthPanel.Controls.Add($netLegendLbl)
-
-$netTab.Controls.Add($netBandwidthPanel)
-
-# -- Connection DataGridView (5 cols, AutoSizeColumnsMode = Fill) ---------
-$script:netGrid = New-Object Windows.Forms.DataGridView
-$script:netGrid.Location            = [Drawing.Point]::new(0, 38)
-$script:netGrid.Size                = [Drawing.Size]::new(1040, 552)
-$script:netGrid.AutoSizeColumnsMode = [Windows.Forms.DataGridViewAutoSizeColumnsMode]::Fill
-Style-Grid $script:netGrid
-$script:netGrid.ColumnHeadersHeight = 28
-$script:netGrid.RowTemplate.Height  = 22
-# DoubleBuffered is a protected property on DataGridView -- must set via Reflection
-([Windows.Forms.DataGridView].GetProperty(
-    'DoubleBuffered',
-    [System.Reflection.BindingFlags]'Instance,NonPublic'
-)).SetValue($script:netGrid, $true, $null)
-
-foreach ($nc in @(
-    @{Name="Process";     Header="PROCESS";      FillWeight=20},
-    @{Name="PID";         Header="PID";          FillWeight=8 },
-    @{Name="Port";        Header="PORT";         FillWeight=8 },
-    @{Name="RemoteIP";    Header="REMOTE IP";    FillWeight=20},
-    @{Name="State";       Header="STATE";        FillWeight=14},
-    @{Name="ThreatIntel"; Header="THREAT INTEL"; FillWeight=30}
-)) {
-    $col = New-Object Windows.Forms.DataGridViewTextBoxColumn
-    $col.Name       = $nc.Name
-    $col.HeaderText = $nc.Header
-    $col.FillWeight = $nc.FillWeight
-    $col.SortMode   = [Windows.Forms.DataGridViewColumnSortMode]::NotSortable
-    $col.ReadOnly   = $true
-    [void]$script:netGrid.Columns.Add($col)
-}
-# Style the THREAT INTEL header distinctively
-$script:netGrid.Columns["ThreatIntel"].HeaderCell.Style.ForeColor = $C.Red
-$script:netGrid.Columns["ThreatIntel"].HeaderCell.Style.Font      = `
-    New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
-
-# -- Threat Intel status label (below the grid) --------------------------
-$script:threatStatusLbl = New-Object Windows.Forms.Label
-$script:threatStatusLbl.Location  = [Drawing.Point]::new(6, 594)
-$script:threatStatusLbl.Size      = [Drawing.Size]::new(1034, 18)
-$script:threatStatusLbl.Font      = New-Object Drawing.Font("Segoe UI", 7, [Drawing.FontStyle]::Italic)
-$script:threatStatusLbl.ForeColor = $C.Dim
-$script:threatStatusLbl.BackColor = [Drawing.Color]::Transparent
-$script:threatStatusLbl.Text      = 'Threat Intel: not installed -- run install.ps1 to update'
-$netTab.Controls.Add($script:threatStatusLbl)
-
-$netTab.Controls.Add($script:netGrid)
-$tabs.TabPages.Add($netTab)
 
 # ========================================================================
 # TAB 5 -- SECURITY AUDIT (Sprint 4 official)
@@ -1886,7 +1702,6 @@ foreach ($manifest in $Script:LoadedPlugins) {
 #region 6 - Event Handlers & Timer
 # Auto-trigger first security scan when user navigates to Security tab
 $tabs.Add_SelectedIndexChanged({
-    if ($tabs.SelectedTab -eq $netTab) { Refresh-NetGrid }
 })
 
 # Tab owner-draw event (added after all tabs are registered)
@@ -1969,7 +1784,6 @@ $script:cpuHighTicks       = 0
 $script:cpuAlertFired      = $false
 $script:lastRamAlert       = [DateTime]::MinValue
 $script:TempRefreshCounter = 0
-$script:NetRefreshCounter  = 0
 $script:lastDiskAlert = [DateTime]::MinValue
 $script:trayHintShown = $false
 
@@ -2039,11 +1853,6 @@ function Do-Refresh {
             }
         }
 
-        # Net tab (every 2 ticks = ~6 sec, only when tab is visible)
-        $script:NetRefreshCounter++
-        if ($script:NetRefreshCounter % 2 -eq 0 -and $script:tabs.SelectedTab -eq $netTab) {
-            Refresh-NetGrid
-        }
 
         # Security tab (every 10 ticks = ~30 sec, only when tab is visible)
         # SkipSlowCheck: omits the COM Windows Update query (done only on SCAN NOW)
