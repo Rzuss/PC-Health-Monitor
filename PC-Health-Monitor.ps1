@@ -1638,13 +1638,12 @@ $cleanAllBtn.Add_Click({
     }
 })
 
-# ── Enable auto-scroll so TopFolders section is reachable ───────────────
-$tab3.AutoScroll = $true
+# ── TOP 10 LARGEST FOLDERS — own tab ────────────────────────────────────
+$diskUsageTab           = New-Object Windows.Forms.TabPage
+$diskUsageTab.Text      = "  Top Folders  "
+$diskUsageTab.BackColor = $C.BgBase
 
-# ── TOP 10 LARGEST FOLDERS section ──────────────────────────────────────
-$tfSectionY = 692
-
-$tfHeaderPnl = New-Pnl 15 $tfSectionY 1020 36 $C.BgCard3
+$tfHeaderPnl = New-Pnl 15 10 1020 36 $C.BgCard3
 $tfHeaderPnl.Add_Paint({
     param($s2, $pe)
     try {
@@ -1668,11 +1667,11 @@ $script:tfScanBtn = New-Btn "SCAN" 870 4 140 28 $C.BgCard2 $C.Blue
 $script:tfScanBtn.FlatAppearance.BorderColor = $C.Blue
 $script:tfScanBtn.FlatAppearance.BorderSize  = 1
 $tfHeaderPnl.Controls.Add($script:tfScanBtn)
-$tab3.Controls.Add($tfHeaderPnl)
+$diskUsageTab.Controls.Add($tfHeaderPnl)
 
 # Container panel for the 10 folder rows
-$script:tfContainer = New-Pnl 15 ($tfSectionY + 36) 1020 360 $C.BgCard
-$tab3.Controls.Add($script:tfContainer)
+$script:tfContainer = New-Pnl 15 46 1020 360 $C.BgCard
+$diskUsageTab.Controls.Add($script:tfContainer)
 
 # Placeholder label shown before any scan (lives inside the container)
 $script:tfPlaceholder = New-Object Windows.Forms.Label
@@ -1774,7 +1773,7 @@ for ($tfI = 0; $tfI -lt 10; $tfI++) {
 $script:tfScanBtn.Add_Click({ Invoke-TopFolderScan })
 
 $tabs.TabPages.Add($tab3)
-
+$tabs.TabPages.Add($diskUsageTab)
 
 # Security tab removed
 
@@ -1804,6 +1803,11 @@ foreach ($manifest in $Script:LoadedPlugins) {
 # Auto-trigger first security scan when user navigates to Security tab
 # Also calls Refresh-Plugin for any plugin tab that becomes active
 $tabs.Add_SelectedIndexChanged({
+    # ── Top Folders tab: refresh panel from cache on entry ────────────────
+    if ($tabs.SelectedTab -eq $diskUsageTab) {
+        Update-TopFolderPanel
+    }
+
     # ── Plugin tabs: call Refresh-Plugin when tab becomes active ──────────
     foreach ($manifest in $Script:LoadedPlugins) {
         if ($tabs.SelectedTab -eq $manifest['_TabPage']) {
@@ -1849,247 +1853,4 @@ $tabs.Add_DrawItem({
 $trayIcon = New-Object Windows.Forms.NotifyIcon
 $trayIcon.Text    = "PC Health Monitor"
 $trayIcon.Visible = $true
-try   { $trayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\perfmon.exe") }
-catch {
-    Write-Log -Message "Failed to load tray icon from perfmon.exe, using system default" -Level WARN -ExceptionRecord $_
-    $trayIcon.Icon = [Drawing.SystemIcons]::Application
-}
-
-$trayMenu = New-Object Windows.Forms.ContextMenuStrip
-$trayMenu.BackColor = $C.BgCard
-$trayMenu.ForeColor = $C.Text
-
-$trayOpen = New-Object Windows.Forms.ToolStripMenuItem "Open"
-$trayOpen.BackColor = $C.BgCard
-$trayOpen.ForeColor = $C.Blue
-
-$traySep  = New-Object Windows.Forms.ToolStripSeparator
-
-$trayExit = New-Object Windows.Forms.ToolStripMenuItem "Exit"
-$trayExit.BackColor = $C.BgCard
-$trayExit.ForeColor = $C.Red
-
-[void]$trayMenu.Items.Add($trayOpen)
-[void]$trayMenu.Items.Add($traySep)
-[void]$trayMenu.Items.Add($trayExit)
-$trayIcon.ContextMenuStrip = $trayMenu
-
-$trayIcon.Add_DoubleClick({
-    $form.Show()
-    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
-    $form.Activate()
-})
-
-$trayOpen.Add_Click({
-    $form.Show()
-    $form.WindowState = [Windows.Forms.FormWindowState]::Normal
-    $form.Activate()
-})
-
-$trayExit.Add_Click({
-    $script:realExit = $true
-    $form.Close()
-})
-
-# -- Alert state variables -----------------------------------------------
-$script:cpuHighTicks       = 0
-$script:cpuAlertFired      = $false
-$script:lastRamAlert       = [DateTime]::MinValue
-# (TempRefreshCounter removed — Do-Refresh now reads from DataEngine cache)
-$script:lastDiskAlert = [DateTime]::MinValue
-$script:trayHintShown = $false
-
-# ========================================================================
-# LIVE REFRESH LOGIC
-# ========================================================================
-$script:tickCount = 0
-
-function Do-Refresh {
-    try {
-        # Read from DataEngine cache — zero blocking calls on UI thread
-        $d = $script:DataCache
-        if (-not $d['Ready']) { return }   # Engine still warming up — skip this tick
-
-        # CPU card
-        $UI["CpuValLbl"].Text      = "$($d['CpuPct'])%"
-        $UI["CpuPctLbl"].Text      = "$($d['CpuPct'])%"
-        $UI["CpuPctLbl"].ForeColor = Pct-Color $d['CpuPct']
-        $UI["CpuCard"].Tag.Pct     = $d['CpuPct']
-        $UI["CpuCard"].Invalidate()
-        $fw = [math]::Max(0, [math]::Min(112, [int](($d['CpuPct'] / 100.0) * 112)))
-        $UI["CpuBarFill"].Width     = $fw
-        $UI["CpuBarFill"].BackColor = Pct-Color $d['CpuPct']
-
-        # RAM card
-        $UI["RamValLbl"].Text      = "$($d['UsedRAM']) GB / $script:totalRAM GB"
-        $UI["RamPctLbl"].Text      = "$($d['RamPct'])%"
-        $UI["RamPctLbl"].ForeColor = Pct-Color $d['RamPct']
-        $UI["RamCard"].Tag.Pct     = $d['RamPct']
-        $UI["RamCard"].Invalidate()
-        $fw2 = [math]::Max(0, [math]::Min(112, [int](($d['RamPct'] / 100.0) * 112)))
-        $UI["RamBarFill"].Width     = $fw2
-        $UI["RamBarFill"].BackColor = Pct-Color $d['RamPct']
-
-        # Disk card (every 5 ticks = ~15 sec)
-        if ($script:tickCount % 5 -eq 0) {
-            $UI["DiskValLbl"].Text      = "$($d['DUsed']) / $($d['DTotal']) GB"
-            $UI["DiskPctLbl"].Text      = "$($d['DPct'])%"
-            $UI["DiskPctLbl"].ForeColor = Pct-Color $d['DPct']
-            $UI["DiskCard"].Tag.Pct     = $d['DPct']
-            $UI["DiskCard"].Invalidate()
-            $fw3 = [math]::Max(0, [math]::Min(112, [int](($d['DPct'] / 100.0) * 112)))
-            $UI["DiskBarFill"].Width     = $fw3
-            $UI["DiskBarFill"].BackColor = Pct-Color $d['DPct']
-        }
-
-        # Temp card — reads from DataEngine cache (no WMI on UI thread)
-        $temps = $d['Temps']
-        if ($temps.Available) {
-            $script:tempStatus.Visible = $false
-            $cVal = $temps.CPU
-            $gVal = $temps.GPU
-            $script:tempCPULbl.Text = if ($cVal) { "CPU: $cVal deg C" } else { 'CPU: N/A' }
-            $script:tempCPULbl.ForeColor = if ($cVal -ge 80)   { $C.Red    }
-                                           elseif ($cVal -ge 60){ $C.Yellow }
-                                           else                  { $C.Green  }
-            $script:tempGPULbl.Text = if ($gVal) { "GPU: $gVal deg C" } else { 'GPU: N/A' }
-            $script:tempGPULbl.ForeColor = if ($gVal -ge 80)   { $C.Red    }
-                                           elseif ($gVal -ge 60){ $C.Yellow }
-                                           else                  { $C.Green  }
-        } else {
-            $script:tempCPULbl.Text      = ''
-            $script:tempGPULbl.Text      = ''
-            $script:tempStatus.Text      = 'Install LibreHardwareMonitor'
-            $script:tempStatus.ForeColor = $C.Dim
-            $script:tempStatus.Visible   = $true
-        }
-
-        # Process grid — reads from DataEngine cache (every 2 ticks = ~6 sec)
-        if ($script:tickCount % 2 -eq 0) {
-            Update-ProcessGrid $d['Procs']
-        }
-
-        # Add new CPU data point to the live chart, keep last 60 points
-        [void]$UI["CpuChart"].Series[0].Points.AddY([double]$d.CpuPct)
-        if ($UI["CpuChart"].Series[0].Points.Count -gt 60) {
-            $UI["CpuChart"].Series[0].Points.RemoveAt(0)
-        }
-
-        $lastUpdLbl.Text = "  Updated: $(Get-Date -Format 'HH:mm:ss')"
-
-        # Blinking dot
-        $script:blinkState = -not $script:blinkState
-        $blinkDot.BackColor = if ($script:blinkState) { $C.Green } else { $C.BgCard }
-
-        # CPU alert: balloon after ~12 seconds of sustained load above 85%
-        if ($d.CpuPct -gt 85) {
-            $script:cpuHighTicks++
-            if ($script:cpuHighTicks -ge 4 -and -not $script:cpuAlertFired) {
-                $script:cpuAlertFired = $true
-                $trayIcon.ShowBalloonTip(6000, "High CPU Usage",
-                    "CPU has been above 85% for over 10 seconds ($($d.CpuPct)%)",
-                    [Windows.Forms.ToolTipIcon]::Warning)
-            }
-        } else {
-            $script:cpuHighTicks  = 0
-            $script:cpuAlertFired = $false
-        }
-
-        # RAM alert: balloon when above 85%, cooldown 5 minutes
-        if ($d.RamPct -gt 85) {
-            if (([DateTime]::Now - $script:lastRamAlert).TotalMinutes -gt 5) {
-                $script:lastRamAlert = [DateTime]::Now
-                $trayIcon.ShowBalloonTip(6000, "High RAM Usage",
-                    "RAM usage is at $($d.RamPct)% ($($d.UsedRAM) GB / $script:totalRAM GB)",
-                    [Windows.Forms.ToolTipIcon]::Warning)
-            }
-        }
-
-        # Disk alert: balloon when above 90%, cooldown 10 minutes
-        if ($d.DPct -gt 90) {
-            if (([DateTime]::Now - $script:lastDiskAlert).TotalMinutes -gt 10) {
-                $script:lastDiskAlert = [DateTime]::Now
-                $trayIcon.ShowBalloonTip(6000, "Low Disk Space",
-                    "Drive C: is $($d.DPct)% full - only $($d.DFree) GB free",
-                    [Windows.Forms.ToolTipIcon]::Warning)
-            }
-        }
-
-        # Drain any errors the DataEngine emitted (logged once per error)
-        $errs = $script:DataEnginePS.Streams.Error
-        while ($script:DataEngineErrIdx -lt $errs.Count) {
-            Write-Log -Message "DataEngine error: $($errs[$script:DataEngineErrIdx].ToString())" -Level ERROR
-            $script:DataEngineErrIdx++
-        }
-
-        # TopFolders panel: refresh whenever Cleanup tab is active and scan data exists
-        if ($tabs.SelectedTab -eq $tab3 -and
-            $null -ne $script:DataCache['TopFolders'] -and
-            $script:DataCache['TopFolders'].Count -gt 0) {
-            Update-TopFolderPanel
-        }
-
-        $script:tickCount++
-    } catch {
-        Write-Log -Message "Do-Refresh failed during live data update" -Level ERROR -ExceptionRecord $_
-        $d = $null    # graceful fallback -- UI retains last-known-good values
-    }
-}
-
-# Timer: fires every 3 seconds
-$timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 3000
-$timer.Add_Tick({ Do-Refresh })
-$timer.Start()
-
-$refreshBtn.Add_Click({ Do-Refresh })
-
-$pGrid.Add_CellClick({
-    param($sender, $e)
-
-    # Only act on the Kill column (index 4), not header row
-    if ($e.RowIndex -lt 0 -or $e.ColumnIndex -ne 4) { return }
-
-    $row         = $sender.Rows[$e.RowIndex]
-    $processName = $row.Cells[0].Value.ToString().Trim()
-    $pid         = [int]$row.Cells[3].Value
-
-    Invoke-KillProcess -ProcessId $pid -ProcessName $processName
-})
-
-$script:realExit = $false
-
-$form.Add_FormClosing({
-    param($sender, $e)
-    if (-not $script:realExit) {
-        $e.Cancel = $true
-        $form.Hide()
-        if (-not $script:trayHintShown) {
-            $script:trayHintShown = $true
-            $trayIcon.ShowBalloonTip(3000, "PC Health Monitor",
-                "Still running in the background. Right-click the tray icon to restore or exit.",
-                [Windows.Forms.ToolTipIcon]::Info)
-        }
-    } else {
-        $timer.Stop()
-        $timer.Dispose()
-        $trayIcon.Visible = $false
-        $trayIcon.Dispose()
-        # Shut down DataEngine background runspace cleanly
-        try {
-            $script:DataEnginePS.Stop()
-            $script:DataEnginePS.Dispose()
-            $script:DataEngineRS.Close()
-            $script:DataEngineRS.Dispose()
-        } catch { <# best-effort cleanup #> }
-    }
-})
-#endregion
-
-#region 7 - Execution
-# Session start log entry
-Write-Log -Message "Session started. Privileges: $(if ($script:isAdmin) {'Administrator'} else {'Standard User'})" -Level INFO
-
-# -- Launch --------------------------------------------------------------
-[void]$form.ShowDialog()
-#endregion
+try   { $trayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\p
