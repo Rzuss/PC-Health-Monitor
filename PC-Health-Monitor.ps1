@@ -420,6 +420,98 @@ function Invoke-KillProcess {
         Refresh-ProcessGrid   # refresh anyway -- process is gone
     }
 }
+
+function Invoke-TopFolderScan {
+    $script:tfScanBtn.Enabled = $false
+    $script:tfScanBtn.Text    = "SCANNING..."
+
+    $capturedCache = $script:DataCache
+    $capturedForm  = $form
+    $capturedBtn   = $script:tfScanBtn
+
+    $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+    $rs.ApartmentState = 'MTA'
+    $rs.ThreadOptions  = 'ReuseThread'
+    $rs.Open()
+
+    $ps = [System.Management.Automation.PowerShell]::Create()
+    $ps.Runspace = $rs
+
+    [void]$ps.AddScript({
+        param($cache, $formObj, $btn)
+        try {
+            $excludePrefixes = @('C:\Windows', 'C:\$Recycle.Bin', 'C:\$RECYCLE.BIN')
+            $topDirs = Get-ChildItem -Path 'C:\' -Directory -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $fp = $_.FullName
+                    $excluded = $false
+                    foreach ($ex in $excludePrefixes) {
+                        if ($fp -like "$ex*") { $excluded = $true; break }
+                    }
+                    -not $excluded
+                }
+
+            $results = @(foreach ($dir in $topDirs) {
+                try {
+                    $sum = (Get-ChildItem -Path $dir.FullName -Recurse -File -ErrorAction SilentlyContinue |
+                            Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
+                    [PSCustomObject]@{
+                        Path  = $dir.FullName
+                        Bytes = [long]$(if ($null -eq $sum) { 0 } else { $sum })
+                    }
+                } catch {
+                    [PSCustomObject]@{ Path = $dir.FullName; Bytes = 0L }
+                }
+            })
+
+            $cache['TopFolders'] = @($results | Sort-Object Bytes -Descending | Select-Object -First 10)
+        } catch {
+            $cache['TopFolders'] = @()
+        }
+
+        $formObj.Invoke([Action]{
+            $btn.Enabled = $true
+            $btn.Text    = "SCAN"
+        })
+    })
+    [void]$ps.AddParameter('cache',   $capturedCache)
+    [void]$ps.AddParameter('formObj', $capturedForm)
+    [void]$ps.AddParameter('btn',     $capturedBtn)
+    [void]$ps.BeginInvoke()
+    Write-Log -Message "TopFolderScan started in background MTA runspace" -Level INFO
+}
+
+function Update-TopFolderPanel {
+    try {
+        $folders = $script:DataCache['TopFolders']
+        if ($null -eq $folders -or $folders.Count -eq 0) { return }
+
+        $script:tfPlaceholder.Visible = $false
+        $maxBytes = [math]::Max(1L, [long]$folders[0].Bytes)
+
+        for ($i = 0; $i -lt $script:tfRowPanels.Count; $i++) {
+            if ($i -lt $folders.Count) {
+                $f = $folders[$i]
+                $script:tfRowPanels[$i].Visible   = $true
+                $script:tfPathLabels[$i].Text     = $f.Path
+                $sizeStr = if ($f.Bytes -ge 1GB) {
+                    "$([math]::Round($f.Bytes / 1GB, 2)) GB"
+                } else {
+                    "$([math]::Round($f.Bytes / 1MB, 1)) MB"
+                }
+                $script:tfSizeLabels[$i].Text     = $sizeStr
+                $pct = [int]([math]::Round(($f.Bytes / $maxBytes) * 100))
+                $script:tfBars[$i].Tag = @{ Pct = $pct; FillColor = (Pct-Color $pct) }
+                $script:tfBars[$i].Invalidate()
+                $script:tfFolderBtns[$i].Tag = $f.Path
+            } else {
+                $script:tfRowPanels[$i].Visible = $false
+            }
+        }
+    } catch {
+        Write-Log -Message "Update-TopFolderPanel error" -Level WARN -ExceptionRecord $_
+    }
+}
 #endregion
 
 # ── DataCache: thread-safe shared state (producer=DataEngine, consumer=UI timer) ──
@@ -433,6 +525,7 @@ $script:DataCache = [System.Collections.Hashtable]::Synchronized(@{
     DTotal       = '0'
     Temps        = @{ Available = $false; CPU = $null; GPU = $null }
     Procs        = @()
+    TopFolders   = @()
     LastUpdated  = [DateTime]::MinValue
     Ready        = $false
 })
@@ -1545,6 +1638,141 @@ $cleanAllBtn.Add_Click({
     }
 })
 
+# ── Enable auto-scroll so TopFolders section is reachable ───────────────
+$tab3.AutoScroll = $true
+
+# ── TOP 10 LARGEST FOLDERS section ──────────────────────────────────────
+$tfSectionY = 692
+
+$tfHeaderPnl = New-Pnl 15 $tfSectionY 1020 36 $C.BgCard3
+$tfHeaderPnl.Add_Paint({
+    param($s2, $pe)
+    try {
+        $pe.Graphics.DrawLine(
+            (New-Object Drawing.Pen($C.Border, 1)),
+            0, $s2.Height - 1, $s2.Width, $s2.Height - 1)
+    } catch {
+        Write-Log -Message "tfHeaderPnl Paint error" -Level WARN -ExceptionRecord $_
+    }
+})
+$tfHeaderLbl = New-Object Windows.Forms.Label
+$tfHeaderLbl.Text      = "  TOP 10 LARGEST FOLDERS  --  C:\"
+$tfHeaderLbl.Location  = [Drawing.Point]::new(4, 8)
+$tfHeaderLbl.Size      = [Drawing.Size]::new(800, 20)
+$tfHeaderLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+$tfHeaderLbl.ForeColor = $C.Blue
+$tfHeaderLbl.BackColor = [Drawing.Color]::Transparent
+$tfHeaderPnl.Controls.Add($tfHeaderLbl)
+
+$script:tfScanBtn = New-Btn "SCAN" 870 4 140 28 $C.BgCard2 $C.Blue
+$script:tfScanBtn.FlatAppearance.BorderColor = $C.Blue
+$script:tfScanBtn.FlatAppearance.BorderSize  = 1
+$tfHeaderPnl.Controls.Add($script:tfScanBtn)
+$tab3.Controls.Add($tfHeaderPnl)
+
+# Container panel for the 10 folder rows
+$script:tfContainer = New-Pnl 15 ($tfSectionY + 36) 1020 360 $C.BgCard
+$tab3.Controls.Add($script:tfContainer)
+
+# Placeholder label shown before any scan (lives inside the container)
+$script:tfPlaceholder = New-Object Windows.Forms.Label
+$script:tfPlaceholder.Text      = "Click SCAN to analyze disk usage on C:\"
+$script:tfPlaceholder.Location  = [Drawing.Point]::new(0, 152)
+$script:tfPlaceholder.Size      = [Drawing.Size]::new(1020, 36)
+$script:tfPlaceholder.Font      = New-Object Drawing.Font("Consolas", 9)
+$script:tfPlaceholder.ForeColor = $C.Dim
+$script:tfPlaceholder.BackColor = [Drawing.Color]::Transparent
+$script:tfPlaceholder.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+$script:tfContainer.Controls.Add($script:tfPlaceholder)
+
+# Arrays for per-row control references (populated in the loop below)
+$script:tfRowPanels  = New-Object System.Collections.ArrayList
+$script:tfPathLabels = New-Object System.Collections.ArrayList
+$script:tfSizeLabels = New-Object System.Collections.ArrayList
+$script:tfBars       = New-Object System.Collections.ArrayList
+$script:tfFolderBtns = New-Object System.Collections.ArrayList
+
+for ($tfI = 0; $tfI -lt 10; $tfI++) {
+    $rowBg  = if ($tfI % 2 -eq 0) { $C.BgCard } else { $C.BgCard2 }
+    $rowPnl = New-Pnl 0 ($tfI * 36) 1020 36 $rowBg
+    $rowPnl.Visible = $false
+
+    # Folder open button
+    $fBtn = New-Object Windows.Forms.Button
+    $fBtn.Text      = ">"
+    $fBtn.Location  = [Drawing.Point]::new(0, 0)
+    $fBtn.Size      = [Drawing.Size]::new(36, 36)
+    $fBtn.BackColor = $C.BgCard3
+    $fBtn.ForeColor = $C.Yellow
+    $fBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $fBtn.FlatAppearance.BorderSize              = 0
+    $fBtn.FlatAppearance.MouseOverBackColor      = $C.BgCard2
+    $fBtn.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
+    $fBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+    $fBtn.Tag       = ""
+    $fBtn.Add_Click({
+        param($s, $e)
+        $p = $s.Tag
+        if ($p) {
+            try { Start-Process -FilePath "explorer.exe" -ArgumentList "`"$p`"" }
+            catch { Write-Log -Message "Failed to open explorer for: $p" -Level WARN -ExceptionRecord $_ }
+        }
+    })
+    $rowPnl.Controls.Add($fBtn)
+
+    # Path label (auto-ellipsis for long paths)
+    $pLbl = New-Object Windows.Forms.Label
+    $pLbl.Text         = ""
+    $pLbl.Location     = [Drawing.Point]::new(40, 2)
+    $pLbl.Size         = [Drawing.Size]::new(720, 32)
+    $pLbl.Font         = New-Object Drawing.Font("Consolas", 9)
+    $pLbl.ForeColor    = $C.Text
+    $pLbl.BackColor    = [Drawing.Color]::Transparent
+    $pLbl.AutoEllipsis = $true
+    $pLbl.TextAlign    = [Drawing.ContentAlignment]::MiddleLeft
+    $rowPnl.Controls.Add($pLbl)
+
+    # Size label (right-aligned)
+    $sLbl = New-Object Windows.Forms.Label
+    $sLbl.Text      = ""
+    $sLbl.Location  = [Drawing.Point]::new(764, 2)
+    $sLbl.Size      = [Drawing.Size]::new(90, 32)
+    $sLbl.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $sLbl.ForeColor = $C.Yellow
+    $sLbl.BackColor = [Drawing.Color]::Transparent
+    $sLbl.TextAlign = [Drawing.ContentAlignment]::MiddleRight
+    $rowPnl.Controls.Add($sLbl)
+
+    # Progress bar: custom-painted 4px panel (track + fill via Paint)
+    $bar = New-Pnl 862 16 120 4 $C.BgCard3
+    $bar.Tag = @{ Pct = 0; FillColor = $C.Green }
+    $bar.Add_Paint({
+        param($s2, $pe)
+        try {
+            $td    = $s2.Tag
+            $fillW = [math]::Max(0, [int]([math]::Round(($td.Pct / 100.0) * $s2.Width)))
+            if ($fillW -gt 0) {
+                $br = New-Object Drawing.SolidBrush($td.FillColor)
+                $pe.Graphics.FillRectangle($br, 0, 0, $fillW, $s2.Height)
+                $br.Dispose()
+            }
+        } catch {
+            Write-Log -Message "TopFolder bar Paint error" -Level WARN -ExceptionRecord $_
+        }
+    })
+    $rowPnl.Controls.Add($bar)
+
+    [void]$script:tfRowPanels.Add($rowPnl)
+    [void]$script:tfPathLabels.Add($pLbl)
+    [void]$script:tfSizeLabels.Add($sLbl)
+    [void]$script:tfBars.Add($bar)
+    [void]$script:tfFolderBtns.Add($fBtn)
+
+    $script:tfContainer.Controls.Add($rowPnl)
+}
+
+$script:tfScanBtn.Add_Click({ Invoke-TopFolderScan })
+
 $tabs.TabPages.Add($tab3)
 
 
@@ -1792,6 +2020,13 @@ function Do-Refresh {
         while ($script:DataEngineErrIdx -lt $errs.Count) {
             Write-Log -Message "DataEngine error: $($errs[$script:DataEngineErrIdx].ToString())" -Level ERROR
             $script:DataEngineErrIdx++
+        }
+
+        # TopFolders panel: refresh whenever Cleanup tab is active and scan data exists
+        if ($tabs.SelectedTab -eq $tab3 -and
+            $null -ne $script:DataCache['TopFolders'] -and
+            $script:DataCache['TopFolders'].Count -gt 0) {
+            Update-TopFolderPanel
         }
 
         $script:tickCount++
