@@ -422,6 +422,21 @@ function Invoke-KillProcess {
 }
 #endregion
 
+# ── DataCache: thread-safe shared state (producer=DataEngine, consumer=UI timer) ──
+$script:DataCache = [System.Collections.Hashtable]::Synchronized(@{
+    CpuPct       = 0
+    RamPct       = 0
+    UsedRAM      = '0'
+    DPct         = 0
+    DUsed        = '0'
+    DFree        = '0'
+    DTotal       = '0'
+    Temps        = @{ Available = $false; CPU = $null; GPU = $null }
+    Procs        = @()
+    LastUpdated  = [DateTime]::MinValue
+    Ready        = $false
+})
+
 # ── DataEngine: persistent background runspace — all blocking I/O lives here ──
 # Use CreateDefault() so all built-in cmdlets (Get-CimInstance, Get-Process, etc.) are available
 $script:DataEngineISS = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
