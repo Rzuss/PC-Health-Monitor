@@ -531,7 +531,9 @@ function Invoke-KillProcess {
 #endregion
 
 # ── DataEngine: persistent background runspace — all blocking I/O lives here ──
-$script:DataEngineRS = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+# Use CreateDefault() so all built-in cmdlets (Get-CimInstance, Get-Process, etc.) are available
+$script:DataEngineISS = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+$script:DataEngineRS  = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace($script:DataEngineISS)
 $script:DataEngineRS.ApartmentState = 'MTA'
 $script:DataEngineRS.ThreadOptions  = 'Default'
 $script:DataEngineRS.Open()
@@ -631,7 +633,10 @@ $script:DataEnginePS.Runspace = $script:DataEngineRS
 }).AddArgument($script:DataCache).AddArgument($script:totalRAM)
 
 $script:DataEngineHandle = $script:DataEnginePS.BeginInvoke()
-Write-Log -Message "DataEngine background worker started (MTA runspace)" -Level INFO
+Write-Log -Message "DataEngine background worker started (MTA runspace, InitialSessionState=Default)" -Level INFO
+
+# Log any DataEngine stream errors on each UI tick (diagnostic helper)
+$script:DataEngineErrIdx = 0
 
 #region 5 - UI Initialization
 # -- MAIN FORM -----------------------------------------------------------
@@ -778,7 +783,7 @@ $UI = @{}
 $cardDefs = @(
     @{Key="Cpu";  Title="CPU Load";  X=15;  Color=$C.Blue;   TrackColor=$C.BlueGlow;   Val="$($live.CpuPct)%";                                  Pct=$live.CpuPct},
     @{Key="Ram";  Title="RAM Usage"; X=280; Color=$C.Purple; TrackColor=$C.PurpleGlow; Val="$($live.UsedRAM) GB / $totalRAM GB";                Pct=$live.RamPct},
-    @{Key="Disk"; Title="Disk C:";   X=545; Color=$C.Yellow; TrackColor=$C.BgCard2;    Val="$($live.DUsed) GB used  |  $($live.DFree) GB free"; Pct=$live.DPct}
+    @{Key="Disk"; Title="Disk C:";   X=545; Color=$C.Yellow; TrackColor=$C.BgCard2;    Val="$($live.DUsed) / $($live.DTotal) GB"; Pct=$live.DPct}
 )
 
 foreach ($cd in $cardDefs) {
@@ -1995,7 +2000,7 @@ function Do-Refresh {
 
         # Disk card (every 5 ticks = ~15 sec)
         if ($script:tickCount % 5 -eq 0) {
-            $UI["DiskValLbl"].Text      = "$($d['DUsed']) GB used  |  $($d['DFree']) GB free"
+            $UI["DiskValLbl"].Text      = "$($d['DUsed']) / $($d['DTotal']) GB"
             $UI["DiskPctLbl"].Text      = "$($d['DPct'])%"
             $UI["DiskPctLbl"].ForeColor = Pct-Color $d['DPct']
             $UI["DiskCard"].Tag.Pct     = $d['DPct']
@@ -2083,6 +2088,13 @@ function Do-Refresh {
                     "Drive C: is $($d.DPct)% full - only $($d.DFree) GB free",
                     [Windows.Forms.ToolTipIcon]::Warning)
             }
+        }
+
+        # Drain any errors the DataEngine emitted (logged once per error)
+        $errs = $script:DataEnginePS.Streams.Error
+        while ($script:DataEngineErrIdx -lt $errs.Count) {
+            Write-Log -Message "DataEngine error: $($errs[$script:DataEngineErrIdx].ToString())" -Level ERROR
+            $script:DataEngineErrIdx++
         }
 
         $script:tickCount++
