@@ -28,6 +28,34 @@ try {
     exit 1
 }
 
+# Step 2a -- Download threat intelligence database (optional — offline IOC lookup)
+$ThreatIntelUrl  = 'https://raw.githubusercontent.com/Rzuss/PC-Health-Monitor/main/threat_intel.json'
+$ThreatIntelDest = Join-Path $InstallDir 'threat_intel.json'
+try {
+    $wc2 = New-Object System.Net.WebClient
+    $wc2.DownloadFile($ThreatIntelUrl, $ThreatIntelDest)
+    $tiJson    = Get-Content $ThreatIntelDest -Raw | ConvertFrom-Json
+    $iocCount  = $tiJson.ioc_count
+    Write-Host "  [OK] Threat intel downloaded ($iocCount IOCs)." -ForegroundColor Cyan
+} catch {
+    Write-Host "  [WARN] Could not download threat_intel.json: $_" -ForegroundColor Yellow
+    Write-Host "         Network tab threat detection will be disabled." -ForegroundColor Gray
+}
+
+# Step 2.5 -- Install pandas for predictive health analytics
+try {
+    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCmd) {
+        & python -m pip install pandas --quiet --exists-action i 2>&1 | Out-Null
+        Write-Host "  [OK] Python + pandas ready for health analytics." -ForegroundColor Cyan
+    } else {
+        Write-Host "  [SKIP] Python not found -- Health Score card will show pending state." -ForegroundColor Yellow
+        Write-Host "         Install Python from https://www.python.org to enable analytics." -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "  [WARN] Could not verify pandas: $_" -ForegroundColor Yellow
+}
+
 # Step 3 -- Create Desktop shortcut
 try {
     $WshShell = New-Object -ComObject WScript.Shell
