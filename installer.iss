@@ -3,7 +3,7 @@
 ; Requires: Inno Setup 6.x (https://jrsoftware.org/isinfo.php)
 
 #define AppName      "PC Health Monitor"
-#define AppVersion   "3.0"
+#define AppVersion   "3.1"
 #define AppPublisher "Rotem"
 #define AppURL       "https://github.com/Rzuss/PC-Health-Monitor"
 #define AppExeName   "PC-Health-Monitor.ps1"
@@ -52,18 +52,12 @@ Source: "Register-HealthTask.ps1";         DestDir: "{app}"; Flags: ignoreversio
 Source: "Create-Desktop-Shortcut.bat";     DestDir: "{app}"; Flags: ignoreversion
 Source: "Launch-Monitor.vbs";              DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
-; Threat intelligence database
-Source: "threat_intel.json";               DestDir: "{app}"; Flags: ignoreversion
-
 ; Python analytics engine (optional)
 Source: "health_analyzer.py";              DestDir: "{app}"; Flags: ignoreversion
 Source: "baseline_engine.py";              DestDir: "{app}"; Flags: ignoreversion
 
 ; Plugins folder
 Source: "plugins\*";                       DestDir: "{app}\plugins"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-; Scripts folder
-Source: "scripts\*";                       DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 ; Screenshots (for reference)
 Source: "screenshots\*";                   DestDir: "{app}\screenshots"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
