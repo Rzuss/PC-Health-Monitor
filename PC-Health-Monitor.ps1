@@ -946,7 +946,7 @@ $scoreCard.Add_Paint({
 })
 
 $script:scoreNumLbl = New-Object Windows.Forms.Label
-$script:scoreNumLbl.Text      = '--'
+$script:scoreNumLbl.Text      = '?'
 $script:scoreNumLbl.Location  = [Drawing.Point]::new(10, 8)
 $script:scoreNumLbl.Size      = [Drawing.Size]::new(82, 54)
 $script:scoreNumLbl.Font      = New-Object Drawing.Font("Consolas", 20, [Drawing.FontStyle]::Bold)
@@ -955,10 +955,10 @@ $script:scoreNumLbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreNumLbl)
 
 $script:scoreGradeLbl = New-Object Windows.Forms.Label
-$script:scoreGradeLbl.Text      = 'HEALTH SCORE'
+$script:scoreGradeLbl.Text      = 'PC HEALTH'
 $script:scoreGradeLbl.Location  = [Drawing.Point]::new(98, 6)
 $script:scoreGradeLbl.Size      = [Drawing.Size]::new(150, 22)
-$script:scoreGradeLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+$script:scoreGradeLbl.Font      = New-Object Drawing.Font("Segoe UI", 9, [Drawing.FontStyle]::Bold)
 $script:scoreGradeLbl.ForeColor = $C.Dim
 $script:scoreGradeLbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreGradeLbl)
@@ -973,7 +973,7 @@ $script:scoreTrendLbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreTrendLbl)
 
 $script:scoreMsg1Lbl = New-Object Windows.Forms.Label
-$script:scoreMsg1Lbl.Text      = 'Analytics not yet run -- install Python & run Register-HealthTask.ps1'
+$script:scoreMsg1Lbl.Text      = 'Your PC health score will appear here after the first daily scan (runs tonight at 3:00 AM).'
 $script:scoreMsg1Lbl.Location  = [Drawing.Point]::new(98, 32)
 $script:scoreMsg1Lbl.Size      = [Drawing.Size]::new(900, 16)
 $script:scoreMsg1Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
@@ -2144,6 +2144,134 @@ $form.Add_FormClosing({
         } catch { <# best-effort cleanup #> }
     }
 })
+#endregion
+
+#region 6.5 - First-Run Wizard
+$script:firstRunRegPath      = 'HKCU:\Software\PC-Health-Monitor'
+$script:firstRunDone         = $false
+$script:wizardExitRequested  = $false
+
+try {
+    $script:firstRunDone = $null -ne (Get-ItemProperty -Path $script:firstRunRegPath -Name 'FirstRunDone' -ErrorAction SilentlyContinue)
+} catch {
+    Write-Log -Message "Could not read FirstRunDone registry key" -Level WARN -ExceptionRecord $_
+}
+
+if (-not $script:firstRunDone) {
+    $wizard = New-Object Windows.Forms.Form
+    $wizard.Size            = [Drawing.Size]::new(480, 300)
+    $wizard.StartPosition   = 'CenterScreen'
+    $wizard.BackColor       = $C.BgCard
+    $wizard.FormBorderStyle = [Windows.Forms.FormBorderStyle]::FixedDialog
+    $wizard.MinimizeBox     = $false
+    $wizard.MaximizeBox     = $false
+    $wizard.ControlBox      = $false
+
+    # Neon circle icon (GDI+ painted, 40x40, centered)
+    $wizIconPnl = New-Object Windows.Forms.Panel
+    $wizIconPnl.Location  = [Drawing.Point]::new(220, 18)
+    $wizIconPnl.Size      = [Drawing.Size]::new(40, 40)
+    $wizIconPnl.BackColor = $C.BgCard
+    Enable-DoubleBuffer $wizIconPnl
+    $wizIconPnl.Add_Paint({
+        param($s2, $pe)
+        try {
+            $g = $pe.Graphics
+            $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $glowBr = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(60, 6, 182, 212))
+            $g.FillEllipse($glowBr, -4, -4, 48, 48)
+            $glowBr.Dispose()
+            $cyanBr = New-Object Drawing.SolidBrush($C.Blue)
+            $g.FillEllipse($cyanBr, 2, 2, 36, 36)
+            $cyanBr.Dispose()
+        } catch { <# non-critical paint — glow circle not rendered this frame #> }
+    })
+    $wizard.Controls.Add($wizIconPnl)
+
+    # Title
+    $wizTitleLbl = New-Object Windows.Forms.Label
+    $wizTitleLbl.Text      = "Welcome to PC Health Monitor"
+    $wizTitleLbl.Location  = [Drawing.Point]::new(20, 66)
+    $wizTitleLbl.Size      = [Drawing.Size]::new(440, 38)
+    $wizTitleLbl.Font      = New-Object Drawing.Font("Segoe UI Light", 18)
+    $wizTitleLbl.ForeColor = $C.Blue
+    $wizTitleLbl.BackColor = [Drawing.Color]::Transparent
+    $wizTitleLbl.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $wizard.Controls.Add($wizTitleLbl)
+
+    # Body text (3 lines)
+    $wizBodyLbl = New-Object Windows.Forms.Label
+    $wizBodyLbl.Text      = "Your PC is being scanned. This takes about 3 seconds.`nNo data leaves your computer. Everything runs locally.`n"
+    $wizBodyLbl.Location  = [Drawing.Point]::new(20, 112)
+    $wizBodyLbl.Size      = [Drawing.Size]::new(440, 60)
+    $wizBodyLbl.Font      = New-Object Drawing.Font("Segoe UI", 9)
+    $wizBodyLbl.ForeColor = $C.SubText
+    $wizBodyLbl.BackColor = [Drawing.Color]::Transparent
+    $wizBodyLbl.TextAlign = [Drawing.ContentAlignment]::TopCenter
+    $wizard.Controls.Add($wizBodyLbl)
+
+    # Admin checkbox — only shown when running without admin rights
+    $wizAdminChk = $null
+    if (-not $script:isAdmin) {
+        $wizAdminChk = New-Object Windows.Forms.CheckBox
+        $wizAdminChk.Text      = "Run as Administrator for full cleanup access"
+        $wizAdminChk.Location  = [Drawing.Point]::new(30, 185)
+        $wizAdminChk.Size      = [Drawing.Size]::new(420, 22)
+        $wizAdminChk.Font      = New-Object Drawing.Font("Segoe UI", 9)
+        $wizAdminChk.ForeColor = $C.SubText
+        $wizAdminChk.BackColor = [Drawing.Color]::Transparent
+        $wizAdminChk.Checked   = $false
+        $wizard.Controls.Add($wizAdminChk)
+    }
+
+    # Get Started button (centered: (480-160)/2 = 160)
+    $wizBtn = New-Object Windows.Forms.Button
+    $wizBtn.Text      = "Get Started " + [char]0x2192
+    $wizBtn.Location  = [Drawing.Point]::new(160, 222)
+    $wizBtn.Size      = [Drawing.Size]::new(160, 40)
+    $wizBtn.BackColor = $C.Blue
+    $wizBtn.ForeColor = [Drawing.Color]::White
+    $wizBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $wizBtn.FlatAppearance.BorderSize = 0
+    $wizBtn.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+    $wizBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+
+    # Capture variables for closure
+    $capturedWizChk  = $wizAdminChk
+    $capturedWizForm = $wizard
+
+    $wizBtn.Add_Click({
+        if ($null -ne $capturedWizChk -and $capturedWizChk.Checked) {
+            $script:wizardExitRequested = $true
+        }
+        $capturedWizForm.Close()
+    })
+    $wizard.Controls.Add($wizBtn)
+
+    [void]$wizard.ShowDialog()
+    $wizard.Dispose()
+
+    # Persist first-run flag regardless of path taken
+    try {
+        if (-not (Test-Path $script:firstRunRegPath)) {
+            [void](New-Item -Path $script:firstRunRegPath -Force -ErrorAction Stop)
+        }
+        Set-ItemProperty -Path $script:firstRunRegPath -Name 'FirstRunDone' -Value 1 -ErrorAction Stop
+        Write-Log -Message "FirstRunDone registry key written" -Level INFO
+    } catch {
+        Write-Log -Message "Could not write FirstRunDone registry key" -Level WARN -ExceptionRecord $_
+    }
+
+    # Admin restart path: launch elevated then exit this instance
+    if ($script:wizardExitRequested) {
+        try {
+            Start-Process powershell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSScriptRoot\PC-Health-Monitor.ps1`""
+        } catch {
+            Write-Log -Message "Failed to relaunch as Administrator from first-run wizard" -Level WARN -ExceptionRecord $_
+        }
+        exit
+    }
+}
 #endregion
 
 #region 7 - Execution
