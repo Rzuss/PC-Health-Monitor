@@ -3,6 +3,25 @@
 
 $ErrorActionPreference = 'Stop'
 
+# -- ExecutionPolicy check -----------------------------------------------
+# irm ... | iex runs in-memory and bypasses file-based policy restrictions,
+# so the installer itself will run fine. However, we verify the policy so
+# the shortcut we create can always launch the .ps1 on disk without friction.
+$policy = Get-ExecutionPolicy -Scope CurrentUser
+if ($policy -eq 'Restricted' -or $policy -eq 'AllSigned') {
+    Write-Host ""
+    Write-Host "  [INFO] ExecutionPolicy is '$policy' for your user account." -ForegroundColor Yellow
+    Write-Host "         Setting it to RemoteSigned so the shortcut can launch the app." -ForegroundColor Yellow
+    try {
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+        Write-Host "  [OK]  ExecutionPolicy set to RemoteSigned (CurrentUser)." -ForegroundColor Green
+    } catch {
+        Write-Host "  [WARN] Could not change ExecutionPolicy: $_" -ForegroundColor Yellow
+        Write-Host "         The Desktop shortcut uses -ExecutionPolicy Bypass and will still work." -ForegroundColor Gray
+    }
+}
+# ------------------------------------------------------------------------
+
 $InstallDir  = Join-Path $env:LOCALAPPDATA 'PC-Health-Monitor'
 $ScriptUrl   = 'https://raw.githubusercontent.com/Rzuss/PC-Health-Monitor/main/PC-Health-Monitor.ps1'
 $ScriptDest  = Join-Path $InstallDir 'PC-Health-Monitor.ps1'
@@ -28,32 +47,18 @@ try {
     exit 1
 }
 
-# Step 2a -- Download threat intelligence database (optional — offline IOC lookup)
-$ThreatIntelUrl  = 'https://raw.githubusercontent.com/Rzuss/PC-Health-Monitor/main/threat_intel.json'
-$ThreatIntelDest = Join-Path $InstallDir 'threat_intel.json'
-try {
-    $wc2 = New-Object System.Net.WebClient
-    $wc2.DownloadFile($ThreatIntelUrl, $ThreatIntelDest)
-    $tiJson    = Get-Content $ThreatIntelDest -Raw | ConvertFrom-Json
-    $iocCount  = $tiJson.ioc_count
-    Write-Host "  [OK] Threat intel downloaded ($iocCount IOCs)." -ForegroundColor Cyan
-} catch {
-    Write-Host "  [WARN] Could not download threat_intel.json: $_" -ForegroundColor Yellow
-    Write-Host "         Network tab threat detection will be disabled." -ForegroundColor Gray
-}
-
-# Step 2.5 -- Install pandas for predictive health analytics
+# Step 2.5 -- Install Python analytics dependencies (optional)
 try {
     $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
     if ($pythonCmd) {
-        & python -m pip install pandas --quiet --exists-action i 2>&1 | Out-Null
-        Write-Host "  [OK] Python + pandas ready for health analytics." -ForegroundColor Cyan
+        & python -m pip install pandas numpy --quiet --exists-action i 2>&1 | Out-Null
+        Write-Host "  [OK] Python + pandas + numpy ready for health analytics." -ForegroundColor Cyan
     } else {
         Write-Host "  [SKIP] Python not found -- Health Score card will show pending state." -ForegroundColor Yellow
         Write-Host "         Install Python from https://www.python.org to enable analytics." -ForegroundColor Gray
     }
 } catch {
-    Write-Host "  [WARN] Could not verify pandas: $_" -ForegroundColor Yellow
+    Write-Host "  [WARN] Could not verify Python packages: $_" -ForegroundColor Yellow
 }
 
 # Step 3 -- Create Desktop shortcut
