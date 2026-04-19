@@ -84,28 +84,51 @@ $script:UIFont   = New-Object Drawing.Font("Segoe UI",  9)
 $script:isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
 
-# -- Color Palette -------------------------------------------------------
+# -- Color Palette (Neon HUD Design System) ------------------------------
 $C = @{
-    BgBase     = [Drawing.Color]::FromArgb(2,   6,   23)
-    BgCard     = [Drawing.Color]::FromArgb(10,  18,  40)
-    BgCard2    = [Drawing.Color]::FromArgb(18,  30,  58)
-    BgCard3    = [Drawing.Color]::FromArgb(15,  23,  42)
-    Blue       = [Drawing.Color]::FromArgb(56,  189, 248)
-    BlueGlow   = [Drawing.Color]::FromArgb(30,  100, 160)
+    BgBase     = [Drawing.Color]::FromArgb(8,   15,  26)
+    BgCard     = [Drawing.Color]::FromArgb(12,  24,  42)
+    BgCard2    = [Drawing.Color]::FromArgb(10,  20,  35)
+    BgCard3    = [Drawing.Color]::FromArgb(10,  25,  45)
+    Blue       = [Drawing.Color]::FromArgb(6,   182, 212)
+    BlueGlow   = [Drawing.Color]::FromArgb(100, 6,   182, 212)
     Purple     = [Drawing.Color]::FromArgb(168, 85,  247)
-    PurpleGlow = [Drawing.Color]::FromArgb(80,  40,  130)
-    Green      = [Drawing.Color]::FromArgb(74,  222, 128)
-    Yellow     = [Drawing.Color]::FromArgb(250, 204, 21)
-    Red        = [Drawing.Color]::FromArgb(248, 113, 113)
-    Orange     = [Drawing.Color]::FromArgb(251, 146, 60)
-    Text       = [Drawing.Color]::FromArgb(226, 232, 240)
+    PurpleGlow = [Drawing.Color]::FromArgb(100, 168, 85,  247)
+    Green      = [Drawing.Color]::FromArgb(34,  197, 94)
+    Yellow     = [Drawing.Color]::FromArgb(249, 115, 22)
+    Red        = [Drawing.Color]::FromArgb(239, 68,  68)
+    Orange     = [Drawing.Color]::FromArgb(249, 115, 22)
+    Text       = [Drawing.Color]::FromArgb(240, 248, 255)
     SubText    = [Drawing.Color]::FromArgb(148, 163, 184)
     Dim        = [Drawing.Color]::FromArgb(71,  85,  105)
     White      = [Drawing.Color]::White
-    DarkRed    = [Drawing.Color]::FromArgb(185, 40,  60)
-    DarkGreen  = [Drawing.Color]::FromArgb(30,  140, 70)
-    Border     = [Drawing.Color]::FromArgb(30,  50,  80)
-    Anomaly    = [Drawing.Color]::FromArgb(232, 121, 249)
+    DarkRed    = [Drawing.Color]::FromArgb(120, 20,  30)
+    DarkGreen  = [Drawing.Color]::FromArgb(20,  80,  40)
+    Border     = [Drawing.Color]::FromArgb(20,  40,  70)
+    Anomaly    = [Drawing.Color]::FromArgb(168, 85,  247)
+}
+
+$script:Colors = @{
+    BG_Primary     = $C.BgBase
+    BG_Panel       = $C.BgCard2
+    BG_Card        = $C.BgCard
+    Neon_Purple    = $C.Purple
+    Neon_Blue      = [Drawing.Color]::FromArgb(59,  130, 246)
+    Neon_Cyan      = $C.Blue
+    Neon_Green     = $C.Green
+    Neon_Red       = $C.Red
+    Neon_Orange    = $C.Yellow
+    Glow_Purple    = $C.PurpleGlow
+    Glow_Blue      = [Drawing.Color]::FromArgb(100, 59,  130, 246)
+    Glow_Cyan      = $C.BlueGlow
+    Text_Primary   = $C.Text
+    Text_Secondary = $C.SubText
+    Text_Dim       = $C.Dim
+    Text_Accent    = $C.Blue
+    Severity_High  = $C.Red
+    Severity_Med   = $C.Yellow
+    Severity_Low   = $C.Green
+    Severity_None  = $C.SubText
 }
 
 # -- Protected Process Blacklist -----------------------------------------
@@ -179,30 +202,31 @@ function New-Pnl($x, $y, $w, $h, $col) {
 }
 
 function Style-Grid($g) {
-    $g.BackgroundColor    = $C.BgCard
+    $g.BackgroundColor    = $C.BgBase
     $g.ForeColor          = $C.Text
-    $g.GridColor          = $C.Border
+    $g.GridColor          = [Drawing.Color]::FromArgb(25, 255, 255, 255)
     $g.BorderStyle        = [Windows.Forms.BorderStyle]::None
     $g.RowHeadersVisible  = $false
     $g.ReadOnly           = $true
     $g.AllowUserToAddRows = $false
     $g.AllowUserToDeleteRows = $false
     $g.SelectionMode      = [Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
-    $g.ColumnHeadersDefaultCellStyle.BackColor  = $C.BgCard3
+    $g.ColumnHeadersDefaultCellStyle.BackColor  = $C.BgCard2
     $g.ColumnHeadersDefaultCellStyle.ForeColor  = $C.Blue
-    $g.ColumnHeadersDefaultCellStyle.Font       = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $g.ColumnHeadersDefaultCellStyle.Font       = New-Object Drawing.Font("Segoe UI", 8, [Drawing.FontStyle]::Bold)
     $g.ColumnHeadersHeightSizeMode = [Windows.Forms.DataGridViewColumnHeadersHeightSizeMode]::DisableResizing
     $g.ColumnHeadersHeight = 32
     $g.DefaultCellStyle.BackColor          = $C.BgCard
     $g.DefaultCellStyle.ForeColor          = $C.Text
-    $g.DefaultCellStyle.Font               = New-Object Drawing.Font("Consolas", 9)
-    $g.DefaultCellStyle.SelectionBackColor = $C.BgCard2
-    $g.DefaultCellStyle.SelectionForeColor = $C.Blue
+    $g.DefaultCellStyle.Font               = New-Object Drawing.Font("Consolas", 8)
+    $g.DefaultCellStyle.SelectionBackColor = [Drawing.Color]::FromArgb(60, 59, 130, 246)
+    $g.DefaultCellStyle.SelectionForeColor = $C.Text
     $g.DefaultCellStyle.Padding            = New-Object Windows.Forms.Padding(4,0,4,0)
     $g.AlternatingRowsDefaultCellStyle.BackColor = $C.BgCard2
-    $g.Font = New-Object Drawing.Font("Consolas", 9)
+    $g.Font = New-Object Drawing.Font("Consolas", 8)
     $g.RowTemplate.Height = 26
     $g.EnableHeadersVisualStyles = $false
+    $g.DoubleBuffered = $true
 }
 
 function Add-Col($grid, $header, $fillW=100) {
@@ -217,34 +241,85 @@ function Add-Col($grid, $header, $fillW=100) {
 # -- GDI+ Helpers --------------------------------------------------------
 function Draw-CircleGauge {
     param($Graphics, $CenterX, $CenterY, $Radius, $Pct, $Color, $TrackColor, $Thick = 6)
-    $rect = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY - $Radius, $Radius * 2, $Radius * 2)
-    $trackPen = New-Object Drawing.Pen($TrackColor, $Thick)
-    $trackPen.StartCap = [Drawing.Drawing2D.LineCap]::Round
-    $trackPen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
-    $Graphics.DrawArc($trackPen, $rect, -90, 360)
-    $sweep = [math]::Max(0, [math]::Min(360, ($Pct / 100) * 360))
-    if ($sweep -gt 2) {
-        $pen = New-Object Drawing.Pen($Color, $Thick)
-        $pen.StartCap = [Drawing.Drawing2D.LineCap]::Round
-        $pen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
-        $Graphics.DrawArc($pen, $rect, -90, $sweep)
-    }
-    $font  = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
-    $label = "$([math]::Round($Pct))%"
-    $sf = New-Object Drawing.StringFormat
-    $sf.Alignment      = [Drawing.StringAlignment]::Center
-    $sf.LineAlignment  = [Drawing.StringAlignment]::Center
-    $brush    = New-Object Drawing.SolidBrush($Color)
-    $textRect = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY - $Radius, $Radius * 2, $Radius * 2)
-    $Graphics.DrawString($label, $font, $brush, $textRect, $sf)
+    try {
+        $g = $Graphics
+        $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+
+        $startAngle  = 135.0
+        $sweepTotal  = 270.0
+        $rect = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY - $Radius, $Radius * 2, $Radius * 2)
+
+        # Track arc
+        $trackPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(50, 30, 80, 120), $Thick)
+        $trackPen.StartCap = [Drawing.Drawing2D.LineCap]::Round
+        $trackPen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
+        $g.DrawArc($trackPen, $rect, $startAngle, $sweepTotal)
+        $trackPen.Dispose()
+
+        # Threshold-based arc color
+        $arcColor = if ($Pct -gt 85)     { $script:Colors.Neon_Red    }
+                    elseif ($Pct -gt 60) { $script:Colors.Neon_Orange  }
+                    else                 { $script:Colors.Neon_Green   }
+
+        $sweep = [math]::Max(0.0, [math]::Min($sweepTotal, ($Pct / 100.0) * $sweepTotal))
+        if ($sweep -gt 2) {
+            # Outer glow pass
+            $glowPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(55, $arcColor.R, $arcColor.G, $arcColor.B), ($Thick + 5))
+            $glowPen.StartCap = [Drawing.Drawing2D.LineCap]::Round
+            $glowPen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($glowPen, $rect, $startAngle, $sweep)
+            $glowPen.Dispose()
+
+            # Main arc
+            $arcPen = New-Object Drawing.Pen($arcColor, $Thick)
+            $arcPen.StartCap = [Drawing.Drawing2D.LineCap]::Round
+            $arcPen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($arcPen, $rect, $startAngle, $sweep)
+            $arcPen.Dispose()
+        }
+
+        # Center fill circle
+        $innerR = [math]::Max(4, $Radius - $Thick - 3)
+        $innerRect = [Drawing.RectangleF]::new($CenterX - $innerR, $CenterY - $innerR, $innerR * 2, $innerR * 2)
+        $centerBr = New-Object Drawing.SolidBrush($script:Colors.BG_Primary)
+        $g.FillEllipse($centerBr, $innerRect)
+        $centerBr.Dispose()
+
+        # Value label in center
+        $font  = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
+        $sf    = New-Object Drawing.StringFormat
+        $sf.Alignment     = [Drawing.StringAlignment]::Center
+        $sf.LineAlignment = [Drawing.StringAlignment]::Center
+        $brush = New-Object Drawing.SolidBrush($arcColor)
+        $textRect = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY - $Radius, $Radius * 2, $Radius * 2)
+        $g.DrawString("$([math]::Round($Pct))%", $font, $brush, $textRect, $sf)
+        $brush.Dispose()
+        $font.Dispose()
+        $sf.Dispose()
+    } catch { }
 }
 
 function Draw-GlowBorder {
     param($Graphics, $Width, $Height, $AccentColor, $AccentThick = 2)
-    $borderPen = New-Object Drawing.Pen($C.Border, 1)
-    $Graphics.DrawRectangle($borderPen, 0, 0, $Width - 1, $Height - 1)
-    $accentPen = New-Object Drawing.Pen($AccentColor, $AccentThick)
-    $Graphics.DrawLine($accentPen, 0, 0, $Width, 0)
+    try {
+        $g = $Graphics
+        $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+
+        # Subtle outer glow
+        $glowPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(50, $AccentColor.R, $AccentColor.G, $AccentColor.B), ($AccentThick + 2))
+        $g.DrawRectangle($glowPen, 1, 1, $Width - 3, $Height - 3)
+        $glowPen.Dispose()
+
+        # Dark structural border
+        $borderPen = New-Object Drawing.Pen($C.Border, 1)
+        $g.DrawRectangle($borderPen, 0, 0, $Width - 1, $Height - 1)
+        $borderPen.Dispose()
+
+        # Neon top accent line
+        $accentPen = New-Object Drawing.Pen($AccentColor, $AccentThick)
+        $g.DrawLine($accentPen, 0, 0, $Width, 0)
+        $accentPen.Dispose()
+    } catch { }
 }
 
 # -- Color helper for pct values -----------------------------------------
@@ -261,6 +336,55 @@ function Temp-Color($temp) {
     return $C.Green
 }
 #endregion
+
+#region THEME_ENGINE
+function Enable-DoubleBuffer {
+    param($Control)
+    try {
+        $flags  = [System.Windows.Forms.ControlStyles]::OptimizedDoubleBuffer -bor
+                  [System.Windows.Forms.ControlStyles]::UserPaint -bor
+                  [System.Windows.Forms.ControlStyles]::AllPaintingInWmPaint
+        $method = $Control.GetType().GetMethod('SetStyle',
+            [System.Reflection.BindingFlags]::NonPublic -bor
+            [System.Reflection.BindingFlags]::Instance)
+        if ($method) { $method.Invoke($Control, @($flags, $true)) }
+    } catch { }
+}
+
+function New-RoundedPanel {
+    param($X, $Y, $W, $H, $BgColor, [Drawing.Color]$BorderColor = [Drawing.Color]::Transparent)
+    $p = New-Object Windows.Forms.Panel
+    $p.Location  = [Drawing.Point]::new($X, $Y)
+    $p.Size      = [Drawing.Size]::new($W, $H)
+    $p.BackColor = [Drawing.Color]::Transparent
+    Enable-DoubleBuffer $p
+    $capturedBg  = $BgColor
+    $capturedBdr = $BorderColor
+    $p.Add_Paint({
+        param($s2, $pe)
+        try {
+            $g = $pe.Graphics
+            $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $br = New-Object Drawing.SolidBrush($capturedBg)
+            $g.FillRectangle($br, 0, 0, $s2.Width, $s2.Height)
+            $br.Dispose()
+            if ($capturedBdr.A -gt 0) {
+                $pen = New-Object Drawing.Pen($capturedBdr, 1)
+                $g.DrawRectangle($pen, 0, 0, $s2.Width - 1, $s2.Height - 1)
+                $pen.Dispose()
+            }
+        } catch { }
+    })
+    return $p
+}
+
+$script:AnimatedValues = [System.Collections.Hashtable]::Synchronized(@{
+    CpuArc    = @{ Current = 0.0; Target = 0.0 }
+    RamArc    = @{ Current = 0.0; Target = 0.0 }
+    DiskArc   = @{ Current = 0.0; Target = 0.0 }
+    HealthBar = @{ Current = 0.0; Target = 0.0 }
+})
+#endregion THEME_ENGINE
 
 #region 4 - Core Logic & Telemetry
 # -- Initial data collection ---------------------------------------------
@@ -574,90 +698,94 @@ $script:DataEngineErrIdx = 0
 #region 5 - UI Initialization
 # -- MAIN FORM -----------------------------------------------------------
 $form = New-Object Windows.Forms.Form
-$form.Text          = "PC Health Monitor - $env:COMPUTERNAME"
-$form.Size          = [Drawing.Size]::new(1060, 720)
-$form.MinimumSize   = [Drawing.Size]::new(1060, 720)
-$form.BackColor     = $C.BgBase
-$form.ForeColor     = $C.Text
-$form.StartPosition = "CenterScreen"
-$form.Font          = New-Object Drawing.Font("Segoe UI", 9)
+$form.Text            = "PC Health Monitor - $env:COMPUTERNAME"
+$form.Size            = [Drawing.Size]::new(1060, 720)
+$form.MinimumSize     = [Drawing.Size]::new(1060, 720)
+$form.BackColor       = $C.BgBase
+$form.ForeColor       = $C.Text
+$form.StartPosition   = "CenterScreen"
+$form.Font            = New-Object Drawing.Font("Segoe UI", 9)
+$form.DoubleBuffered  = $true
+$form.AutoScaleDimensions = [Drawing.SizeF]::new(96, 96)
+$form.AutoScaleMode   = [Windows.Forms.AutoScaleMode]::Dpi
 try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\perfmon.exe") } catch {
     Write-Log -Message "Failed to load form icon from perfmon.exe" -Level WARN -ExceptionRecord $_
     # Fallback: form retains default Windows icon
 }
 
-# -- Title Bar -----------------------------------------------------------
+# -- Title Bar (Neon HUD) -------------------------------------------------
 $titlePnl = New-Pnl 0 0 1060 64 $C.BgCard
-
-$dotPnl = New-Object Windows.Forms.Panel
-$dotPnl.Location  = [Drawing.Point]::new(12, 22)
-$dotPnl.Size      = [Drawing.Size]::new(10, 10)
-$dotPnl.BackColor = [Drawing.Color]::Transparent
-$dotPnl.Add_Paint({
-    param($s2, $pe)
-    try {
-        $pe.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $pe.Graphics.FillEllipse((New-Object Drawing.SolidBrush($C.Blue)), 0, 0, 8, 8)
-    } catch {
-        Write-Log -Message "dotPnl Paint error" -Level WARN -ExceptionRecord $_
-        # Fallback: dot not rendered this frame
-    }
-})
-$titlePnl.Controls.Add($dotPnl)
+Enable-DoubleBuffer $titlePnl
 
 $titleMainLbl = New-Object Windows.Forms.Label
-$titleMainLbl.Text      = "  PC Health Monitor"
-$titleMainLbl.Location  = [Drawing.Point]::new(18, 6)
-$titleMainLbl.Size      = [Drawing.Size]::new(500, 34)
-$titleMainLbl.Font      = New-Object Drawing.Font("Consolas", 14, [Drawing.FontStyle]::Bold)
+$titleMainLbl.Text      = "  PC HEALTH MONITOR"
+$titleMainLbl.Location  = [Drawing.Point]::new(28, 6)
+$titleMainLbl.Size      = [Drawing.Size]::new(500, 30)
+$titleMainLbl.Font      = New-Object Drawing.Font("Segoe UI Light", 16, [Drawing.FontStyle]::Bold)
 $titleMainLbl.ForeColor = $C.Blue
 $titleMainLbl.BackColor = [Drawing.Color]::Transparent
 $titlePnl.Controls.Add($titleMainLbl)
 
 $subLbl = New-Object Windows.Forms.Label
-$subLbl.Text      = "  $env:COMPUTERNAME   |   $($os.Caption)"
-$subLbl.Location  = [Drawing.Point]::new(14, 42)
-$subLbl.Size      = [Drawing.Size]::new(700, 18)
-$subLbl.Font      = New-Object Drawing.Font("Segoe UI", 8)
+$subLbl.Text      = "  $env:COMPUTERNAME  |  $($os.Caption)"
+$subLbl.Location  = [Drawing.Point]::new(28, 38)
+$subLbl.Size      = [Drawing.Size]::new(680, 18)
+$subLbl.Font      = New-Object Drawing.Font("Segoe UI", 7.5)
 $subLbl.ForeColor = $C.Dim
 $subLbl.BackColor = [Drawing.Color]::Transparent
 $titlePnl.Controls.Add($subLbl)
 
+$blinkDot = New-Object Windows.Forms.Panel
+$blinkDot.Location  = [Drawing.Point]::new(714, 50)
+$blinkDot.Size      = [Drawing.Size]::new(7, 7)
+$blinkDot.BackColor = $C.Green
+$titlePnl.Controls.Add($blinkDot)
+$script:blinkState = $true
+
 $lastUpdLbl = New-Object Windows.Forms.Label
 $lastUpdLbl.Text      = "  Updated: just now"
-$lastUpdLbl.Location  = [Drawing.Point]::new(706, 48)
-$lastUpdLbl.Size      = [Drawing.Size]::new(250, 16)
+$lastUpdLbl.Location  = [Drawing.Point]::new(724, 47)
+$lastUpdLbl.Size      = [Drawing.Size]::new(222, 16)
 $lastUpdLbl.Font      = New-Object Drawing.Font("Consolas", 7)
 $lastUpdLbl.ForeColor = $C.Dim
 $lastUpdLbl.BackColor = [Drawing.Color]::Transparent
 $titlePnl.Controls.Add($lastUpdLbl)
 
-$blinkDot = New-Object Windows.Forms.Panel
-$blinkDot.Location  = [Drawing.Point]::new(690, 52)
-$blinkDot.Size      = [Drawing.Size]::new(6, 6)
-$blinkDot.BackColor = $C.Green
-$titlePnl.Controls.Add($blinkDot)
-$script:blinkState = $true
-
 $refreshBtn = New-Object Windows.Forms.Button
-$refreshBtn.Text      = "Refresh"
-$refreshBtn.Location  = [Drawing.Point]::new(960, 15)
-$refreshBtn.Size      = [Drawing.Size]::new(85, 34)
+$refreshBtn.Text      = "REFRESH"
+$refreshBtn.Location  = [Drawing.Point]::new(958, 16)
+$refreshBtn.Size      = [Drawing.Size]::new(88, 32)
 $refreshBtn.BackColor = $C.BgCard2
 $refreshBtn.ForeColor = $C.Blue
 $refreshBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-$refreshBtn.FlatAppearance.BorderColor = $C.Border
+$refreshBtn.FlatAppearance.BorderColor = $C.Blue
 $refreshBtn.FlatAppearance.BorderSize  = 1
-$refreshBtn.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+$refreshBtn.Font      = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
 $refreshBtn.Cursor    = [Windows.Forms.Cursors]::Hand
 $titlePnl.Controls.Add($refreshBtn)
 
 $titlePnl.Add_Paint({
     param($s2, $pe)
     try {
-        $pe.Graphics.DrawLine(
-            (New-Object Drawing.Pen($C.Border, 1)),
-            0, $titlePnl.Height - 1, $titlePnl.Width, $titlePnl.Height - 1)
+        $g = $pe.Graphics
+        $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        # Gradient: BG_Card → BG_Primary
+        $gradBr = New-Object Drawing.Drawing2D.LinearGradientBrush(
+            [Drawing.Point]::new(0,0), [Drawing.Point]::new(0,$s2.Height),
+            $C.BgCard2, $C.BgBase)
+        $g.FillRectangle($gradBr, 0, 0, $s2.Width, $s2.Height)
+        $gradBr.Dispose()
+        # Neon cyan bottom separator
+        $sep = New-Object Drawing.Pen([Drawing.Color]::FromArgb(80, 6, 182, 212), 1)
+        $g.DrawLine($sep, 0, $s2.Height - 1, $s2.Width, $s2.Height - 1)
+        $sep.Dispose()
+        # Neon pulse dot (left accent)
+        $dotBr = New-Object Drawing.SolidBrush($C.Blue)
+        $g.FillEllipse($dotBr, 14, 28, 8, 8)
+        $dotBr.Dispose()
+        $glowBr = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(50, 6, 182, 212))
+        $g.FillEllipse($glowBr, 10, 24, 16, 16)
+        $glowBr.Dispose()
     } catch {
         Write-Log -Message "titlePnl Paint error" -Level WARN -ExceptionRecord $_
         # Fallback: bottom border line not rendered this frame
@@ -726,18 +854,24 @@ foreach ($cd in $cardDefs) {
     # Store per-card paint data in Tag -- avoids closure capture issues
     $cp.Tag = @{ Color = $cd.Color; TrackColor = $cd.TrackColor; Pct = $pct }
 
+    Enable-DoubleBuffer $cp
     $cp.Add_Paint({
         param($s2, $pe)
         try {
             $g = $pe.Graphics
             $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-            $g.FillRectangle((New-Object Drawing.SolidBrush($C.BgCard)), 0, 0, $s2.Width, $s2.Height)
             $td = $s2.Tag
+            # Gradient background: BG_Panel → BG_Card, 135°
+            $gradBr = New-Object Drawing.Drawing2D.LinearGradientBrush(
+                [Drawing.Point]::new(0, 0),
+                [Drawing.Point]::new($s2.Width, $s2.Height),
+                $C.BgCard2, $C.BgCard)
+            $g.FillRectangle($gradBr, 0, 0, $s2.Width, $s2.Height)
+            $gradBr.Dispose()
             Draw-GlowBorder $g $s2.Width $s2.Height $td.Color 2
             Draw-CircleGauge $g 46 55 30 $td.Pct $td.Color $td.TrackColor 5
         } catch {
             Write-Log -Message "CPU/RAM/Disk card Paint error" -Level WARN -ExceptionRecord $_
-            # Fallback: card not rendered this frame
         }
     })
 
@@ -789,6 +923,13 @@ foreach ($cd in $cardDefs) {
     $tab1.Controls.Add($cp)
 }
 
+# Wire animated arc initial targets from live data
+$script:AnimatedValues.CpuArc.Target  = [double]$live.CpuPct
+$script:AnimatedValues.RamArc.Target  = [double]$live.RamPct
+$script:AnimatedValues.DiskArc.Target = [double]$live.DPct
+$script:AnimatedValues.CpuArc.Current  = [double]$live.CpuPct
+$script:AnimatedValues.RamArc.Current  = [double]$live.RamPct
+$script:AnimatedValues.DiskArc.Current = [double]$live.DPct
 
 # -- Health Score Card (Sprint 6) ----------------------------------------
 $scoreCard = New-Pnl 15 128 1020 70 $C.BgCard
@@ -1722,30 +1863,44 @@ $tabs.Add_SelectedIndexChanged({
     }
 })
 
-# Tab owner-draw event (added after all tabs are registered)
+# Tab owner-draw event (Neon HUD style)
 $tabs.Add_DrawItem({
     param($s2, $de)
     try {
-        $tab      = $tabs.TabPages[$de.Index]
-        $isSel    = ($de.Index -eq $tabs.SelectedIndex)
-        $bgColor  = if ($isSel) { $C.BgCard2 } else { $C.BgBase }
-        $fgColor  = if ($isSel) { $C.Blue    } else { $C.Dim    }
-        $de.Graphics.FillRectangle((New-Object Drawing.SolidBrush($bgColor)), $de.Bounds)
+        $g      = $de.Graphics
+        $tab    = $tabs.TabPages[$de.Index]
+        $isSel  = ($de.Index -eq $tabs.SelectedIndex)
+        $bounds = $de.Bounds
+
+        # Background
+        $bgColor = if ($isSel) { $C.BgCard } else { $C.BgBase }
+        $bgBr    = New-Object Drawing.SolidBrush($bgColor)
+        $g.FillRectangle($bgBr, $bounds)
+        $bgBr.Dispose()
+
+        # Active tab: Neon_Cyan bottom border + side glow
         if ($isSel) {
+            $glowPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(40, 6, 182, 212), 4)
+            $g.DrawLine($glowPen, $bounds.Left, $bounds.Bottom - 2, $bounds.Right, $bounds.Bottom - 2)
+            $glowPen.Dispose()
             $accentPen = New-Object Drawing.Pen($C.Blue, 2)
-            $de.Graphics.DrawLine($accentPen,
-                $de.Bounds.Left, $de.Bounds.Bottom - 1,
-                $de.Bounds.Right, $de.Bounds.Bottom - 1)
+            $g.DrawLine($accentPen, $bounds.Left, $bounds.Bottom - 1, $bounds.Right, $bounds.Bottom - 1)
+            $accentPen.Dispose()
         }
-        $font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+
+        # Text
+        $fgColor = if ($isSel) { $C.Text } else { $C.Dim }
+        $font = New-Object Drawing.Font("Segoe UI", 8.5, $(if ($isSel) { [Drawing.FontStyle]::Bold } else { [Drawing.FontStyle]::Regular }))
         $sf   = New-Object Drawing.StringFormat
-        $sf.Alignment      = [Drawing.StringAlignment]::Center
-        $sf.LineAlignment  = [Drawing.StringAlignment]::Center
-        $de.Graphics.DrawString($tab.Text.Trim(), $font,
-            (New-Object Drawing.SolidBrush($fgColor)), [Drawing.RectangleF]$de.Bounds, $sf)
+        $sf.Alignment     = [Drawing.StringAlignment]::Center
+        $sf.LineAlignment = [Drawing.StringAlignment]::Center
+        $fgBr = New-Object Drawing.SolidBrush($fgColor)
+        $g.DrawString($tab.Text.Trim(), $font, $fgBr, [Drawing.RectangleF]$bounds, $sf)
+        $fgBr.Dispose()
+        $font.Dispose()
+        $sf.Dispose()
     } catch {
         Write-Log -Message "Tab DrawItem paint error at index $($de.Index)" -Level WARN -ExceptionRecord $_
-        # Fallback: tab label not rendered this frame
     }
 })
 
@@ -1815,12 +1970,11 @@ function Do-Refresh {
         $d = $script:DataCache
         if (-not $d['Ready']) { return }   # Engine still warming up — skip this tick
 
-        # CPU card
+        # CPU card — update labels + bar directly; arc animates via $script:AnimTimer
         $UI["CpuValLbl"].Text      = "$($d['CpuPct'])%"
         $UI["CpuPctLbl"].Text      = "$($d['CpuPct'])%"
         $UI["CpuPctLbl"].ForeColor = Pct-Color $d['CpuPct']
-        $UI["CpuCard"].Tag.Pct     = $d['CpuPct']
-        $UI["CpuCard"].Invalidate()
+        $script:AnimatedValues.CpuArc.Target = [double]$d['CpuPct']
         $fw = [math]::Max(0, [math]::Min(112, [int](($d['CpuPct'] / 100.0) * 112)))
         $UI["CpuBarFill"].Width     = $fw
         $UI["CpuBarFill"].BackColor = Pct-Color $d['CpuPct']
@@ -1829,8 +1983,7 @@ function Do-Refresh {
         $UI["RamValLbl"].Text      = "$($d['UsedRAM']) GB / $script:totalRAM GB"
         $UI["RamPctLbl"].Text      = "$($d['RamPct'])%"
         $UI["RamPctLbl"].ForeColor = Pct-Color $d['RamPct']
-        $UI["RamCard"].Tag.Pct     = $d['RamPct']
-        $UI["RamCard"].Invalidate()
+        $script:AnimatedValues.RamArc.Target = [double]$d['RamPct']
         $fw2 = [math]::Max(0, [math]::Min(112, [int](($d['RamPct'] / 100.0) * 112)))
         $UI["RamBarFill"].Width     = $fw2
         $UI["RamBarFill"].BackColor = Pct-Color $d['RamPct']
@@ -1840,8 +1993,7 @@ function Do-Refresh {
             $UI["DiskValLbl"].Text      = "$($d['DUsed']) / $($d['DTotal']) GB"
             $UI["DiskPctLbl"].Text      = "$($d['DPct'])%"
             $UI["DiskPctLbl"].ForeColor = Pct-Color $d['DPct']
-            $UI["DiskCard"].Tag.Pct     = $d['DPct']
-            $UI["DiskCard"].Invalidate()
+            $script:AnimatedValues.DiskArc.Target = [double]$d['DPct']
             $fw3 = [math]::Max(0, [math]::Min(112, [int](($d['DPct'] / 100.0) * 112)))
             $UI["DiskBarFill"].Width     = $fw3
             $UI["DiskBarFill"].BackColor = Pct-Color $d['DPct']
@@ -1919,7 +2071,30 @@ function Do-Refresh {
     }
 }
 
-# Timer: fires every 3 seconds
+# Animation timer: 60fps spring interpolation for gauge arcs
+$script:AnimTimer = New-Object System.Windows.Forms.Timer
+$script:AnimTimer.Interval = 16
+$script:AnimTimer.Add_Tick({
+    $dirty = $false
+    foreach ($key in @('CpuArc','RamArc','DiskArc')) {
+        $av   = $script:AnimatedValues[$key]
+        $diff = $av.Target - $av.Current
+        if ([math]::Abs($diff) -gt 0.15) {
+            $av.Current += $diff * 0.12
+            $dirty = $true
+        } elseif ($diff -ne 0.0) {
+            $av.Current = $av.Target
+        }
+    }
+    if ($dirty) {
+        if ($UI['CpuCard'])  { $UI['CpuCard'].Tag.Pct  = $script:AnimatedValues.CpuArc.Current;  $UI['CpuCard'].Invalidate()  }
+        if ($UI['RamCard'])  { $UI['RamCard'].Tag.Pct  = $script:AnimatedValues.RamArc.Current;  $UI['RamCard'].Invalidate()  }
+        if ($UI['DiskCard']) { $UI['DiskCard'].Tag.Pct = $script:AnimatedValues.DiskArc.Current; $UI['DiskCard'].Invalidate() }
+    }
+})
+$script:AnimTimer.Start()
+
+# Main data-refresh timer: fires every 3 seconds
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 3000
 $timer.Add_Tick({ Do-Refresh })
@@ -1956,6 +2131,8 @@ $form.Add_FormClosing({
     } else {
         $timer.Stop()
         $timer.Dispose()
+        $script:AnimTimer.Stop()
+        $script:AnimTimer.Dispose()
         $trayIcon.Visible = $false
         $trayIcon.Dispose()
         # Shut down DataEngine background runspace cleanly
