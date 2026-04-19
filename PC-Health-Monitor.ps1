@@ -1,4 +1,4 @@
-# PC-Health-Monitor.ps1
+﻿# PC-Health-Monitor.ps1
 # Full Windows Forms GUI -- Cyber-HUD Dark Theme -- Live Auto-Refresh
 
 # CATCH BLOCK AUDIT: Found 9 empty catch blocks on the main thread
@@ -351,6 +351,85 @@ function Enable-DoubleBuffer {
     } catch { }
 }
 
+function Format-CleanBytes {
+    param([long]$Bytes)
+    if     ($Bytes -ge 1GB) { return "{0:N1} GB" -f ($Bytes / 1GB) }
+    elseif ($Bytes -ge 1MB) { return "{0:N1} MB" -f ($Bytes / 1MB) }
+    else                    { return "{0:N0} KB" -f ($Bytes / 1KB) }
+}
+
+$script:CleanSummaryPending = [hashtable]::Synchronized(@{ Ready = $false })
+
+function Show-CleanSummary {
+    param([string]$SummaryText)
+    # Remove any existing summary panel
+    $old = $tab3.Controls | Where-Object { $_.Tag -eq 'CleanSummary' }
+    if ($old) { $old | ForEach-Object { $tab3.Controls.Remove($_); $_.Dispose() } }
+
+    $sp = New-Object Windows.Forms.Panel
+    $sp.Size      = [Drawing.Size]::new(1020, 56)
+    $sp.Location  = [Drawing.Point]::new(15, 570)
+    $sp.BackColor = [Drawing.Color]::FromArgb(20, 30, 20)
+    $sp.Tag       = 'CleanSummary'
+
+    $sp.Add_Paint({
+        param($s2, $pe)
+        try {
+            # Green 4px left accent
+            $pe.Graphics.FillRectangle(
+                (New-Object Drawing.SolidBrush($C.Green)), 0, 0, 4, $s2.Height)
+        } catch { }
+    })
+
+    # Checkmark icon
+    $iconLbl = New-Object Windows.Forms.Label
+    $iconLbl.Text      = [char]0x2713   # ✓
+    $iconLbl.Location  = [Drawing.Point]::new(14, 10)
+    $iconLbl.Size      = [Drawing.Size]::new(30, 34)
+    $iconLbl.Font      = New-Object Drawing.Font("Segoe UI", 16, [Drawing.FontStyle]::Bold)
+    $iconLbl.ForeColor = $C.Green
+    $iconLbl.BackColor = [Drawing.Color]::Transparent
+    $sp.Controls.Add($iconLbl)
+
+    # Summary text
+    $summLbl = New-Object Windows.Forms.Label
+    $summLbl.Text      = $SummaryText
+    $summLbl.Location  = [Drawing.Point]::new(52, 8)
+    $summLbl.Size      = [Drawing.Size]::new(950, 38)
+    $summLbl.Font      = New-Object Drawing.Font("Segoe UI", 10)
+    $summLbl.ForeColor = $C.Text
+    $summLbl.BackColor = [Drawing.Color]::Transparent
+    $sp.Controls.Add($summLbl)
+
+    $tab3.Controls.Add($sp)
+    $sp.BringToFront()
+
+    # Auto-dismiss after 6 seconds via fade-out (alpha steps via Timer)
+    $alphaStep = 0
+    $fadeTimer = New-Object Windows.Forms.Timer
+    $fadeTimer.Interval = 16   # ~60fps
+    $capturedSp   = $sp
+    $capturedTab3 = $tab3
+    $fadeTimer.Add_Tick({
+        $alphaStep++
+        # Begin fade at frame 255 (~4 sec at 16ms), fully gone at frame 375 (~6 sec)
+        if ($alphaStep -gt 255) {
+            $alpha = [math]::Max(0, 255 - (($alphaStep - 255) * 3))
+            try { $capturedSp.BackColor = [Drawing.Color]::FromArgb(
+                [math]::Max(0, [int]($alpha * 0.08)), 30, 20) } catch { }
+        }
+        if ($alphaStep -ge 375) {
+            $fadeTimer.Stop()
+            $fadeTimer.Dispose()
+            try {
+                $capturedTab3.Controls.Remove($capturedSp)
+                $capturedSp.Dispose()
+            } catch { }
+        }
+    })
+    $fadeTimer.Start()
+}
+
 function New-RoundedPanel {
     param($X, $Y, $W, $H, $BgColor, [Drawing.Color]$BorderColor = [Drawing.Color]::Transparent)
     $p = New-Object Windows.Forms.Panel
@@ -698,7 +777,7 @@ $script:DataEngineErrIdx = 0
 #region 5 - UI Initialization
 # -- MAIN FORM -----------------------------------------------------------
 $form = New-Object Windows.Forms.Form
-$form.Text            = "PC Health Monitor - $env:COMPUTERNAME"
+$form.Text            = "PC Health Monitor"
 $form.Size            = [Drawing.Size]::new(1060, 720)
 $form.MinimumSize     = [Drawing.Size]::new(1060, 720)
 $form.BackColor       = $C.BgBase
@@ -742,14 +821,6 @@ $blinkDot.BackColor = $C.Green
 $titlePnl.Controls.Add($blinkDot)
 $script:blinkState = $true
 
-$lastUpdLbl = New-Object Windows.Forms.Label
-$lastUpdLbl.Text      = "  Updated: just now"
-$lastUpdLbl.Location  = [Drawing.Point]::new(724, 47)
-$lastUpdLbl.Size      = [Drawing.Size]::new(222, 16)
-$lastUpdLbl.Font      = New-Object Drawing.Font("Consolas", 7)
-$lastUpdLbl.ForeColor = $C.Dim
-$lastUpdLbl.BackColor = [Drawing.Color]::Transparent
-$titlePnl.Controls.Add($lastUpdLbl)
 
 $refreshBtn = New-Object Windows.Forms.Button
 $refreshBtn.Text      = "REFRESH"
@@ -795,7 +866,7 @@ $form.Controls.Add($titlePnl)
 
 # -- Admin warning strip -------------------------------------------------
 $tabsY = 64
-$tabsH = 658
+$tabsH = 636
 if (-not $script:isAdmin) {
     $warnPnl = New-Pnl 0 64 1060 22 ([Drawing.Color]::FromArgb(40, 35, 10))
     $warnPnl.Add_Paint({
@@ -818,7 +889,7 @@ if (-not $script:isAdmin) {
     $warnPnl.Controls.Add($warnLbl)
     $form.Controls.Add($warnPnl)
     $tabsY = 86
-    $tabsH = 636
+    $tabsH = 614
 }
 
 # -- Tab Control ---------------------------------------------------------
@@ -831,6 +902,60 @@ $tabs.Font      = New-Object Drawing.Font("Segoe UI", 10)
 $tabs.DrawMode  = [Windows.Forms.TabDrawMode]::OwnerDrawFixed
 $tabs.ItemSize  = [Drawing.Size]::new(140, 28)
 $form.Controls.Add($tabs)
+
+# -- Status Bar (22px, bottom) -------------------------------------------
+$statusBar = New-Object Windows.Forms.Panel
+$statusBar.Size      = [Drawing.Size]::new(1060, 22)
+$statusBar.Location  = [Drawing.Point]::new(0, 698)
+$statusBar.BackColor = $C.BgCard
+$statusBar.Anchor    = [Windows.Forms.AnchorStyles]::Bottom -bor
+                       [Windows.Forms.AnchorStyles]::Left   -bor
+                       [Windows.Forms.AnchorStyles]::Right
+
+$statusBar.Add_Paint({
+    param($s2, $pe)
+    try {
+        $pe.Graphics.FillRectangle(
+            (New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(80, 6, 182, 212))),
+            0, 0, $s2.Width, 1)
+    } catch { }
+})
+
+# Left — version
+$sbVersionLbl = New-Object Windows.Forms.Label
+$sbVersionLbl.Text      = "  ● PC Health Monitor v3.1"
+$sbVersionLbl.Location  = [Drawing.Point]::new(0, 4)
+$sbVersionLbl.Size      = [Drawing.Size]::new(240, 14)
+$sbVersionLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$sbVersionLbl.ForeColor = $C.Dim
+$sbVersionLbl.BackColor = [Drawing.Color]::Transparent
+$statusBar.Controls.Add($sbVersionLbl)
+
+# Center — last updated time
+$script:sbTimeLbl = New-Object Windows.Forms.Label
+$script:sbTimeLbl.Text      = ""
+$script:sbTimeLbl.Location  = [Drawing.Point]::new(380, 4)
+$script:sbTimeLbl.Size      = [Drawing.Size]::new(300, 14)
+$script:sbTimeLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$script:sbTimeLbl.ForeColor = $C.Dim
+$script:sbTimeLbl.BackColor = [Drawing.Color]::Transparent
+$script:sbTimeLbl.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+$statusBar.Controls.Add($script:sbTimeLbl)
+
+# Right — admin indicator
+$sbAdminTxt  = if ($script:isAdmin) { "● Administrator" } else { "● Standard User" }
+$sbAdminClr  = if ($script:isAdmin) { $C.Green }           else { $C.Yellow }
+$sbAdminLbl = New-Object Windows.Forms.Label
+$sbAdminLbl.Text      = "$sbAdminTxt  "
+$sbAdminLbl.Location  = [Drawing.Point]::new(820, 4)
+$sbAdminLbl.Size      = [Drawing.Size]::new(240, 14)
+$sbAdminLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$sbAdminLbl.ForeColor = $sbAdminClr
+$sbAdminLbl.BackColor = [Drawing.Color]::Transparent
+$sbAdminLbl.TextAlign = [Drawing.ContentAlignment]::MiddleRight
+$statusBar.Controls.Add($sbAdminLbl)
+
+$form.Controls.Add($statusBar)
 
 # ========================================================================
 # TAB 1 -- DASHBOARD
@@ -1594,17 +1719,26 @@ foreach ($ji in $junkItems) {
         $ps.Runspace = $rs
 
         [void]$ps.AddScript({
-            param($path, $formObj, $btn, $log, $prog, $dg, $szLbl, $fLbl, $green, $name)
-            $del = 0; $errCount = 0
+            param($path, $formObj, $btn, $log, $prog, $dg, $szLbl, $fLbl, $green, $name, $pending)
+            $del = 0; $errCount = 0; $totalBytes = 0L
 
             $formObj.Invoke([Action]{ $log.AppendText("`nCleaning: $path") })
 
             Get-ChildItem $path -Force -ErrorAction SilentlyContinue | ForEach-Object {
-                try   { Remove-Item $_.FullName -Recurse -Force -ErrorAction Stop; $del++ }
-                catch { $errCount++ }
+                try {
+                    $totalBytes += $_.Length
+                    Remove-Item $_.FullName -Recurse -Force -ErrorAction Stop
+                    $del++
+                } catch { $errCount++ }
                 # NOTE: Write-Log cannot be called here -- this runs inside a Runspace
                 # which does not share $script: scope. Error count is surfaced via UI message below.
             }
+
+            $pending['Bytes']    = $totalBytes
+            $pending['Name']     = $name
+            $pending['Removed']  = $del
+            $pending['Skipped']  = $errCount
+            $pending['Ready']    = $true
 
             $msg = "  Done - removed $del items ($errCount locked/skipped)"
             $formObj.Invoke([Action]{
@@ -1616,11 +1750,6 @@ foreach ($ji in $junkItems) {
                 $szLbl.Text      = "0 MB"
                 $szLbl.ForeColor = $green
                 $fLbl.Text       = "0 files"
-                [System.Windows.Forms.MessageBox]::Show(
-                    "All files in '$name' have been successfully removed.",
-                    "Cleanup Complete",
-                    [System.Windows.Forms.MessageBoxButtons]::OK,
-                    [System.Windows.Forms.MessageBoxIcon]::Information)
             })
         })
         [void]$ps.AddParameter("path",    $capturedPath)
@@ -1633,8 +1762,30 @@ foreach ($ji in $junkItems) {
         [void]$ps.AddParameter("fLbl",    $capturedFilesLbl)
         [void]$ps.AddParameter("green",   $capturedGreen)
         [void]$ps.AddParameter("name",    $capturedName)
+        [void]$ps.AddParameter("pending", $script:CleanSummaryPending)
 
+        $script:CleanSummaryPending['Ready'] = $false
         [void]$ps.BeginInvoke()
+
+        # Poll $script:CleanSummaryPending on the UI thread; call Show-CleanSummary when done
+        $pollTimer = New-Object Windows.Forms.Timer
+        $pollTimer.Interval = 500
+        $pollTimer.Add_Tick({
+            if ($script:CleanSummaryPending['Ready']) {
+                $pollTimer.Stop()
+                $pollTimer.Dispose()
+                $b = [long]$script:CleanSummaryPending['Bytes']
+                $n = $script:CleanSummaryPending['Name']
+                $d = [int]$script:CleanSummaryPending['Removed']
+                $sk = [int]$script:CleanSummaryPending['Skipped']
+                $sizeStr = Format-CleanBytes $b
+                $txt = "$n cleaned — $sizeStr freed  ($d items removed"
+                if ($sk -gt 0) { $txt += ", $sk skipped" }
+                $txt += ")"
+                Show-CleanSummary -SummaryText $txt
+            }
+        })
+        $pollTimer.Start()
     })
 
     $skipBtn.Add_Click({
@@ -1672,6 +1823,8 @@ $cleanAllBtn.Add_Click({
         [Windows.Forms.MessageBoxIcon]::Warning)
     if ($r -eq [Windows.Forms.DialogResult]::Yes) {
         $logBox.AppendText("`n--- CLEAN ALL STARTED ---")
+        $totalCleanedBytes = 0L
+        $cleanedNames      = @()
         foreach ($ji2 in $junkItems) {
             if (($adminRequiredNames -contains $ji2.Name) -and (-not $script:isAdmin)) {
                 $logBox.AppendText("`nSkipped (requires admin): $($ji2.Name)")
@@ -1682,16 +1835,25 @@ $cleanAllBtn.Add_Click({
             [Windows.Forms.Application]::DoEvents()
             $del=0; $errCount=0
             Get-ChildItem $ji2.Path -Force -EA SilentlyContinue | ForEach-Object {
-                try   { Remove-Item $_.FullName -Force -Recurse -EA Stop; $del++ }
-                catch {
+                try {
+                    $totalCleanedBytes += $_.Length
+                    Remove-Item $_.FullName -Force -Recurse -EA Stop
+                    $del++
+                } catch {
                     Write-Log -Message "Clean All: failed to remove item from $($ji2.Name)" -Level WARN -ExceptionRecord $_
                     $errCount++
                 }
             }
             $logBox.AppendText("  -> $del removed, $errCount skipped")
+            $cleanedNames += $ji2.Name
         }
         $logBox.AppendText("`n--- DONE ---")
         $logBox.ScrollToCaret()
+        if ($cleanedNames.Count -gt 0) {
+            $sizeStr = Format-CleanBytes $totalCleanedBytes
+            $locStr  = if ($cleanedNames.Count -eq 1) { $cleanedNames[0] } else { "$($cleanedNames.Count) locations" }
+            Show-CleanSummary -SummaryText "Clean All complete — $sizeStr freed from $locStr"
+        }
     }
 })
 
@@ -2024,7 +2186,7 @@ function Do-Refresh {
             $UI["CpuChart"].Series[0].Points.RemoveAt(0)
         }
 
-        $lastUpdLbl.Text = "  Updated: $(Get-Date -Format 'HH:mm:ss')"
+        $script:sbTimeLbl.Text = "Updated: $(Get-Date -Format 'HH:mm:ss')"
 
         # Blinking dot
         $script:blinkState = -not $script:blinkState
