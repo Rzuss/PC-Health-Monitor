@@ -204,7 +204,7 @@ function New-Pnl($x, $y, $w, $h, $col) {
 function Style-Grid($g) {
     $g.BackgroundColor    = $C.BgBase
     $g.ForeColor          = $C.Text
-    $g.GridColor          = [Drawing.Color]::FromArgb(25, 255, 255, 255)
+    $g.GridColor          = [Drawing.Color]::FromArgb(255, 28, 42, 65)
     $g.BorderStyle        = [Windows.Forms.BorderStyle]::None
     $g.RowHeadersVisible  = $false
     $g.ReadOnly           = $true
@@ -226,7 +226,7 @@ function Style-Grid($g) {
     $g.Font = New-Object Drawing.Font("Consolas", 8)
     $g.RowTemplate.Height = 26
     $g.EnableHeadersVisualStyles = $false
-    $g.DoubleBuffered = $true
+    Enable-DoubleBuffer $g
 }
 
 function Add-Col($grid, $header, $fillW=100) {
@@ -705,7 +705,7 @@ $form.BackColor       = $C.BgBase
 $form.ForeColor       = $C.Text
 $form.StartPosition   = "CenterScreen"
 $form.Font            = New-Object Drawing.Font("Segoe UI", 9)
-$form.DoubleBuffered  = $true
+Enable-DoubleBuffer $form
 $form.AutoScaleDimensions = [Drawing.SizeF]::new(96, 96)
 $form.AutoScaleMode   = [Windows.Forms.AutoScaleMode]::Dpi
 try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\perfmon.exe") } catch {
