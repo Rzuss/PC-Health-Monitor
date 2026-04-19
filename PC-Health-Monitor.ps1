@@ -5,6 +5,8 @@
 # Runspace catch blocks: 1 (inside $cleanBtn.Add_Click Runspace -- handled via $errCount counter, Write-Log not callable from Runspace)
 # Main thread catch blocks: 9 empty (all refactored with Write-Log) + 2 with existing logic (augmented with Write-Log)
 
+$script:AppVersion = '3.1'
+
 #region 1 - Logging Engine
 $script:LogPath = "$env:TEMP\PCHealth-Monitor.log"
 
@@ -611,6 +613,39 @@ function Update-TopFolderPanel {
     } catch {
         Write-Log -Message "Update-TopFolderPanel error" -Level WARN -ExceptionRecord $_
     }
+}
+
+function Invoke-UpdateCheck {
+    $script:UpdateRS = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+    $script:UpdateRS.ApartmentState = 'MTA'
+    $script:UpdateRS.ThreadOptions  = 'ReuseThread'
+    $script:UpdateRS.Open()
+
+    $script:UpdatePS = [System.Management.Automation.PowerShell]::Create()
+    $script:UpdatePS.Runspace = $script:UpdateRS
+
+    [void]$script:UpdatePS.AddScript({
+        param($info, $currentVersion)
+        try {
+            $api       = 'https://api.github.com/repos/Rzuss/PC-Health-Monitor/releases/latest'
+            $response  = Invoke-RestMethod -Uri $api -TimeoutSec 8 -ErrorAction Stop
+            $latestTag = $response.tag_name.TrimStart('v')
+            if ([System.Version]$latestTag -gt [System.Version]$currentVersion) {
+                $info['Available'] = $true
+                $info['Version']   = $latestTag
+                $info['Url']       = $response.html_url
+            } else {
+                $info['Available'] = $false
+            }
+        } catch {
+            $info['Available'] = $false   # silent fail — no internet, rate limit, or parse error
+        }
+    })
+    [void]$script:UpdatePS.AddArgument($script:UpdateInfo)
+    [void]$script:UpdatePS.AddArgument($script:AppVersion)
+
+    [void]$script:UpdatePS.BeginInvoke()
+    Write-Log -Message "Update check started in background MTA runspace (current: v$script:AppVersion)" -Level INFO
 }
 #endregion
 
@@ -1988,7 +2023,11 @@ $script:cpuAlertFired      = $false
 $script:lastRamAlert       = [DateTime]::MinValue
 # (TempRefreshCounter removed — Do-Refresh now reads from DataEngine cache)
 $script:lastDiskAlert = [DateTime]::MinValue
-$script:trayHintShown = $false
+$script:trayHintShown   = $false
+$script:UpdateInfo      = [System.Collections.Hashtable]::Synchronized(@{ Available = $false })
+$script:UpdateNotified  = $false
+$script:UpdateRS        = $null
+$script:UpdatePS        = $null
 
 # ========================================================================
 # LIVE REFRESH LOGIC
@@ -2095,6 +2134,75 @@ function Do-Refresh {
             Update-TopFolderPanel
         }
 
+        # Update banner — shown once per session when a newer version is available
+        if (-not $script:UpdateNotified -and $script:UpdateInfo['Available'] -eq $true) {
+            $script:UpdateNotified = $true
+            $updateVer    = $script:UpdateInfo['Version']
+            $capturedUrl  = $script:UpdateInfo['Url']
+
+            $updateBanner = New-Object Windows.Forms.Panel
+            $updateBanner.Size      = [Drawing.Size]::new($form.ClientSize.Width, 36)
+            $updateBanner.Location  = [Drawing.Point]::new(0, $form.ClientSize.Height - 36)
+            $updateBanner.BackColor = [Drawing.Color]::FromArgb(255, 20, 40, 20)
+            $updateBanner.Anchor    = [Windows.Forms.AnchorStyles]::Bottom -bor
+                                      [Windows.Forms.AnchorStyles]::Left   -bor
+                                      [Windows.Forms.AnchorStyles]::Right
+            Enable-DoubleBuffer $updateBanner
+            $updateBanner.Add_Paint({
+                param($s2, $pe)
+                try {
+                    $pe.Graphics.FillRectangle(
+                        (New-Object Drawing.SolidBrush($C.Green)), 0, 0, 3, $s2.Height)
+                } catch { <# non-critical — accent stripe not rendered this frame #> }
+            })
+
+            $updateTextLbl = New-Object Windows.Forms.Label
+            $updateTextLbl.Text      = "Update available: v$updateVer — "
+            $updateTextLbl.Font      = New-Object Drawing.Font("Segoe UI", 9)
+            $updateTextLbl.ForeColor = $C.Green
+            $updateTextLbl.BackColor = [Drawing.Color]::Transparent
+            $updateTextLbl.AutoSize  = $true
+            $updateTextLbl.Location  = [Drawing.Point]::new(12, 10)
+            $updateBanner.Controls.Add($updateTextLbl)
+
+            $updateLinkLbl = New-Object Windows.Forms.LinkLabel
+            $updateLinkLbl.Text            = "Download"
+            $updateLinkLbl.Font            = New-Object Drawing.Font("Segoe UI", 9)
+            $updateLinkLbl.ForeColor       = $C.Blue
+            $updateLinkLbl.LinkColor       = $C.Blue
+            $updateLinkLbl.ActiveLinkColor = $C.Blue
+            $updateLinkLbl.BackColor       = [Drawing.Color]::Transparent
+            $updateLinkLbl.AutoSize        = $true
+            $updateLinkLbl.Location        = [Drawing.Point]::new($updateTextLbl.PreferredWidth + 12, 10)
+            $updateLinkLbl.Add_LinkClicked({
+                try { Start-Process $capturedUrl } catch { <# browser launch failed silently #> }
+            })
+            $updateBanner.Controls.Add($updateLinkLbl)
+
+            $capturedBanner   = $updateBanner
+            $capturedFormRef  = $form
+            $updateDismissBtn = New-Object Windows.Forms.Button
+            $updateDismissBtn.Text      = [char]0x00D7
+            $updateDismissBtn.Size      = [Drawing.Size]::new(20, 20)
+            $updateDismissBtn.Location  = [Drawing.Point]::new($form.ClientSize.Width - 28, 8)
+            $updateDismissBtn.BackColor = [Drawing.Color]::Transparent
+            $updateDismissBtn.ForeColor = $C.Green
+            $updateDismissBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+            $updateDismissBtn.FlatAppearance.BorderSize = 0
+            $updateDismissBtn.Font      = New-Object Drawing.Font("Segoe UI", 10)
+            $updateDismissBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+            $updateDismissBtn.Anchor    = [Windows.Forms.AnchorStyles]::Top -bor
+                                          [Windows.Forms.AnchorStyles]::Right
+            $updateDismissBtn.Add_Click({
+                $capturedFormRef.Controls.Remove($capturedBanner)
+                $capturedBanner.Dispose()
+            })
+            $updateBanner.Controls.Add($updateDismissBtn)
+
+            $form.Controls.Add($updateBanner)
+            $updateBanner.BringToFront()
+        }
+
         $script:tickCount++
     } catch {
         Write-Log -Message "Do-Refresh failed during live data update" -Level ERROR -ExceptionRecord $_
@@ -2173,8 +2281,15 @@ $form.Add_FormClosing({
             $script:DataEngineRS.Close()
             $script:DataEngineRS.Dispose()
         } catch { <# best-effort cleanup #> }
+        # Shut down update check runspace if still running
+        try {
+            if ($null -ne $script:UpdatePS) { $script:UpdatePS.Stop(); $script:UpdatePS.Dispose() }
+            if ($null -ne $script:UpdateRS) { $script:UpdateRS.Close(); $script:UpdateRS.Dispose() }
+        } catch { <# best-effort cleanup #> }
     }
 })
+
+$form.Add_Shown({ Invoke-UpdateCheck })
 #endregion
 
 #region 6.5 - First-Run Wizard
