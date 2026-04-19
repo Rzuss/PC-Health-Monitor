@@ -2110,9 +2110,9 @@ $pGrid.Add_CellClick({
 
     $row         = $sender.Rows[$e.RowIndex]
     $processName = $row.Cells[0].Value.ToString().Trim()
-    $pid         = [int]$row.Cells[3].Value
+    $procId      = [int]$row.Cells[3].Value
 
-    Invoke-KillProcess -ProcessId $pid -ProcessName $processName
+    Invoke-KillProcess -ProcessId $procId -ProcessName $processName
 })
 
 $script:realExit = $false
