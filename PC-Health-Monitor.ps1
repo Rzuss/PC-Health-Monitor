@@ -1064,11 +1064,15 @@ Add-Col $pGrid "Process Name" 220
 Add-Col $pGrid "RAM (MB)"      80
 Add-Col $pGrid "CPU (sec)"     80
 Add-Col $pGrid "PID"           60
+$pGrid.Columns["Process Name"].HeaderText = "App / Process"
+$pGrid.Columns["RAM (MB)"].HeaderText     = "Memory"
+$pGrid.Columns["CPU (sec)"].HeaderText    = "CPU Usage"
+$pGrid.Columns["PID"].HeaderText          = "ID"
 
 # -- ANOMALY column (index 4) — inserted before Kill so Kill shifts to index 5
 $anomalyCol = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $anomalyCol.Name       = "Anomaly"
-$anomalyCol.HeaderText = "ANOMALY"
+$anomalyCol.HeaderText = "Status"
 $anomalyCol.Width      = 90
 $anomalyCol.ReadOnly   = $true
 $anomalyCol.DefaultCellStyle.Alignment = [Windows.Forms.DataGridViewContentAlignment]::MiddleCenter
@@ -1080,7 +1084,7 @@ $anomalyCol.HeaderCell.Style.Font      = New-Object Drawing.Font("Consolas", 9, 
 
 $killCol = New-Object System.Windows.Forms.DataGridViewButtonColumn
 $killCol.Name            = "Kill"
-$killCol.HeaderText      = "ACTION"
+$killCol.HeaderText      = ""
 $killCol.Text            = "END"
 $killCol.UseColumnTextForButtonValue = $true
 $killCol.Width           = 58
@@ -1130,12 +1134,21 @@ function Update-ProcessGrid($procs) {
             $row.Cells[5].Style.BackColor = $C.BgCard
             $row.Cells[5].ReadOnly        = $true
             $row.Cells[5].ToolTipText     = "System process - protected"
+            $row.Cells[1].Style.ForeColor = $C.Dim
         }
         if ($Script:Anomalies.ContainsKey($p.Name)) {
             $a = $Script:Anomalies[$p.Name]
-            $row.Cells[4].Value           = [char]0x26A0 + " +$($a.pct)%"
-            $row.Cells[4].Style.ForeColor = $C.Anomaly
-            $row.DefaultCellStyle.Font    = $script:MonoBold
+            if ($a.pct -gt 50) {
+                $row.Cells[4].Value           = 'High'
+                $row.Cells[4].Style.ForeColor = $C.Red
+            } elseif ($a.pct -gt 20) {
+                $row.Cells[4].Value           = 'Elevated'
+                $row.Cells[4].Style.ForeColor = $C.Yellow
+            } else {
+                $row.Cells[4].Value = ''
+            }
+            $row.Cells[4].ToolTipText  = "Using $($a.current)MB — $($a.pct)% above its normal $($a.mean)MB average"
+            $row.DefaultCellStyle.Font = $script:MonoBold
         }
     }
     $pGrid.ResumeLayout()
@@ -1207,14 +1220,23 @@ function Refresh-ProcessGrid {
             $row.Cells[5].Style.BackColor = $C.BgCard
             $row.Cells[5].ReadOnly        = $true
             $row.Cells[5].ToolTipText     = "System process - protected"
+            $row.Cells[1].Style.ForeColor = $C.Dim
         }
 
         # Anomaly marking (index 4)
         if ($Script:Anomalies.ContainsKey($p.Name)) {
             $a = $Script:Anomalies[$p.Name]
-            $row.Cells[4].Value           = [char]0x26A0 + " +$($a.pct)%"
-            $row.Cells[4].Style.ForeColor = $C.Anomaly
-            $row.DefaultCellStyle.Font    = $script:MonoBold
+            if ($a.pct -gt 50) {
+                $row.Cells[4].Value           = 'High'
+                $row.Cells[4].Style.ForeColor = $C.Red
+            } elseif ($a.pct -gt 20) {
+                $row.Cells[4].Value           = 'Elevated'
+                $row.Cells[4].Style.ForeColor = $C.Yellow
+            } else {
+                $row.Cells[4].Value = ''
+            }
+            $row.Cells[4].ToolTipText  = "Using $($a.current)MB — $($a.pct)% above its normal $($a.mean)MB average"
+            $row.DefaultCellStyle.Font = $script:MonoBold
         }
     }
     $pGrid.ResumeLayout()
@@ -1252,11 +1274,11 @@ $tabs.TabPages.Add($tab1)
 # TAB 2 -- STARTUP PROGRAMS
 # ========================================================================
 $tab2 = New-Object Windows.Forms.TabPage
-$tab2.Text      = "  Startup Programs  "
+$tab2.Text      = "  Startup Apps  "
 $tab2.BackColor = $C.BgBase
 
 $s2TitleLbl = New-Object Windows.Forms.Label
-$s2TitleLbl.Text      = "  Programs that launch automatically on boot"
+$s2TitleLbl.Text      = "  Apps that start automatically with Windows"
 $s2TitleLbl.Location  = [Drawing.Point]::new(15, 15)
 $s2TitleLbl.Size      = [Drawing.Size]::new(700, 26)
 $s2TitleLbl.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
@@ -1265,7 +1287,7 @@ $s2TitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab2.Controls.Add($s2TitleLbl)
 
 $s2SubLbl = New-Object Windows.Forms.Label
-$s2SubLbl.Text      = "  Disabling a User item removes it from the registry. System items require admin rights."
+$s2SubLbl.Text      = "  Disabling an app here stops it from launching on startup. You can re-enable it later."
 $s2SubLbl.Location  = [Drawing.Point]::new(15, 43)
 $s2SubLbl.Size      = [Drawing.Size]::new(900, 18)
 $s2SubLbl.Font      = New-Object Drawing.Font("Consolas", 8)
@@ -1274,7 +1296,13 @@ $s2SubLbl.BackColor = [Drawing.Color]::Transparent
 $tab2.Controls.Add($s2SubLbl)
 
 $s2CountLbl = New-Object Windows.Forms.Label
-$s2CountLbl.Text      = "  Found $($startups.Count) startup items"
+$s2CountLbl.Text      = if ($startups.Count -eq 0) {
+    "  No startup apps found — your system starts clean."
+} elseif ($startups.Count -le 5) {
+    "  $($startups.Count) app(s) start with Windows — looks good."
+} else {
+    "  $($startups.Count) apps start with Windows — consider disabling some."
+}
 $s2CountLbl.Location  = [Drawing.Point]::new(15, 63)
 $s2CountLbl.Size      = [Drawing.Size]::new(400, 20)
 $s2CountLbl.Font      = New-Object Drawing.Font("Consolas", 9)
@@ -1289,8 +1317,11 @@ Style-Grid $sGrid
 $sGrid.ReadOnly = $false
 
 Add-Col $sGrid "Source"  70
-Add-Col $sGrid "Name"   150
+$sGrid.Columns["Source"].HeaderText = "Type"
+Add-Col $sGrid "Name"   300
+$sGrid.Columns["Name"].HeaderText = "App Name"
 Add-Col $sGrid "Command" 550
+$sGrid.Columns["Command"].Visible = $false
 
 $disableCol = New-Object Windows.Forms.DataGridViewButtonColumn
 $disableCol.HeaderText = "Action"
@@ -1398,7 +1429,7 @@ $tabs.TabPages.Add($tab2)
 # TAB 3 -- CLEANUP
 # ========================================================================
 $tab3 = New-Object Windows.Forms.TabPage
-$tab3.Text      = "  Cleanup  "
+$tab3.Text      = "  Junk Cleaner  "
 $tab3.BackColor = $C.BgBase
 
 $cleanTitleLbl = New-Object Windows.Forms.Label
@@ -1683,7 +1714,7 @@ $cleanAllBtn.Add_Click({
 
 # ── TOP 10 LARGEST FOLDERS — own tab ────────────────────────────────────
 $diskUsageTab           = New-Object Windows.Forms.TabPage
-$diskUsageTab.Text      = "  Top Folders  "
+$diskUsageTab.Text      = "  Storage  "
 $diskUsageTab.BackColor = $C.BgBase
 
 $tfHeaderPnl = New-Pnl 15 10 1020 36 $C.BgCard3
