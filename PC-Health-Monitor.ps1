@@ -2229,19 +2229,24 @@ for ($tfI = 0; $tfI -lt 10; $tfI++) {
     $rowPnl = New-Pnl 0 ($tfI * 36) 1020 36 $rowBg
     $rowPnl.Visible = $false
 
-    # Folder open button
+    # Folder open button (📁 → opens path in Explorer)
     $fBtn = New-Object Windows.Forms.Button
-    $fBtn.Text      = ">"
-    $fBtn.Location  = [Drawing.Point]::new(0, 0)
-    $fBtn.Size      = [Drawing.Size]::new(36, 36)
-    $fBtn.BackColor = $C.BgCard3
-    $fBtn.ForeColor = $C.Yellow
+    $fBtn.Text      = [char]::ConvertFromUtf32(0x1F4C1)   # 📁
+    $fBtn.Location  = [Drawing.Point]::new(4, 0)
+    $fBtn.Size      = [Drawing.Size]::new(34, 36)
+    $fBtn.BackColor = $C.BgCard2
+    $fBtn.ForeColor = $C.Blue
     $fBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-    $fBtn.FlatAppearance.BorderSize              = 0
-    $fBtn.FlatAppearance.MouseOverBackColor      = $C.BgCard2
-    $fBtn.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
+    $fBtn.FlatAppearance.BorderColor         = $C.Blue
+    $fBtn.FlatAppearance.BorderSize          = 1
+    $fBtn.FlatAppearance.MouseOverBackColor  = $C.BgCard3
+    $fBtn.Font      = New-Object Drawing.Font("Segoe UI Emoji", 12)
     $fBtn.Cursor    = [Windows.Forms.Cursors]::Hand
     $fBtn.Tag       = ""
+
+    $tfTip = New-Object Windows.Forms.ToolTip
+    $tfTip.SetToolTip($fBtn, "Open folder in Explorer")
+
     $fBtn.Add_Click({
         param($s, $e)
         $p = $s.Tag
