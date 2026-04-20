@@ -1178,7 +1178,7 @@ function Show-ScoreInfo {
     $bd = $script:scoreBreakdown
     $f = New-Object Windows.Forms.Form
     $f.Text            = "Health Score — Breakdown"
-    $f.Size            = [Drawing.Size]::new(560, 400)
+    $f.Size            = [Drawing.Size]::new(640, 460)
     $f.StartPosition   = "CenterParent"
     $f.BackColor       = $C.BgBase
     $f.ForeColor       = $C.Text
@@ -1190,7 +1190,7 @@ function Show-ScoreInfo {
     $tl = New-Object Windows.Forms.Label
     $tl.Text = "PC Health Score — How it is calculated"
     $tl.Location = [Drawing.Point]::new(20, 16)
-    $tl.Size = [Drawing.Size]::new(520, 22)
+    $tl.Size = [Drawing.Size]::new(600, 22)
     $tl.Font = New-Object Drawing.Font("Segoe UI", 11, [Drawing.FontStyle]::Bold)
     $tl.ForeColor = $C.Blue; $tl.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($tl)
@@ -1198,7 +1198,7 @@ function Show-ScoreInfo {
     $sl = New-Object Windows.Forms.Label
     $sl.Text = "Score starts at 100. Each factor below deducts points based on current readings."
     $sl.Location = [Drawing.Point]::new(20, 42)
-    $sl.Size = [Drawing.Size]::new(520, 18)
+    $sl.Size = [Drawing.Size]::new(600, 18)
     $sl.Font = New-Object Drawing.Font("Segoe UI", 8)
     $sl.ForeColor = $C.SubText; $sl.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($sl)
@@ -1206,7 +1206,7 @@ function Show-ScoreInfo {
     # Table grid
     $grid = New-Object Windows.Forms.DataGridView
     $grid.Location = [Drawing.Point]::new(20, 68)
-    $grid.Size = [Drawing.Size]::new(520, 220)
+    $grid.Size = [Drawing.Size]::new(600, 230)
     Style-Grid $grid
     $grid.ColumnHeadersHeight = 28
     $grid.RowTemplate.Height  = 34
@@ -1220,7 +1220,7 @@ function Show-ScoreInfo {
         @{H="Current Value"; W=110},
         @{H="Points Lost";   W=90},
         @{H="Max Possible";  W=90},
-        @{H="Tip";           W=100}
+        @{H="Tip";           W=180}
     )) {
         $c = New-Object Windows.Forms.DataGridViewTextBoxColumn
         $c.HeaderText = $col.H; $c.Width = $col.W; $c.ReadOnly = $true
@@ -1249,24 +1249,24 @@ function Show-ScoreInfo {
     $finalScore = [math]::Max(0, 100 - $totalPen)
     $tRow = New-Object Windows.Forms.Label
     $tRow.Text = "Total deductions: -$totalPen pts     Final Score: $finalScore / 100"
-    $tRow.Location = [Drawing.Point]::new(20, 296)
-    $tRow.Size = [Drawing.Size]::new(520, 22)
+    $tRow.Location = [Drawing.Point]::new(20, 308)
+    $tRow.Size = [Drawing.Size]::new(600, 22)
     $tRow.Font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
     $tRow.ForeColor = $C.Text; $tRow.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($tRow)
 
     $note = New-Object Windows.Forms.Label
     $note.Text = "Score refreshes every 15 seconds. Values reflect real-time system state."
-    $note.Location = [Drawing.Point]::new(20, 322)
-    $note.Size = [Drawing.Size]::new(520, 16)
+    $note.Location = [Drawing.Point]::new(20, 338)
+    $note.Size = [Drawing.Size]::new(600, 16)
     $note.Font = New-Object Drawing.Font("Segoe UI", 8)
     $note.ForeColor = $C.SubText; $note.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($note)
 
     $closeBtn = New-Object Windows.Forms.Button
     $closeBtn.Text = "Close"
-    $closeBtn.Location = [Drawing.Point]::new(420, 346)
-    $closeBtn.Size = [Drawing.Size]::new(120, 32)
+    $closeBtn.Location = [Drawing.Point]::new(500, 368)
+    $closeBtn.Size = [Drawing.Size]::new(120, 34)
     $closeBtn.BackColor = $C.BgCard2; $closeBtn.ForeColor = $C.Text
     $closeBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
     $closeBtn.FlatAppearance.BorderSize = 0
