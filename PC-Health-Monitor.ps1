@@ -1494,16 +1494,16 @@ $vipHeaderLbl.BackColor = [Drawing.Color]::Transparent
 $vipCard.Controls.Add($vipHeaderLbl)
 
 $script:vipCombo = New-Object Windows.Forms.ComboBox
-$script:vipCombo.Location     = [Drawing.Point]::new(118, 8)
-$script:vipCombo.Size         = [Drawing.Size]::new(540, 26)
+$script:vipCombo.Location      = [Drawing.Point]::new(118, 8)
+$script:vipCombo.Size          = [Drawing.Size]::new(430, 26)
 $script:vipCombo.DropDownStyle = [Windows.Forms.ComboBoxStyle]::DropDownList
-$script:vipCombo.BackColor    = $C.BgCard2
-$script:vipCombo.ForeColor    = $C.Text
-$script:vipCombo.Font         = New-Object Drawing.Font("Consolas", 8)
-$script:vipCombo.FlatStyle    = [Windows.Forms.FlatStyle]::Flat
+$script:vipCombo.BackColor     = $C.BgCard2
+$script:vipCombo.ForeColor     = $C.Text
+$script:vipCombo.Font          = New-Object Drawing.Font("Consolas", 8)
+$script:vipCombo.FlatStyle     = [Windows.Forms.FlatStyle]::Flat
 $vipCard.Controls.Add($script:vipCombo)
 
-$vipRefreshBtn = New-Btn ([char]0x21BA + "") 664 8 30 26 $C.BgCard2 $C.SubText
+$vipRefreshBtn = New-Btn ([char]0x21BA + "") 552 8 28 26 $C.BgCard2 $C.SubText
 $vipRefreshBtn.Font   = New-Object Drawing.Font("Segoe UI", 10)
 $vipRefreshBtn.Cursor = [Windows.Forms.Cursors]::Hand
 $vipToolTip = New-Object Windows.Forms.ToolTip
@@ -1514,7 +1514,7 @@ $vipRefreshBtn.Add_Click({
 })
 $vipCard.Controls.Add($vipRefreshBtn)
 
-$script:vipBtn = New-Btn "SET VIP" 700 8 110 26 $C.BgCard2 $C.Yellow
+$script:vipBtn = New-Btn "SET VIP" 584 8 116 26 $C.BgCard2 $C.Yellow
 $script:vipBtn.FlatAppearance.BorderColor = $C.Yellow
 $script:vipBtn.FlatAppearance.BorderSize  = 1
 $script:vipBtn.Font   = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
@@ -1527,7 +1527,7 @@ $script:vipBtn.Add_Click({
         $script:vipBtn.Text      = "SET VIP"
         $script:vipBtn.BackColor = $C.BgCard2
         $script:vipBtn.ForeColor = $C.Yellow
-        $script:vipStatusLbl.Text      = "No VIP process active"
+        $script:vipStatusLbl.Text      = "No VIP active"
         $script:vipStatusLbl.ForeColor = $C.Dim
         $vipCard.Invalidate()
     } else {
@@ -1539,7 +1539,7 @@ $script:vipBtn.Add_Click({
                 $script:vipBtn.Text      = "CLEAR VIP"
                 $script:vipBtn.BackColor = $C.Yellow
                 $script:vipBtn.ForeColor = $C.BgBase
-                $script:vipStatusLbl.Text      = [char]0x25CF + " VIP: $($selProc.ProcessName) [PID $($selProc.Id)] — High Priority"
+                $script:vipStatusLbl.Text      = [char]0x25CF + " $($selProc.ProcessName)  [High Priority]"
                 $script:vipStatusLbl.ForeColor = $C.Yellow
                 $vipCard.Invalidate()
             } else {
@@ -1552,12 +1552,13 @@ $script:vipBtn.Add_Click({
 $vipCard.Controls.Add($script:vipBtn)
 
 $script:vipStatusLbl = New-Object Windows.Forms.Label
-$script:vipStatusLbl.Text      = "No VIP process active"
-$script:vipStatusLbl.Location  = [Drawing.Point]::new(818, 12)
-$script:vipStatusLbl.Size      = [Drawing.Size]::new(196, 18)
-$script:vipStatusLbl.Font      = New-Object Drawing.Font("Consolas", 7)
-$script:vipStatusLbl.ForeColor = $C.Dim
-$script:vipStatusLbl.BackColor = [Drawing.Color]::Transparent
+$script:vipStatusLbl.Text         = "No VIP active"
+$script:vipStatusLbl.Location     = [Drawing.Point]::new(706, 11)
+$script:vipStatusLbl.Size         = [Drawing.Size]::new(306, 20)
+$script:vipStatusLbl.Font         = New-Object Drawing.Font("Consolas", 8)
+$script:vipStatusLbl.ForeColor    = $C.Dim
+$script:vipStatusLbl.BackColor    = [Drawing.Color]::Transparent
+$script:vipStatusLbl.AutoEllipsis = $true
 $vipCard.Controls.Add($script:vipStatusLbl)
 
 $tab1.Controls.Add($vipCard)
@@ -2860,7 +2861,7 @@ function Do-Refresh {
                 $script:vipBtn.Text      = "SET VIP"
                 $script:vipBtn.BackColor = $C.BgCard2
                 $script:vipBtn.ForeColor = $C.Yellow
-                $script:vipStatusLbl.Text      = "VIP app closed — priority restored"
+                $script:vipStatusLbl.Text      = "VIP closed — priority restored"
                 $script:vipStatusLbl.ForeColor = $C.SubText
                 $vipCard.Invalidate()
             }
