@@ -430,6 +430,8 @@ $live = Get-LiveData
 $Script:LastCPU      = $live.CpuPct
 $Script:LastRAM      = $live.RamPct
 $Script:LastDiskFree = $live.DFree
+$script:lastHealthScore = 0
+$script:StartupItems    = $null
 
 # Startup items
 $startups = @()
@@ -445,6 +447,7 @@ foreach ($rp in $runPaths) {
         }
     }
 }
+$script:StartupItems = $startups
 
 # Junk file locations
 $junkDefs = @(
@@ -1173,16 +1176,6 @@ $script:scoreMsg2Lbl.ForeColor = $C.SubText
 $script:scoreMsg2Lbl.BackColor = [Drawing.Color]::Transparent
 $script:scoreMsg2Lbl.Visible   = $false
 $scoreCard.Controls.Add($script:scoreMsg2Lbl)
-
-$script:scoreMsg3Lbl = New-Object Windows.Forms.Label
-$script:scoreMsg3Lbl.Text      = ''
-$script:scoreMsg3Lbl.Location  = [Drawing.Point]::new(98, 54)
-$script:scoreMsg3Lbl.Size      = [Drawing.Size]::new(900, 14)
-$script:scoreMsg3Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
-$script:scoreMsg3Lbl.ForeColor = $C.SubText
-$script:scoreMsg3Lbl.BackColor = [Drawing.Color]::Transparent
-$script:scoreMsg3Lbl.Visible   = $false
-$scoreCard.Controls.Add($script:scoreMsg3Lbl)
 
 $UI["ScoreCard"] = $scoreCard
 $tab1.Controls.Add($scoreCard)
@@ -2204,6 +2197,25 @@ $script:UpdatePS        = $null
 # ========================================================================
 $script:tickCount = 0
 
+function Compute-HealthScore {
+    param([int]$CpuPct, [int]$RamPct, [int]$DiskPct, [int]$StartupCount)
+    $cpuScore    = [math]::Max(0, 100 - $CpuPct)
+    $ramScore    = [math]::Max(0, 100 - $RamPct)
+    $diskScore   = if ($DiskPct -ge 95) { 0 } elseif ($DiskPct -ge 85) { 30 } elseif ($DiskPct -ge 70) { 60 } else { 100 }
+    $startPenalty = [math]::Min(20, [math]::Max(0, ($StartupCount - 10) * 2))
+    $raw = ($cpuScore * 0.35) + ($ramScore * 0.35) + ($diskScore * 0.20) + ((100 - $startPenalty) * 0.10)
+    return [math]::Max(0, [math]::Min(100, [int]$raw))
+}
+
+function Get-ScoreLabel {
+    param([int]$Score)
+    if ($Score -ge 90) { return @{ Grade = 'GREAT';    Color = '#00ff88'; Arrow = '↑' } }
+    if ($Score -ge 75) { return @{ Grade = 'GOOD';     Color = '#88ff44'; Arrow = '→' } }
+    if ($Score -ge 55) { return @{ Grade = 'FAIR';     Color = '#ffcc00'; Arrow = '→' } }
+    if ($Score -ge 35) { return @{ Grade = 'POOR';     Color = '#ff8800'; Arrow = '↓' } }
+    return               @{ Grade = 'CRITICAL'; Color = '#ff3355'; Arrow = '↓' }
+}
+
 function Do-Refresh {
     try {
         # Read from DataEngine cache — zero blocking calls on UI thread
@@ -2237,6 +2249,24 @@ function Do-Refresh {
             $fw3 = [math]::Max(0, [math]::Min(112, [int](($d['DPct'] / 100.0) * 112)))
             $UI["DiskBarFill"].Width     = $fw3
             $UI["DiskBarFill"].BackColor = Pct-Color $d['DPct']
+
+            # Health Score card — live PowerShell computation, no Python required
+            $startupCnt = if ($script:StartupItems) { $script:StartupItems.Count } else { 0 }
+            $hs  = Compute-HealthScore -CpuPct $d['CpuPct'] -RamPct $d['RamPct'] -DiskPct $d['DPct'] -StartupCount $startupCnt
+            $lbl = Get-ScoreLabel -Score $hs
+            $trend = if ($hs -gt $script:lastHealthScore) { '↑' } elseif ($hs -lt $script:lastHealthScore) { '↓' } else { $lbl.Arrow }
+            $script:lastHealthScore = $hs
+            $hColor = [Drawing.ColorTranslator]::FromHtml($lbl.Color)
+            $script:scoreNumLbl.Text       = "$hs"
+            $script:scoreNumLbl.ForeColor  = $hColor
+            $script:scoreGradeLbl.Text     = $lbl.Grade
+            $script:scoreGradeLbl.ForeColor = $hColor
+            $script:scoreTrendLbl.Text     = $trend
+            $script:scoreTrendLbl.ForeColor = $hColor
+            $script:scoreMsg1Lbl.Text      = "CPU $($d['CpuPct'])%  |  RAM $($d['RamPct'])%  |  Disk $($d['DPct'])%  |  Startup apps: $startupCnt"
+            $script:scoreMsg1Lbl.ForeColor = $C.SubText
+            $script:scoreMsg2Lbl.Text      = 'Score recalculates every 15 seconds from live system data'
+            $script:scoreMsg2Lbl.Visible   = $true
         }
 
         # Process grid — reads from DataEngine cache (every 2 ticks = ~6 sec)
