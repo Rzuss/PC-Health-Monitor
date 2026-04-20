@@ -2557,8 +2557,9 @@ $refreshBtn.Add_Click({ Do-Refresh })
 $pGrid.Add_CellClick({
     param($sender, $e)
 
-    # Only act on the Kill column (index 4), not header row
-    if ($e.RowIndex -lt 0 -or $e.ColumnIndex -ne 4) { return }
+    # Only act on the Kill column (index 5), not header row
+    # Column layout: 0=App/Process 1=Memory 2=CPU 3=ID 4=Status 5=Kill
+    if ($e.RowIndex -lt 0 -or $e.ColumnIndex -ne 5) { return }
 
     $row         = $sender.Rows[$e.RowIndex]
     $processName = $row.Cells[0].Value.ToString().Trim()
