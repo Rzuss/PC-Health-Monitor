@@ -2188,6 +2188,16 @@ foreach ($ji in $junkItems) {
 
             $formObj.Invoke([Action]{ $log.AppendText("`nCleaning: $path") })
 
+            # -- Special handling: Thumbnail / Icon Cache requires Explorer restart ----
+            # iconcache_*.db and thumbcache_*.db are held open by explorer.exe.
+            # Standard protocol: stop Explorer → delete → restart Explorer.
+            $isThumbnailCache = ($name -eq 'Thumbnail Cache')
+            if ($isThumbnailCache) {
+                $formObj.Invoke([Action]{ $log.AppendText("`n  Stopping Windows Explorer to release cache locks...") })
+                Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 1800   # allow explorer.exe to fully terminate
+            }
+
             # Pass 1: delete each file individually — a locked file never blocks others
             Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue |
                 Where-Object { -not $_.PSIsContainer } |
@@ -2208,9 +2218,18 @@ foreach ($ji in $junkItems) {
                     try { Remove-Item $_.FullName -Force -ErrorAction Stop } catch { }
                 }
 
+            # -- Restart Explorer if we stopped it ---------------------------------
+            if ($isThumbnailCache) {
+                Start-Sleep -Milliseconds 500
+                Start-Process explorer.exe
+                $formObj.Invoke([Action]{ $log.AppendText("`n  Windows Explorer restarted.") })
+                Start-Sleep -Milliseconds 2000   # let Explorer stabilise before rescan
+            }
+
             # Rescan to get actual remaining size (not assume 0)
-            $remaining = Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue
-            $remCount  = $remaining.Count
+            $remaining = Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue |
+                         Where-Object { -not $_.PSIsContainer }
+            $remCount  = @($remaining).Count
             $remMB     = [math]::Round(($remaining | Measure-Object Length -Sum -ErrorAction SilentlyContinue).Sum / 1MB, 1)
 
             $pending['Bytes']    = $totalBytes
