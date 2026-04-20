@@ -1170,8 +1170,117 @@ $script:AnimatedValues.CpuArc.Current  = [double]$live.CpuPct
 $script:AnimatedValues.RamArc.Current  = [double]$live.RamPct
 $script:AnimatedValues.DiskArc.Current = [double]$live.DPct
 
-# -- Health Score Card (Sprint 6) ----------------------------------------
-$scoreCard = New-Pnl 15 128 1020 70 $C.BgCard
+# -- Health Score Card (redesigned) --------------------------------------
+$script:scoreBreakdown = @{ Cpu=0; Ram=0; Disk=0; Startup=0; Junk=0.0;
+                             CpuPen=0; RamPen=0; DiskPen=0; StartupPen=0; JunkPen=0 }
+
+function Show-ScoreInfo {
+    $bd = $script:scoreBreakdown
+    $f = New-Object Windows.Forms.Form
+    $f.Text            = "Health Score — Breakdown"
+    $f.Size            = [Drawing.Size]::new(560, 400)
+    $f.StartPosition   = "CenterParent"
+    $f.BackColor       = $C.BgBase
+    $f.ForeColor       = $C.Text
+    $f.FormBorderStyle = [Windows.Forms.FormBorderStyle]::FixedDialog
+    $f.MaximizeBox     = $false; $f.MinimizeBox = $false
+    $f.TopMost         = $true
+
+    # Title
+    $tl = New-Object Windows.Forms.Label
+    $tl.Text = "PC Health Score — How it is calculated"
+    $tl.Location = [Drawing.Point]::new(20, 16)
+    $tl.Size = [Drawing.Size]::new(520, 22)
+    $tl.Font = New-Object Drawing.Font("Segoe UI", 11, [Drawing.FontStyle]::Bold)
+    $tl.ForeColor = $C.Blue; $tl.BackColor = [Drawing.Color]::Transparent
+    $f.Controls.Add($tl)
+
+    $sl = New-Object Windows.Forms.Label
+    $sl.Text = "Score starts at 100. Each factor below deducts points based on current readings."
+    $sl.Location = [Drawing.Point]::new(20, 42)
+    $sl.Size = [Drawing.Size]::new(520, 18)
+    $sl.Font = New-Object Drawing.Font("Segoe UI", 8)
+    $sl.ForeColor = $C.SubText; $sl.BackColor = [Drawing.Color]::Transparent
+    $f.Controls.Add($sl)
+
+    # Table grid
+    $grid = New-Object Windows.Forms.DataGridView
+    $grid.Location = [Drawing.Point]::new(20, 68)
+    $grid.Size = [Drawing.Size]::new(520, 220)
+    Style-Grid $grid
+    $grid.ColumnHeadersHeight = 28
+    $grid.RowTemplate.Height  = 34
+    $grid.ReadOnly            = $true
+    $grid.AllowUserToAddRows  = $false
+    $grid.MultiSelect         = $false
+    $grid.SelectionMode       = [Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
+
+    foreach ($col in @(
+        @{H="Factor";        W=130},
+        @{H="Current Value"; W=110},
+        @{H="Points Lost";   W=90},
+        @{H="Max Possible";  W=90},
+        @{H="Tip";           W=100}
+    )) {
+        $c = New-Object Windows.Forms.DataGridViewTextBoxColumn
+        $c.HeaderText = $col.H; $c.Width = $col.W; $c.ReadOnly = $true
+        [void]$grid.Columns.Add($c)
+    }
+
+    $rows = @(
+        @("CPU Load",       "$($bd.Cpu)%",               "-$($bd.CpuPen)",  "-25", $(if($bd.CpuPen -gt 15){"Close heavy apps"}else{"Good"})),
+        @("RAM Usage",      "$($bd.Ram)%",               "-$($bd.RamPen)",  "-25", $(if($bd.RamPen -gt 15){"Free up memory"}else{"Good"})),
+        @("Disk (C:)",      "$($bd.Disk)%",              "-$($bd.DiskPen)", "-20", $(if($bd.DiskPen -gt 12){"Run Junk Cleaner"}else{"Good"})),
+        @("Startup Apps",   "$($bd.Startup) apps",       "-$($bd.StartupPen)","-15",$(if($bd.StartupPen -gt 8){"Disable some apps"}else{"Good"})),
+        @("Junk Files",     "$($bd.Junk) GB",            "-$($bd.JunkPen)", "-15", $(if($bd.JunkPen -gt 8){"Clean temp files"}else{"Good"}))
+    )
+
+    foreach ($r in $rows) {
+        $ri = $grid.Rows.Add($r)
+        $pen = [int]($r[2] -replace '-','')
+        $clr = if ($pen -ge 15) { $C.Red } elseif ($pen -ge 8) { $C.Yellow } else { $C.Green }
+        $grid.Rows[$ri].Cells[2].Style.ForeColor = $clr
+        $grid.Rows[$ri].Cells[2].Style.Font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    }
+    $f.Controls.Add($grid)
+
+    # Total row
+    $totalPen = $bd.CpuPen + $bd.RamPen + $bd.DiskPen + $bd.StartupPen + $bd.JunkPen
+    $finalScore = [math]::Max(0, 100 - $totalPen)
+    $tRow = New-Object Windows.Forms.Label
+    $tRow.Text = "Total deductions: -$totalPen pts     Final Score: $finalScore / 100"
+    $tRow.Location = [Drawing.Point]::new(20, 296)
+    $tRow.Size = [Drawing.Size]::new(520, 22)
+    $tRow.Font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $tRow.ForeColor = $C.Text; $tRow.BackColor = [Drawing.Color]::Transparent
+    $f.Controls.Add($tRow)
+
+    $note = New-Object Windows.Forms.Label
+    $note.Text = "Score refreshes every 15 seconds. Values reflect real-time system state."
+    $note.Location = [Drawing.Point]::new(20, 322)
+    $note.Size = [Drawing.Size]::new(520, 16)
+    $note.Font = New-Object Drawing.Font("Segoe UI", 8)
+    $note.ForeColor = $C.SubText; $note.BackColor = [Drawing.Color]::Transparent
+    $f.Controls.Add($note)
+
+    $closeBtn = New-Object Windows.Forms.Button
+    $closeBtn.Text = "Close"
+    $closeBtn.Location = [Drawing.Point]::new(420, 346)
+    $closeBtn.Size = [Drawing.Size]::new(120, 32)
+    $closeBtn.BackColor = $C.BgCard2; $closeBtn.ForeColor = $C.Text
+    $closeBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $closeBtn.FlatAppearance.BorderSize = 0
+    $closeBtn.Font = New-Object Drawing.Font("Segoe UI", 9)
+    $closeBtn.Cursor = [Windows.Forms.Cursors]::Hand
+    $closeBtn.Add_Click({ $f.Close() })
+    $f.Controls.Add($closeBtn)
+    $f.AcceptButton = $closeBtn
+
+    [void]$f.ShowDialog()
+}
+
+$scoreCard = New-Pnl 15 128 1020 80 $C.BgCard
+Enable-DoubleBuffer $scoreCard
 $scoreCard.Add_Paint({
     param($s2, $pe)
     try {
@@ -1179,56 +1288,104 @@ $scoreCard.Add_Paint({
         $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $g.FillRectangle((New-Object Drawing.SolidBrush($C.BgCard)), 0, 0, $s2.Width, $s2.Height)
         Draw-GlowBorder $g $s2.Width $s2.Height $C.Blue 2
+        # Left accent bar — color reflects score tier
+        $accentClr = if ($script:lastHealthScore -ge 85) { [Drawing.Color]::FromArgb(255,6,182,212) }
+                     elseif ($script:lastHealthScore -ge 70) { [Drawing.Color]::FromArgb(255,34,211,238) }
+                     elseif ($script:lastHealthScore -ge 55) { [Drawing.Color]::FromArgb(255,245,158,11) }
+                     elseif ($script:lastHealthScore -ge 35) { [Drawing.Color]::FromArgb(255,249,115,22) }
+                     else { [Drawing.Color]::FromArgb(255,239,68,68) }
+        $g.FillRectangle((New-Object Drawing.SolidBrush($accentClr)), 0, 0, 4, $s2.Height)
     } catch {
         Write-Log -Message "Score card Paint error" -Level WARN -ExceptionRecord $_
     }
 })
 
+# Big score number
 $script:scoreNumLbl = New-Object Windows.Forms.Label
 $script:scoreNumLbl.Text      = '--'
-$script:scoreNumLbl.Location  = [Drawing.Point]::new(10, 8)
-$script:scoreNumLbl.Size      = [Drawing.Size]::new(82, 54)
-$script:scoreNumLbl.Font      = New-Object Drawing.Font("Consolas", 20, [Drawing.FontStyle]::Bold)
+$script:scoreNumLbl.Location  = [Drawing.Point]::new(14, 10)
+$script:scoreNumLbl.Size      = [Drawing.Size]::new(90, 56)
+$script:scoreNumLbl.Font      = New-Object Drawing.Font("Consolas", 28, [Drawing.FontStyle]::Bold)
 $script:scoreNumLbl.ForeColor = $C.Dim
 $script:scoreNumLbl.BackColor = [Drawing.Color]::Transparent
+$script:scoreNumLbl.TextAlign = [Drawing.ContentAlignment]::MiddleRight
 $scoreCard.Controls.Add($script:scoreNumLbl)
 
+# "/100" suffix
+$script:scoreOf100Lbl = New-Object Windows.Forms.Label
+$script:scoreOf100Lbl.Text      = '/ 100'
+$script:scoreOf100Lbl.Location  = [Drawing.Point]::new(106, 38)
+$script:scoreOf100Lbl.Size      = [Drawing.Size]::new(56, 22)
+$script:scoreOf100Lbl.Font      = New-Object Drawing.Font("Consolas", 9)
+$script:scoreOf100Lbl.ForeColor = $C.SubText
+$script:scoreOf100Lbl.BackColor = [Drawing.Color]::Transparent
+$scoreCard.Controls.Add($script:scoreOf100Lbl)
+
+# "HEALTH SCORE" header label (small, above grade)
+$hsHeaderLbl = New-Object Windows.Forms.Label
+$hsHeaderLbl.Text      = 'HEALTH SCORE'
+$hsHeaderLbl.Location  = [Drawing.Point]::new(170, 8)
+$hsHeaderLbl.Size      = [Drawing.Size]::new(200, 14)
+$hsHeaderLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$hsHeaderLbl.ForeColor = $C.SubText
+$hsHeaderLbl.BackColor = [Drawing.Color]::Transparent
+$scoreCard.Controls.Add($hsHeaderLbl)
+
+# Grade label (GREAT SHAPE / COULD BE BETTER etc.)
 $script:scoreGradeLbl = New-Object Windows.Forms.Label
-$script:scoreGradeLbl.Text      = 'HEALTH SCORE'
-$script:scoreGradeLbl.Location  = [Drawing.Point]::new(98, 6)
-$script:scoreGradeLbl.Size      = [Drawing.Size]::new(150, 22)
-$script:scoreGradeLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+$script:scoreGradeLbl.Text      = 'CALCULATING...'
+$script:scoreGradeLbl.Location  = [Drawing.Point]::new(170, 24)
+$script:scoreGradeLbl.Size      = [Drawing.Size]::new(340, 26)
+$script:scoreGradeLbl.Font      = New-Object Drawing.Font("Segoe UI", 13, [Drawing.FontStyle]::Bold)
 $script:scoreGradeLbl.ForeColor = $C.Dim
 $script:scoreGradeLbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreGradeLbl)
 
+# Trend arrow
 $script:scoreTrendLbl = New-Object Windows.Forms.Label
 $script:scoreTrendLbl.Text      = ''
-$script:scoreTrendLbl.Location  = [Drawing.Point]::new(256, 4)
-$script:scoreTrendLbl.Size      = [Drawing.Size]::new(36, 26)
-$script:scoreTrendLbl.Font      = New-Object Drawing.Font("Segoe UI", 12, [Drawing.FontStyle]::Bold)
+$script:scoreTrendLbl.Location  = [Drawing.Point]::new(516, 24)
+$script:scoreTrendLbl.Size      = [Drawing.Size]::new(28, 26)
+$script:scoreTrendLbl.Font      = New-Object Drawing.Font("Segoe UI", 13, [Drawing.FontStyle]::Bold)
 $script:scoreTrendLbl.ForeColor = $C.Dim
 $script:scoreTrendLbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreTrendLbl)
 
+# Message line 1
 $script:scoreMsg1Lbl = New-Object Windows.Forms.Label
 $script:scoreMsg1Lbl.Text      = '  Calculating your PC health score...'
-$script:scoreMsg1Lbl.Location  = [Drawing.Point]::new(98, 32)
-$script:scoreMsg1Lbl.Size      = [Drawing.Size]::new(900, 16)
-$script:scoreMsg1Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
+$script:scoreMsg1Lbl.Location  = [Drawing.Point]::new(170, 52)
+$script:scoreMsg1Lbl.Size      = [Drawing.Size]::new(760, 16)
+$script:scoreMsg1Lbl.Font      = New-Object Drawing.Font("Segoe UI", 8)
 $script:scoreMsg1Lbl.ForeColor = $C.Dim
 $script:scoreMsg1Lbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreMsg1Lbl)
 
+# Message line 2
 $script:scoreMsg2Lbl = New-Object Windows.Forms.Label
 $script:scoreMsg2Lbl.Text      = ''
-$script:scoreMsg2Lbl.Location  = [Drawing.Point]::new(98, 48)
-$script:scoreMsg2Lbl.Size      = [Drawing.Size]::new(900, 16)
-$script:scoreMsg2Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
+$script:scoreMsg2Lbl.Location  = [Drawing.Point]::new(170, 66)
+$script:scoreMsg2Lbl.Size      = [Drawing.Size]::new(760, 14)
+$script:scoreMsg2Lbl.Font      = New-Object Drawing.Font("Segoe UI", 8)
 $script:scoreMsg2Lbl.ForeColor = $C.SubText
 $script:scoreMsg2Lbl.BackColor = [Drawing.Color]::Transparent
 $script:scoreMsg2Lbl.Visible   = $false
 $scoreCard.Controls.Add($script:scoreMsg2Lbl)
+
+# (i) Info button — top right of card
+$scoreInfoBtn = New-Object Windows.Forms.Button
+$scoreInfoBtn.Text      = "i"
+$scoreInfoBtn.Location  = [Drawing.Point]::new(984, 28)
+$scoreInfoBtn.Size      = [Drawing.Size]::new(26, 26)
+$scoreInfoBtn.BackColor = $C.BgCard2
+$scoreInfoBtn.ForeColor = $C.Blue
+$scoreInfoBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+$scoreInfoBtn.FlatAppearance.BorderColor = $C.Blue
+$scoreInfoBtn.FlatAppearance.BorderSize  = 1
+$scoreInfoBtn.Font      = New-Object Drawing.Font("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+$scoreInfoBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+$scoreInfoBtn.Add_Click({ Show-ScoreInfo })
+$scoreCard.Controls.Add($scoreInfoBtn)
 
 $UI["ScoreCard"] = $scoreCard
 $tab1.Controls.Add($scoreCard)
@@ -2455,6 +2612,18 @@ function Do-Refresh {
                 $script:scoreTrendLbl.ForeColor = if ($hs -ge $script:lastHealthScore) { $C.Green } else { $C.Red }
             }
             $script:lastHealthScore = $hs
+
+            # Populate breakdown for Show-ScoreInfo popup
+            $script:scoreBreakdown.Cpu        = $d['CpuPct']
+            $script:scoreBreakdown.Ram        = $d['RamPct']
+            $script:scoreBreakdown.Disk       = $d['DPct']
+            $script:scoreBreakdown.Startup    = $startupCount
+            $script:scoreBreakdown.Junk       = $junkGB
+            $script:scoreBreakdown.CpuPen     = [math]::Min(25, [int]($d['CpuPct'] * 0.25))
+            $script:scoreBreakdown.RamPen     = [math]::Min(25, [int]($d['RamPct'] * 0.25))
+            $script:scoreBreakdown.DiskPen    = [math]::Min(20, [int]($d['DPct'] * 0.20))
+            $script:scoreBreakdown.StartupPen = [math]::Min(15, $startupCount * 2)
+            $script:scoreBreakdown.JunkPen    = [math]::Min(15, [int]($junkGB * 5))
         }
 
         # Process grid — reads from DataEngine cache (every 2 ticks = ~6 sec)
