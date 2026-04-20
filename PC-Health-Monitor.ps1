@@ -1836,7 +1836,8 @@ $hdrPnl.Add_Paint({
 $hdrPnl.Controls.Add((New-Lbl "Location"  10  5 230 18 9 $true $C.Blue))
 $hdrPnl.Controls.Add((New-Lbl "Size"     248  5 100 18 9 $true $C.Blue))
 $hdrPnl.Controls.Add((New-Lbl "Files"    355  5  60 18 9 $true $C.Blue))
-$hdrPnl.Controls.Add((New-Lbl "Path"     422  5 310 18 9 $true $C.Blue))
+$hdrPnl.Controls.Add((New-Lbl "Path"     422  5 290 18 9 $true $C.Blue))
+$hdrPnl.Controls.Add((New-Lbl "Open"     745  5  36 18 9 $true $C.Blue))
 $tab3.Controls.Add($hdrPnl)
 
 $logBox = New-Object Windows.Forms.RichTextBox
@@ -1918,9 +1919,38 @@ foreach ($ji in $junkItems) {
     $pathLbl.BackColor = [Drawing.Color]::Transparent
     $rPnl.Controls.Add($pathLbl)
 
+    # -- Folder-open button: opens the junk folder directly in Explorer ----
+    $folderBtn          = New-Object Windows.Forms.Button
+    $folderBtn.Text     = [char]::ConvertFromUtf32(0x1F4C1)   # 📁
+    $folderBtn.Location = [Drawing.Point]::new(740, 10)
+    $folderBtn.Size     = [Drawing.Size]::new(36, 36)
+    $folderBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $folderBtn.FlatAppearance.BorderColor = $C.Blue
+    $folderBtn.FlatAppearance.BorderSize  = 1
+    $folderBtn.BackColor = $C.BgCard2
+    $folderBtn.ForeColor = $C.Blue
+    $folderBtn.Font      = New-Object Drawing.Font("Segoe UI Emoji", 12)
+    $folderBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+    $cleanToolTip.SetToolTip($folderBtn, "Open folder in Explorer")
+    $folderBtn.Tag = $ji.Path
+    $folderBtn.Add_Click({
+        param($s2, $ev)
+        $p = $s2.Tag
+        if (Test-Path $p) {
+            Start-Process explorer.exe -ArgumentList "`"$p`""
+        } else {
+            [Windows.Forms.MessageBox]::Show(
+                "Folder not found:`n$p",
+                "PC Health Monitor",
+                [Windows.Forms.MessageBoxButtons]::OK,
+                [Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        }
+    })
+    $rPnl.Controls.Add($folderBtn)
+
     $cleanBtn = New-Object Windows.Forms.Button
     $cleanBtn.Text      = "Clean"
-    $cleanBtn.Location  = [Drawing.Point]::new(820, 10)
+    $cleanBtn.Location  = [Drawing.Point]::new(784, 10)
     $cleanBtn.Size      = [Drawing.Size]::new(100, 36)
     $cleanBtn.BackColor = $C.DarkRed
     $cleanBtn.ForeColor = $C.White
@@ -1932,7 +1962,7 @@ foreach ($ji in $junkItems) {
 
     $skipBtn = New-Object Windows.Forms.Button
     $skipBtn.Text      = "Skip"
-    $skipBtn.Location  = [Drawing.Point]::new(928, 10)
+    $skipBtn.Location  = [Drawing.Point]::new(892, 10)
     $skipBtn.Size      = [Drawing.Size]::new(80, 36)
     $skipBtn.BackColor = $C.BgCard2
     $skipBtn.ForeColor = $C.Dim
