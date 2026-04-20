@@ -1828,15 +1828,30 @@ foreach ($ji in $junkItems) {
 
             $formObj.Invoke([Action]{ $log.AppendText("`nCleaning: $path") })
 
-            Get-ChildItem $path -Force -ErrorAction SilentlyContinue | ForEach-Object {
-                try {
-                    $totalBytes += $_.Length
-                    Remove-Item $_.FullName -Recurse -Force -ErrorAction Stop
-                    $del++
-                } catch { $errCount++ }
-                # NOTE: Write-Log cannot be called here -- this runs inside a Runspace
-                # which does not share $script: scope. Error count is surfaced via UI message below.
-            }
+            # Pass 1: delete each file individually — a locked file never blocks others
+            Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue |
+                Where-Object { -not $_.PSIsContainer } |
+                Sort-Object FullName -Descending |
+                ForEach-Object {
+                    try {
+                        $totalBytes += $_.Length
+                        Remove-Item $_.FullName -Force -ErrorAction Stop
+                        $del++
+                    } catch { $errCount++ }
+                }
+
+            # Pass 2: remove directories that are now empty (best-effort, silent)
+            Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue |
+                Where-Object { $_.PSIsContainer } |
+                Sort-Object FullName -Descending |
+                ForEach-Object {
+                    try { Remove-Item $_.FullName -Force -ErrorAction Stop } catch { }
+                }
+
+            # Rescan to get actual remaining size (not assume 0)
+            $remaining = Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue
+            $remCount  = $remaining.Count
+            $remMB     = [math]::Round(($remaining | Measure-Object Length -Sum -ErrorAction SilentlyContinue).Sum / 1MB, 1)
 
             $pending['Bytes']    = $totalBytes
             $pending['Name']     = $name
@@ -1844,16 +1859,22 @@ foreach ($ji in $junkItems) {
             $pending['Skipped']  = $errCount
             $pending['Ready']    = $true
 
-            $msg = "  Done - removed $del items ($errCount locked/skipped)"
+            $msg = "  Done - removed $del files ($errCount locked/skipped) | $remMB MB remaining"
             $formObj.Invoke([Action]{
                 $btn.Text        = "Done"
                 $btn.BackColor   = $dg
                 $log.AppendText($msg)
                 $log.ScrollToCaret()
                 $prog.Visible    = $false
-                $szLbl.Text      = "0 MB"
-                $szLbl.ForeColor = $green
-                $fLbl.Text       = "0 files"
+                if ($remMB -le 0) {
+                    $szLbl.Text      = "0 MB"
+                    $szLbl.ForeColor = $green
+                    $fLbl.Text       = "0 files"
+                } else {
+                    $szLbl.Text      = "$remMB MB"
+                    $szLbl.ForeColor = [Drawing.Color]::FromArgb(255, 200, 100)  # amber — partial clean
+                    $fLbl.Text       = "$remCount locked"
+                }
             })
         })
         [void]$ps.AddParameter("path",    $capturedPath)
