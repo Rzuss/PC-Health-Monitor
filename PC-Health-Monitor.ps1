@@ -2240,6 +2240,8 @@ $script:lastDiskAlert      = [DateTime]::MinValue
 $script:trayHintShown      = $false
 $script:lastHealthScore    = 0
 $script:StartupItems       = $null
+$script:UpdateChecked      = $false
+$script:UpdatePending      = [hashtable]::Synchronized(@{ Done = $false; NewVersion = '' })
 
 # ========================================================================
 # HEALTH SCORE ENGINE (pure PowerShell — no Python required)
@@ -2268,6 +2270,100 @@ function Get-ScoreLabel {
     elseif ($Score -ge 55) { return @{ Grade = 'Could Be Better'; Color = '#F59E0B'; Msg1 = 'Some areas need attention.';             Msg2 = 'Check startup apps and free up disk space.' } }
     elseif ($Score -ge 35) { return @{ Grade = 'Needs a Cleanup'; Color = '#F97316'; Msg1 = 'Your PC is under strain.';               Msg2 = 'Run the Junk Cleaner and disable unused startup apps.' } }
     else                   { return @{ Grade = 'Poor Condition';  Color = '#EF4444'; Msg1 = 'Your PC needs attention urgently.';       Msg2 = 'High resource usage detected — consider restarting.' } }
+}
+
+# ========================================================================
+# AUTO-UPDATE ENGINE
+# ========================================================================
+function Show-UpdateBanner {
+    param([string]$NewVersion)
+
+    # Remove any existing banner
+    $old = $form.Controls | Where-Object { $_.Tag -eq 'UpdateBanner' }
+    if ($old) { $old | ForEach-Object { $form.Controls.Remove($_); $_.Dispose() } }
+
+    $banner = New-Object Windows.Forms.Panel
+    $banner.Size      = [Drawing.Size]::new(1060, 36)
+    $banner.Location  = [Drawing.Point]::new(0, 64)   # just below title panel
+    $banner.BackColor = [Drawing.Color]::FromArgb(25, 40, 15)
+    $banner.Tag       = 'UpdateBanner'
+    $banner.Anchor    = [Windows.Forms.AnchorStyles]::Top -bor
+                        [Windows.Forms.AnchorStyles]::Left -bor
+                        [Windows.Forms.AnchorStyles]::Right
+
+    $banner.Add_Paint({
+        param($s2, $pe)
+        try {
+            # Green 3px top accent
+            $pe.Graphics.FillRectangle(
+                (New-Object Drawing.SolidBrush($C.Green)), 0, 0, $s2.Width, 3)
+        } catch { }
+    })
+
+    # Message label
+    $bannerMsg = New-Object Windows.Forms.Label
+    $bannerMsg.Text      = "  [!]  Version $NewVersion is available — click to download the update"
+    $bannerMsg.Location  = [Drawing.Point]::new(8, 8)
+    $bannerMsg.Size      = [Drawing.Size]::new(800, 20)
+    $bannerMsg.Font      = New-Object Drawing.Font("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+    $bannerMsg.ForeColor = $C.Green
+    $bannerMsg.BackColor = [Drawing.Color]::Transparent
+    $bannerMsg.Cursor    = [Windows.Forms.Cursors]::Hand
+    $bannerMsg.Add_Click({
+        Start-Process "https://github.com/Rzuss/PC-Health-Monitor/releases/latest"
+    })
+    $banner.Controls.Add($bannerMsg)
+
+    # Dismiss button
+    $dismissBtn = New-Object Windows.Forms.Button
+    $dismissBtn.Text      = "Dismiss"
+    $dismissBtn.Location  = [Drawing.Point]::new(960, 6)
+    $dismissBtn.Size      = [Drawing.Size]::new(86, 22)
+    $dismissBtn.BackColor = $C.BgCard2
+    $dismissBtn.ForeColor = $C.Dim
+    $dismissBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $dismissBtn.FlatAppearance.BorderSize = 0
+    $dismissBtn.Font      = New-Object Drawing.Font("Segoe UI", 8)
+    $dismissBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+    $capturedBanner       = $banner
+    $capturedForm         = $form
+    $dismissBtn.Add_Click({
+        $capturedForm.Controls.Remove($capturedBanner)
+        $capturedBanner.Dispose()
+    })
+    $banner.Controls.Add($dismissBtn)
+
+    $form.Controls.Add($banner)
+    $banner.BringToFront()
+}
+
+function Start-UpdateCheck {
+    param([hashtable]$Pending)
+    $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+    $rs.ApartmentState = "MTA"
+    $rs.ThreadOptions  = "ReuseThread"
+    $rs.Open()
+
+    $ps = [System.Management.Automation.PowerShell]::Create()
+    $ps.Runspace = $rs
+
+    [void]$ps.AddScript({
+        param($pending)
+        try {
+            $api = 'https://api.github.com/repos/Rzuss/PC-Health-Monitor/releases/latest'
+            $wc  = New-Object System.Net.WebClient
+            $wc.Headers.Add('User-Agent', 'PC-Health-Monitor')
+            $json   = $wc.DownloadString($api)
+            $parsed = $json | ConvertFrom-Json
+            $pending['NewVersion'] = $parsed.tag_name -replace '^v',''
+        } catch {
+            $pending['NewVersion'] = ''
+        } finally {
+            $pending['Done'] = $true
+        }
+    })
+    [void]$ps.AddParameter("pending", $Pending)
+    [void]$ps.BeginInvoke()
 }
 
 # ========================================================================
@@ -2406,6 +2502,18 @@ function Do-Refresh {
         }
 
         $script:tickCount++
+
+        # Auto-update: show banner once if a new version was found
+        if (-not $script:UpdateChecked -and $script:UpdatePending['Done']) {
+            $script:UpdateChecked = $true
+            $latest  = $script:UpdatePending['NewVersion']
+            $current = '3.1'
+            if ($latest -and $latest -ne $current -and
+                [Version]::TryParse($latest, [ref][Version]::new()) -and
+                ([Version]$latest -gt [Version]$current)) {
+                Show-UpdateBanner -NewVersion $latest
+            }
+        }
     } catch {
         Write-Log -Message "Do-Refresh failed during live data update" -Level ERROR -ExceptionRecord $_
         $d = $null    # graceful fallback -- UI retains last-known-good values
@@ -2440,6 +2548,9 @@ $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 3000
 $timer.Add_Tick({ Do-Refresh })
 $timer.Start()
+
+# Kick off background update check (non-blocking, MTA runspace)
+Start-UpdateCheck -Pending $script:UpdatePending
 
 $refreshBtn.Add_Click({ Do-Refresh })
 
