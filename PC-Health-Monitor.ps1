@@ -107,6 +107,7 @@ $C = @{
     Border     = [Drawing.Color]::FromArgb(20,  40,  70)
     Anomaly    = [Drawing.Color]::FromArgb(168, 85,  247)
 }
+$script:C = $C   # expose color palette to function scopes (e.g. Show-ScoreInfo)
 
 $script:Colors = @{
     BG_Primary     = $C.BgBase
@@ -1175,6 +1176,7 @@ $script:scoreBreakdown = @{ Cpu=0; Ram=0; Disk=0; Startup=0; Junk=0.0;
                              CpuPen=0; RamPen=0; DiskPen=0; StartupPen=0; JunkPen=0 }
 
 function Show-ScoreInfo {
+    $C  = $script:C          # ensure color palette is accessible inside this function
     $bd = $script:scoreBreakdown
     $f = New-Object Windows.Forms.Form
     $f.Text            = "Health Score — Breakdown"
