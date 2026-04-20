@@ -776,6 +776,119 @@ Write-Log -Message "DataEngine background worker started (MTA runspace, InitialS
 $script:DataEngineErrIdx = 0
 
 #region 5 - UI Initialization
+
+# -- First-Run Welcome Screen --------------------------------------------
+function Show-WelcomeScreen {
+    $regPath = 'HKCU:\Software\PC-Health-Monitor'
+    $regKey  = 'WelcomeSeen'
+    try {
+        $seen = Get-ItemPropertyValue -Path $regPath -Name $regKey -ErrorAction SilentlyContinue
+        if ($seen -eq 1) { return }
+    } catch { }
+
+    $w = New-Object Windows.Forms.Form
+    $w.Text            = "Welcome to PC Health Monitor"
+    $w.Size            = [Drawing.Size]::new(560, 500)
+    $w.StartPosition   = "CenterScreen"
+    $w.BackColor       = $C.BgBase
+    $w.ForeColor       = $C.Text
+    $w.FormBorderStyle = [Windows.Forms.FormBorderStyle]::FixedDialog
+    $w.MaximizeBox     = $false
+    $w.MinimizeBox     = $false
+    $w.TopMost         = $true
+
+    # Title
+    $wTitle = New-Object Windows.Forms.Label
+    $wTitle.Text      = "PC Health Monitor"
+    $wTitle.Location  = [Drawing.Point]::new(30, 30)
+    $wTitle.Size      = [Drawing.Size]::new(500, 38)
+    $wTitle.Font      = New-Object Drawing.Font("Segoe UI", 20, [Drawing.FontStyle]::Bold)
+    $wTitle.ForeColor = $C.Blue
+    $wTitle.BackColor = [Drawing.Color]::Transparent
+    $w.Controls.Add($wTitle)
+
+    # Subtitle
+    $wSub = New-Object Windows.Forms.Label
+    $wSub.Text      = "Your PC's personal health assistant"
+    $wSub.Location  = [Drawing.Point]::new(30, 72)
+    $wSub.Size      = [Drawing.Size]::new(500, 22)
+    $wSub.Font      = New-Object Drawing.Font("Segoe UI", 11)
+    $wSub.ForeColor = $C.SubText
+    $wSub.BackColor = [Drawing.Color]::Transparent
+    $w.Controls.Add($wSub)
+
+    # Separator
+    $wLine = New-Object Windows.Forms.Panel
+    $wLine.Location  = [Drawing.Point]::new(30, 104)
+    $wLine.Size      = [Drawing.Size]::new(500, 1)
+    $wLine.BackColor = [Drawing.Color]::FromArgb(60, 6, 182, 212)
+    $w.Controls.Add($wLine)
+
+    # Feature bullets
+    $features = @(
+        @{ Icon = [char]0x1F4CA; Text = "Live Dashboard  —  CPU, RAM, and storage at a glance" },
+        @{ Icon = [char]0x1F9F9; Text = "Junk Cleaner  —  safely free up space in one click" },
+        @{ Icon = [char]0x1F680; Text = "Startup Apps  —  control what launches with Windows" },
+        @{ Icon = [char]0x1F4BE; Text = "Storage  —  find the largest folders on your drive" },
+        @{ Icon = [char]0x1F514; Text = "Smart Alerts  —  notified only when something needs you" }
+    )
+
+    $featureY = 120
+    foreach ($f in $features) {
+        $iconLbl = New-Object Windows.Forms.Label
+        $iconLbl.Text      = $f.Icon
+        $iconLbl.Location  = [Drawing.Point]::new(30, $featureY)
+        $iconLbl.Size      = [Drawing.Size]::new(36, 36)
+        $iconLbl.Font      = New-Object Drawing.Font("Segoe UI", 14)
+        $iconLbl.BackColor = [Drawing.Color]::Transparent
+        $w.Controls.Add($iconLbl)
+
+        $textLbl = New-Object Windows.Forms.Label
+        $textLbl.Text      = $f.Text
+        $textLbl.Location  = [Drawing.Point]::new(72, $featureY + 6)
+        $textLbl.Size      = [Drawing.Size]::new(458, 24)
+        $textLbl.Font      = New-Object Drawing.Font("Segoe UI", 10)
+        $textLbl.ForeColor = $C.Text
+        $textLbl.BackColor = [Drawing.Color]::Transparent
+        $w.Controls.Add($textLbl)
+
+        $featureY += 44
+    }
+
+    # Footer note
+    $wNote = New-Object Windows.Forms.Label
+    $wNote.Text      = "Runs quietly in the system tray. No internet connection required."
+    $wNote.Location  = [Drawing.Point]::new(30, 374)
+    $wNote.Size      = [Drawing.Size]::new(500, 18)
+    $wNote.Font      = New-Object Drawing.Font("Segoe UI", 8)
+    $wNote.ForeColor = $C.SubText
+    $wNote.BackColor = [Drawing.Color]::Transparent
+    $w.Controls.Add($wNote)
+
+    # Get Started button
+    $wBtn = New-Object Windows.Forms.Button
+    $wBtn.Text      = "Get Started"
+    $wBtn.Location  = [Drawing.Point]::new(370, 410)
+    $wBtn.Size      = [Drawing.Size]::new(160, 44)
+    $wBtn.BackColor = $C.Blue
+    $wBtn.ForeColor = [Drawing.Color]::White
+    $wBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $wBtn.FlatAppearance.BorderSize = 0
+    $wBtn.Font      = New-Object Drawing.Font("Segoe UI", 11, [Drawing.FontStyle]::Bold)
+    $wBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+    $wBtn.Add_Click({
+        try {
+            if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+            Set-ItemProperty -Path $regPath -Name $regKey -Value 1 -Type DWord -Force
+        } catch { }
+        $w.Close()
+    })
+    $w.Controls.Add($wBtn)
+    $w.AcceptButton = $wBtn
+
+    [void]$w.ShowDialog()
+}
+
 # -- MAIN FORM -----------------------------------------------------------
 $form = New-Object Windows.Forms.Form
 $form.Text            = "PC Health Monitor"
@@ -2379,5 +2492,6 @@ $form.Add_FormClosing({
 Write-Log -Message "Session started. Privileges: $(if ($script:isAdmin) {'Administrator'} else {'Standard User'})" -Level INFO
 
 # -- Launch --------------------------------------------------------------
+Show-WelcomeScreen
 [void]$form.ShowDialog()
 #endregion
