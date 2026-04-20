@@ -522,6 +522,7 @@ foreach ($rp in $runPaths) {
         }
     }
 }
+$script:StartupItems = $startups   # expose to Health Score engine
 
 # Junk file locations
 $junkDefs = @(
@@ -1098,7 +1099,7 @@ $script:scoreTrendLbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreTrendLbl)
 
 $script:scoreMsg1Lbl = New-Object Windows.Forms.Label
-$script:scoreMsg1Lbl.Text      = 'Analytics not yet run -- install Python & run Register-HealthTask.ps1'
+$script:scoreMsg1Lbl.Text      = '  Calculating your PC health score...'
 $script:scoreMsg1Lbl.Location  = [Drawing.Point]::new(98, 32)
 $script:scoreMsg1Lbl.Size      = [Drawing.Size]::new(900, 16)
 $script:scoreMsg1Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
@@ -1115,16 +1116,6 @@ $script:scoreMsg2Lbl.ForeColor = $C.SubText
 $script:scoreMsg2Lbl.BackColor = [Drawing.Color]::Transparent
 $script:scoreMsg2Lbl.Visible   = $false
 $scoreCard.Controls.Add($script:scoreMsg2Lbl)
-
-$script:scoreMsg3Lbl = New-Object Windows.Forms.Label
-$script:scoreMsg3Lbl.Text      = ''
-$script:scoreMsg3Lbl.Location  = [Drawing.Point]::new(98, 54)
-$script:scoreMsg3Lbl.Size      = [Drawing.Size]::new(900, 14)
-$script:scoreMsg3Lbl.Font      = New-Object Drawing.Font("Consolas", 8)
-$script:scoreMsg3Lbl.ForeColor = $C.SubText
-$script:scoreMsg3Lbl.BackColor = [Drawing.Color]::Transparent
-$script:scoreMsg3Lbl.Visible   = $false
-$scoreCard.Controls.Add($script:scoreMsg3Lbl)
 
 $UI["ScoreCard"] = $scoreCard
 $tab1.Controls.Add($scoreCard)
@@ -2132,8 +2123,39 @@ $script:cpuHighTicks       = 0
 $script:cpuAlertFired      = $false
 $script:lastRamAlert       = [DateTime]::MinValue
 # (TempRefreshCounter removed — Do-Refresh now reads from DataEngine cache)
-$script:lastDiskAlert = [DateTime]::MinValue
-$script:trayHintShown = $false
+$script:lastDiskAlert      = [DateTime]::MinValue
+$script:trayHintShown      = $false
+$script:lastHealthScore    = 0
+$script:StartupItems       = $null
+
+# ========================================================================
+# HEALTH SCORE ENGINE (pure PowerShell — no Python required)
+# ========================================================================
+function Compute-HealthScore {
+    param(
+        [int]$CpuPct,
+        [int]$RamPct,
+        [int]$DiskPct,
+        [int]$StartupCount,
+        [double]$JunkGB
+    )
+    $score = 100
+    $score -= [math]::Min(25, [int]($CpuPct  * 0.25))   # CPU:     up to -25
+    $score -= [math]::Min(25, [int]($RamPct  * 0.25))   # RAM:     up to -25
+    $score -= [math]::Min(20, [int]($DiskPct * 0.20))   # Disk:    up to -20
+    $score -= [math]::Min(15, $StartupCount * 2)         # Startup: -2 each, up to -15
+    $score -= [math]::Min(15, [int]($JunkGB  * 5))       # Junk:    -5 per GB, up to -15
+    return [math]::Max(0, [math]::Min(100, $score))
+}
+
+function Get-ScoreLabel {
+    param([int]$Score)
+    if     ($Score -ge 85) { return @{ Grade = 'Great Shape';     Color = '#06B6D4'; Msg1 = 'Your PC is running efficiently.';        Msg2 = 'No action needed — keep it up.' } }
+    elseif ($Score -ge 70) { return @{ Grade = 'Good';            Color = '#22D3EE'; Msg1 = 'Your PC is in good condition.';           Msg2 = 'Consider clearing some junk files.' } }
+    elseif ($Score -ge 55) { return @{ Grade = 'Could Be Better'; Color = '#F59E0B'; Msg1 = 'Some areas need attention.';             Msg2 = 'Check startup apps and free up disk space.' } }
+    elseif ($Score -ge 35) { return @{ Grade = 'Needs a Cleanup'; Color = '#F97316'; Msg1 = 'Your PC is under strain.';               Msg2 = 'Run the Junk Cleaner and disable unused startup apps.' } }
+    else                   { return @{ Grade = 'Poor Condition';  Color = '#EF4444'; Msg1 = 'Your PC needs attention urgently.';       Msg2 = 'High resource usage detected — consider restarting.' } }
+}
 
 # ========================================================================
 # LIVE REFRESH LOGIC
@@ -2173,6 +2195,36 @@ function Do-Refresh {
             $fw3 = [math]::Max(0, [math]::Min(112, [int](($d['DPct'] / 100.0) * 112)))
             $UI["DiskBarFill"].Width     = $fw3
             $UI["DiskBarFill"].BackColor = Pct-Color $d['DPct']
+        }
+
+        # Health Score — computed live every 5 ticks (~15 sec)
+        if ($script:tickCount % 5 -eq 0) {
+            $junkGB = if ($junkItems -and $junkItems.Count -gt 0) {
+                [math]::Round(($junkItems | Measure-Object SizeMB -Sum).Sum / 1024, 2)
+            } else { 0.0 }
+            $startupCount = if ($script:StartupItems) { $script:StartupItems.Count } else { 0 }
+
+            $hs  = Compute-HealthScore -CpuPct $d['CpuPct'] -RamPct $d['RamPct'] `
+                       -DiskPct $d['DPct'] -StartupCount $startupCount -JunkGB $junkGB
+            $lbl = Get-ScoreLabel -Score $hs
+
+            $script:scoreNumLbl.Text       = "$hs"
+            $script:scoreNumLbl.ForeColor  = [Drawing.ColorTranslator]::FromHtml($lbl.Color)
+            $script:scoreGradeLbl.Text     = $lbl.Grade.ToUpper()
+            $script:scoreGradeLbl.ForeColor = [Drawing.ColorTranslator]::FromHtml($lbl.Color)
+            $script:scoreMsg1Lbl.Text      = "  $($lbl.Msg1)"
+            $script:scoreMsg1Lbl.ForeColor = $C.Text
+            $script:scoreMsg2Lbl.Text      = "  $($lbl.Msg2)"
+            $script:scoreMsg2Lbl.Visible   = $true
+            $script:scoreMsg2Lbl.ForeColor = $C.SubText
+
+            if ($script:lastHealthScore -gt 0) {
+                $script:scoreTrendLbl.Text = if ($hs -gt $script:lastHealthScore) { [char]0x2191 }
+                                             elseif ($hs -lt $script:lastHealthScore) { [char]0x2193 }
+                                             else { '' }
+                $script:scoreTrendLbl.ForeColor = if ($hs -ge $script:lastHealthScore) { $C.Green } else { $C.Red }
+            }
+            $script:lastHealthScore = $hs
         }
 
         # Process grid — reads from DataEngine cache (every 2 ticks = ~6 sec)
