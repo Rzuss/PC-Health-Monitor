@@ -1073,6 +1073,74 @@ $statusBar.Controls.Add($sbAdminLbl)
 $form.Controls.Add($statusBar)
 
 # ========================================================================
+# VIP MODE — Process Priority Elevation (state + functions)
+# ========================================================================
+$script:vipPid          = 0
+$script:vipName         = ''
+$script:vipActive       = $false
+$script:vipOrigPriority = [Diagnostics.ProcessPriorityClass]::Normal
+$script:vipProcs        = @()   # cached list from last Refresh-VipCombo call
+
+function Get-UserFacingProcesses {
+    <# Returns only processes that own a visible window — filters out all
+       background services and system daemons automatically. #>
+    Get-Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.MainWindowTitle -ne '' -and
+            $_.MainWindowHandle -ne [IntPtr]::Zero -and
+            $_.Name -notmatch '^(PC-Health-Monitor|explorer|SearchHost|StartMenuExperienceHost)$'
+        } |
+        Sort-Object WorkingSet64 -Descending |
+        Select-Object -First 30
+}
+
+function Set-VipProcess {
+    param([int]$ProcessId)
+    try {
+        $p = Get-Process -Id $ProcessId -ErrorAction Stop
+        if ($p.HasExited) { return $false }
+        $script:vipOrigPriority = $p.PriorityClass
+        $p.PriorityClass        = [Diagnostics.ProcessPriorityClass]::High
+        $script:vipPid          = $ProcessId
+        $script:vipName         = $p.ProcessName
+        $script:vipActive       = $true
+        Write-Log -Message "VIP: '$($p.ProcessName)' [PID $ProcessId] elevated to High (was $($script:vipOrigPriority))" -Level INFO
+        return $true
+    } catch {
+        Write-Log -Message "VIP: Failed to elevate PID $ProcessId" -Level WARN -ExceptionRecord $_
+        return $false
+    }
+}
+
+function Clear-VipProcess {
+    if ($script:vipPid -gt 0) {
+        try {
+            $p = Get-Process -Id $script:vipPid -ErrorAction Stop
+            if (-not $p.HasExited) {
+                $p.PriorityClass = $script:vipOrigPriority
+                Write-Log -Message "VIP: '$($p.ProcessName)' restored to $($script:vipOrigPriority)" -Level INFO
+            }
+        } catch { <# process already gone — nothing to restore #> }
+        $script:vipPid    = 0
+        $script:vipName   = ''
+        $script:vipActive = $false
+    }
+}
+
+function Refresh-VipCombo {
+    $script:vipCombo.Items.Clear()
+    $procs = Get-UserFacingProcesses
+    $script:vipProcs = $procs
+    foreach ($p in $procs) {
+        $title = if ($p.MainWindowTitle.Length -gt 40) {
+            $p.MainWindowTitle.Substring(0, 40) + '...'
+        } else { $p.MainWindowTitle }
+        [void]$script:vipCombo.Items.Add("$($p.ProcessName)  [$($p.Id)]  — $title")
+    }
+    if ($script:vipCombo.Items.Count -gt 0) { $script:vipCombo.SelectedIndex = 0 }
+}
+
+# ========================================================================
 # TAB 1 -- DASHBOARD
 # ========================================================================
 $tab1 = New-Object Windows.Forms.TabPage
@@ -1404,9 +1472,99 @@ $scoreCard.Controls.Add($scoreInfoBtn)
 $UI["ScoreCard"] = $scoreCard
 $tab1.Controls.Add($scoreCard)
 
+# -- VIP MODE Card -------------------------------------------------------
+$vipCard = New-Pnl 15 215 1020 42 $C.BgCard
+Enable-DoubleBuffer $vipCard
+$vipCard.Add_Paint({
+    param($s2, $pe)
+    try {
+        $accentColor = if ($script:vipActive) { $C.Yellow } else { $C.Blue }
+        $pe.Graphics.FillRectangle((New-Object Drawing.SolidBrush($accentColor)), 0, 0, 4, $s2.Height)
+        $pe.Graphics.DrawLine((New-Object Drawing.Pen($C.Border, 1)), 0, $s2.Height - 1, $s2.Width, $s2.Height - 1)
+    } catch { }
+})
+
+$vipHeaderLbl = New-Object Windows.Forms.Label
+$vipHeaderLbl.Text      = [char]0x2605 + " VIP MODE"
+$vipHeaderLbl.Location  = [Drawing.Point]::new(12, 12)
+$vipHeaderLbl.Size      = [Drawing.Size]::new(100, 18)
+$vipHeaderLbl.Font      = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
+$vipHeaderLbl.ForeColor = $C.Blue
+$vipHeaderLbl.BackColor = [Drawing.Color]::Transparent
+$vipCard.Controls.Add($vipHeaderLbl)
+
+$script:vipCombo = New-Object Windows.Forms.ComboBox
+$script:vipCombo.Location     = [Drawing.Point]::new(118, 8)
+$script:vipCombo.Size         = [Drawing.Size]::new(540, 26)
+$script:vipCombo.DropDownStyle = [Windows.Forms.ComboBoxStyle]::DropDownList
+$script:vipCombo.BackColor    = $C.BgCard2
+$script:vipCombo.ForeColor    = $C.Text
+$script:vipCombo.Font         = New-Object Drawing.Font("Consolas", 8)
+$script:vipCombo.FlatStyle    = [Windows.Forms.FlatStyle]::Flat
+$vipCard.Controls.Add($script:vipCombo)
+
+$vipRefreshBtn = New-Btn ([char]0x21BA + "") 664 8 30 26 $C.BgCard2 $C.SubText
+$vipRefreshBtn.Font   = New-Object Drawing.Font("Segoe UI", 10)
+$vipRefreshBtn.Cursor = [Windows.Forms.Cursors]::Hand
+$vipToolTip = New-Object Windows.Forms.ToolTip
+$vipToolTip.SetToolTip($vipRefreshBtn, "Refresh app list")
+$vipRefreshBtn.Add_Click({
+    Refresh-VipCombo
+    $vipCard.Invalidate()
+})
+$vipCard.Controls.Add($vipRefreshBtn)
+
+$script:vipBtn = New-Btn "SET VIP" 700 8 110 26 $C.BgCard2 $C.Yellow
+$script:vipBtn.FlatAppearance.BorderColor = $C.Yellow
+$script:vipBtn.FlatAppearance.BorderSize  = 1
+$script:vipBtn.Font   = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
+$script:vipBtn.Cursor = [Windows.Forms.Cursors]::Hand
+$vipToolTip.SetToolTip($script:vipBtn, "Elevate selected app to High CPU priority")
+$script:vipBtn.Add_Click({
+    if ($script:vipActive) {
+        # Toggle OFF — restore priority
+        Clear-VipProcess
+        $script:vipBtn.Text      = "SET VIP"
+        $script:vipBtn.BackColor = $C.BgCard2
+        $script:vipBtn.ForeColor = $C.Yellow
+        $script:vipStatusLbl.Text      = "No VIP process active"
+        $script:vipStatusLbl.ForeColor = $C.Dim
+        $vipCard.Invalidate()
+    } else {
+        # Toggle ON — elevate selected process
+        $idx = $script:vipCombo.SelectedIndex
+        if ($idx -ge 0 -and $idx -lt $script:vipProcs.Count) {
+            $selProc = $script:vipProcs[$idx]
+            if (Set-VipProcess -ProcessId $selProc.Id) {
+                $script:vipBtn.Text      = "CLEAR VIP"
+                $script:vipBtn.BackColor = $C.Yellow
+                $script:vipBtn.ForeColor = $C.BgBase
+                $script:vipStatusLbl.Text      = [char]0x25CF + " VIP: $($selProc.ProcessName) [PID $($selProc.Id)] — High Priority"
+                $script:vipStatusLbl.ForeColor = $C.Yellow
+                $vipCard.Invalidate()
+            } else {
+                $script:vipStatusLbl.Text      = "Failed — try running as Administrator"
+                $script:vipStatusLbl.ForeColor = $C.Red
+            }
+        }
+    }
+})
+$vipCard.Controls.Add($script:vipBtn)
+
+$script:vipStatusLbl = New-Object Windows.Forms.Label
+$script:vipStatusLbl.Text      = "No VIP process active"
+$script:vipStatusLbl.Location  = [Drawing.Point]::new(818, 12)
+$script:vipStatusLbl.Size      = [Drawing.Size]::new(196, 18)
+$script:vipStatusLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$script:vipStatusLbl.ForeColor = $C.Dim
+$script:vipStatusLbl.BackColor = [Drawing.Color]::Transparent
+$vipCard.Controls.Add($script:vipStatusLbl)
+
+$tab1.Controls.Add($vipCard)
+
 # -- CPU History Chart ---------------------------------------------------
 $cpuChart = New-Object System.Windows.Forms.DataVisualization.Charting.Chart
-$cpuChart.Location        = [Drawing.Point]::new(15, 205)
+$cpuChart.Location        = [Drawing.Point]::new(15, 265)
 $cpuChart.Size            = [Drawing.Size]::new(1020, 120)
 $cpuChart.BackColor       = $C.BgBase
 $cpuChart.BorderlineColor = [Drawing.Color]::Transparent
@@ -1445,20 +1603,20 @@ $tab1.Controls.Add($cpuChart)
 # -- Section label + underline -------------------------------------------
 $procTitleLbl = New-Object Windows.Forms.Label
 $procTitleLbl.Text      = "  Top 25 Processes by RAM"
-$procTitleLbl.Location  = [Drawing.Point]::new(15, 333)
+$procTitleLbl.Location  = [Drawing.Point]::new(15, 393)
 $procTitleLbl.Size      = [Drawing.Size]::new(500, 26)
 $procTitleLbl.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
 $procTitleLbl.ForeColor = $C.Blue
 $procTitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab1.Controls.Add($procTitleLbl)
 
-$underlinePnl = New-Pnl 17 359 220 1 $C.Blue
+$underlinePnl = New-Pnl 17 419 220 1 $C.Blue
 $tab1.Controls.Add($underlinePnl)
 
 # -- Process list --------------------------------------------------------
 $pGrid = New-Object Windows.Forms.DataGridView
-$pGrid.Location = [Drawing.Point]::new(15, 363)
-$pGrid.Size     = [Drawing.Size]::new(1020, 235)
+$pGrid.Location = [Drawing.Point]::new(15, 423)
+$pGrid.Size     = [Drawing.Size]::new(1020, 175)
 Style-Grid $pGrid
 Add-Col $pGrid "App / Process" 220
 Add-Col $pGrid "Memory"        80
@@ -2688,6 +2846,26 @@ function Do-Refresh {
 
         $script:sbTimeLbl.Text = "Updated: $(Get-Date -Format 'HH:mm:ss')"
 
+        # VIP Mode — auto-clear if selected process has exited
+        if ($script:vipActive -and $script:vipPid -gt 0) {
+            $vipGone = $false
+            try {
+                $vp = Get-Process -Id $script:vipPid -ErrorAction Stop
+                if ($vp.HasExited) { $vipGone = $true }
+            } catch { $vipGone = $true }
+            if ($vipGone) {
+                $script:vipPid    = 0
+                $script:vipName   = ''
+                $script:vipActive = $false
+                $script:vipBtn.Text      = "SET VIP"
+                $script:vipBtn.BackColor = $C.BgCard2
+                $script:vipBtn.ForeColor = $C.Yellow
+                $script:vipStatusLbl.Text      = "VIP app closed — priority restored"
+                $script:vipStatusLbl.ForeColor = $C.SubText
+                $vipCard.Invalidate()
+            }
+        }
+
         # Blinking dot
         $script:blinkState = -not $script:blinkState
         $blinkDot.BackColor = if ($script:blinkState) { $C.Green } else { $C.BgCard }
@@ -2821,6 +2999,7 @@ $form.Add_FormClosing({
                 [Windows.Forms.ToolTipIcon]::Info)
         }
     } else {
+        Clear-VipProcess   # restore any elevated process priority before exit
         $timer.Stop()
         $timer.Dispose()
         $script:AnimTimer.Stop()
@@ -2843,6 +3022,7 @@ $form.Add_FormClosing({
 Write-Log -Message "Session started. Privileges: $(if ($script:isAdmin) {'Administrator'} else {'Standard User'})" -Level INFO
 
 # -- Launch --------------------------------------------------------------
+Refresh-VipCombo        # populate VIP combo with currently open apps
 Show-WelcomeScreen
 [void]$form.ShowDialog()
 #endregion
