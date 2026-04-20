@@ -2253,12 +2253,14 @@ foreach ($ji in $junkItems) {
         [void]$ps.BeginInvoke()
 
         # Poll $script:CleanSummaryPending on the UI thread; call Show-CleanSummary when done
-        $pollTimer = New-Object Windows.Forms.Timer
-        $pollTimer.Interval = 500
-        $pollTimer.Add_Tick({
+        # Use $script:pollTimer so the Add_Tick nested closure can reliably access it
+        if ($script:pollTimer) { try { $script:pollTimer.Stop(); $script:pollTimer.Dispose() } catch {} }
+        $script:pollTimer = New-Object Windows.Forms.Timer
+        $script:pollTimer.Interval = 500
+        $script:pollTimer.Add_Tick({
             if ($script:CleanSummaryPending['Ready']) {
-                $pollTimer.Stop()
-                $pollTimer.Dispose()
+                $script:pollTimer.Stop()
+                $script:pollTimer.Dispose()
                 $b = [long]$script:CleanSummaryPending['Bytes']
                 $n = $script:CleanSummaryPending['Name']
                 $d = [int]$script:CleanSummaryPending['Removed']
@@ -2270,7 +2272,7 @@ foreach ($ji in $junkItems) {
                 Show-CleanSummary -SummaryText $txt
             }
         })
-        $pollTimer.Start()
+        $script:pollTimer.Start()
     })
 
     $skipBtn.Add_Click({
