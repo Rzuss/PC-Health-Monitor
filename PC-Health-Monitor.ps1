@@ -824,13 +824,13 @@ function Show-WelcomeScreen {
     $wLine.BackColor = [Drawing.Color]::FromArgb(60, 6, 182, 212)
     $w.Controls.Add($wLine)
 
-    # Feature bullets
+    # Feature bullets (BMP-safe Unicode symbols — no surrogate pairs)
     $features = @(
-        @{ Icon = [char]0x1F4CA; Text = "Live Dashboard  —  CPU, RAM, and storage at a glance" },
-        @{ Icon = [char]0x1F9F9; Text = "Junk Cleaner  —  safely free up space in one click" },
-        @{ Icon = [char]0x1F680; Text = "Startup Apps  —  control what launches with Windows" },
-        @{ Icon = [char]0x1F4BE; Text = "Storage  —  find the largest folders on your drive" },
-        @{ Icon = [char]0x1F514; Text = "Smart Alerts  —  notified only when something needs you" }
+        @{ Icon = [char]0x25B6; Text = "Live Dashboard  —  CPU, RAM, and storage at a glance" },
+        @{ Icon = [char]0x2605; Text = "Junk Cleaner  —  safely free up space in one click" },
+        @{ Icon = [char]0x25B2; Text = "Startup Apps  —  control what launches with Windows" },
+        @{ Icon = [char]0x25A0; Text = "Storage  —  find the largest folders on your drive" },
+        @{ Icon = [char]0x25CF; Text = "Smart Alerts  —  notified only when something needs you" }
     )
 
     $featureY = 120
