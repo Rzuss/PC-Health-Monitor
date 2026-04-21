@@ -1144,8 +1144,9 @@ function Refresh-VipCombo {
 # TAB 1 -- DASHBOARD
 # ========================================================================
 $tab1 = New-Object Windows.Forms.TabPage
-$tab1.Text      = "  Dashboard  "
-$tab1.BackColor = $C.BgBase
+$tab1.Text        = "  Dashboard  "
+$tab1.BackColor   = $C.BgBase
+$tab1.AutoScroll  = $true   # vertical scroll when content exceeds visible area
 
 $UI = @{}
 
@@ -1617,7 +1618,7 @@ $tab1.Controls.Add($underlinePnl)
 # -- Process list --------------------------------------------------------
 $pGrid = New-Object Windows.Forms.DataGridView
 $pGrid.Location = [Drawing.Point]::new(15, 423)
-$pGrid.Size     = [Drawing.Size]::new(1020, 175)
+$pGrid.Size     = [Drawing.Size]::new(1020, 560)
 Style-Grid $pGrid
 Add-Col $pGrid "App / Process" 220
 Add-Col $pGrid "Memory"        80
