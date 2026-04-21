@@ -2746,41 +2746,73 @@ $tabs.TabPages.Add($tab3)
 $tabs.TabPages.Add($diskUsageTab)
 
 # ========================================================================
-# TAB 5 -- PC ADVISOR (AI CHAT)
+# TAB 5 -- PC ADVISOR (AI CHAT)  v2 — bubble chat + live metrics
 # ========================================================================
 $advisorTab           = New-Object Windows.Forms.TabPage
 $advisorTab.Text      = "  PC Advisor  "
 $advisorTab.BackColor = $C.BgBase
 
-$script:advisorGreeted = $false
+$script:advisorGreeted  = $false
+$script:advPendingMsg   = ''
 
 $advPnl = New-Pnl 0 0 1040 590 $C.BgBase
 $advisorTab.Controls.Add($advPnl)
 
-# -- Header --
-$advHdrLbl            = New-Lbl "🤖  PC Advisor" 16 8 500 28 12 $true $C.Blue
+# ── Header ────────────────────────────────────────────────────────────────
+$advHdrLbl = New-Lbl "🤖  PC Advisor" 16 8 500 28 12 $true $C.Blue
 $advPnl.Controls.Add($advHdrLbl)
 
-$advSubLbl            = New-Lbl "Built-in AI analysis engine — ask anything, anytime" 16 38 700 20 8.5 $false $C.SubText
+$advSubLbl = New-Lbl "Built-in AI analysis engine — ask anything, anytime" 16 38 700 20 8.5 $false $C.SubText
 $advPnl.Controls.Add($advSubLbl)
 
-# -- Chat History RichTextBox --
-$script:advisorChat             = New-Object Windows.Forms.RichTextBox
-$script:advisorChat.Location    = [Drawing.Point]::new(16, 64)
-$script:advisorChat.Size        = [Drawing.Size]::new(1008, 424)
-$script:advisorChat.BackColor   = $C.BgCard
-$script:advisorChat.ForeColor   = $C.Text
-$script:advisorChat.Font        = New-Object Drawing.Font("Segoe UI Variable", 9.5)
-$script:advisorChat.ReadOnly    = $true
-$script:advisorChat.BorderStyle = [Windows.Forms.BorderStyle]::None
-$script:advisorChat.ScrollBars  = [Windows.Forms.RichTextBoxScrollBars]::Vertical
-$script:advisorChat.DetectUrls  = $false
-Add-RoundedRegion $script:advisorChat 8
-$advPnl.Controls.Add($script:advisorChat)
+# ── Live Metrics Strip ────────────────────────────────────────────────────
+$advMetricsPnl = New-Pnl 16 62 1008 36 $C.BgCard
+$advPnl.Controls.Add($advMetricsPnl)
 
-# -- Input Panel --
-$inputPnl         = New-Pnl 16 498 1008 52 $C.BgCard
-Add-RoundedRegion $inputPnl 8
+$script:advCpuLbl  = New-Lbl "⚡  CPU   --"   12  8 210 20 8.5 $true $C.Blue
+$script:advRamLbl  = New-Lbl "💾  RAM   --"  222  8 210 20 8.5 $true $C.Purple
+$script:advDiskLbl = New-Lbl "💿  Disk  --"  432  8 210 20 8.5 $true $C.Yellow
+$script:advHsLbl   = New-Lbl "🏥  Health  --" 642  8 280 20 8.5 $true $C.Green
+$advMetricsPnl.Controls.AddRange(@($script:advCpuLbl, $script:advRamLbl, $script:advDiskLbl, $script:advHsLbl))
+
+# ── Chat outer container ──────────────────────────────────────────────────
+$advChatOuter          = New-Pnl 16 104 1008 392 $C.BgCard
+$advPnl.Controls.Add($advChatOuter)
+
+# Border via Paint
+$advChatOuter.Add_Paint({
+    param($sp, $pe)
+    $pe.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $pen  = New-Object Drawing.Pen([Drawing.Color]::FromArgb(45, 255, 255, 255), 1)
+    $path = New-Object Drawing.Drawing2D.GraphicsPath
+    $r    = 8
+    $path.AddArc(0, 0, $r*2, $r*2, 180, 90)
+    $path.AddArc($sp.Width-$r*2-1, 0, $r*2, $r*2, 270, 90)
+    $path.AddArc($sp.Width-$r*2-1, $sp.Height-$r*2-1, $r*2, $r*2, 0, 90)
+    $path.AddArc(0, $sp.Height-$r*2-1, $r*2, $r*2, 90, 90)
+    $path.CloseFigure()
+    $pe.Graphics.DrawPath($pen, $path)
+    $pen.Dispose(); $path.Dispose()
+})
+
+# FlowLayoutPanel for chat bubbles
+$script:advChatFlow                = New-Object Windows.Forms.FlowLayoutPanel
+$script:advChatFlow.Location       = [Drawing.Point]::new(1, 1)
+$script:advChatFlow.Size           = [Drawing.Size]::new(1006, 390)
+$script:advChatFlow.FlowDirection  = [Windows.Forms.FlowDirection]::TopDown
+$script:advChatFlow.WrapContents   = $false
+$script:advChatFlow.AutoScroll     = $true
+$script:advChatFlow.BackColor      = $C.BgCard
+$script:advChatFlow.Padding        = [Windows.Forms.Padding]::new(10, 10, 10, 10)
+$advChatOuter.Controls.Add($script:advChatFlow)
+
+# ── Typing indicator ──────────────────────────────────────────────────────
+$script:advTypingLbl            = New-Lbl "🤖  PC Advisor is analyzing..." 16 500 600 16 8 $false $C.SubText
+$script:advTypingLbl.Visible    = $false
+$advPnl.Controls.Add($script:advTypingLbl)
+
+# ── Input Panel ──────────────────────────────────────────────────────────
+$inputPnl = New-Pnl 16 520 1008 52 $C.BgCard
 $advPnl.Controls.Add($inputPnl)
 
 $script:advisorInput                = New-Object Windows.Forms.TextBox
@@ -2793,68 +2825,154 @@ $script:advisorInput.BorderStyle    = [Windows.Forms.BorderStyle]::None
 try { $script:advisorInput.PlaceholderText = "Ask a question... (press Enter to send)" } catch {}
 $inputPnl.Controls.Add($script:advisorInput)
 
-$advSendBtn                         = New-Object Windows.Forms.Button
-$advSendBtn.Text                    = "Send"
-$advSendBtn.Location                = [Drawing.Point]::new(862, 9)
-$advSendBtn.Size                    = [Drawing.Size]::new(80, 34)
-$advSendBtn.BackColor               = $C.Blue
-$advSendBtn.ForeColor               = $C.Text
-$advSendBtn.FlatStyle               = [Windows.Forms.FlatStyle]::Flat
+$advSendBtn                           = New-Object Windows.Forms.Button
+$advSendBtn.Text                      = "Send"
+$advSendBtn.Location                  = [Drawing.Point]::new(862, 9)
+$advSendBtn.Size                      = [Drawing.Size]::new(80, 34)
+$advSendBtn.BackColor                 = $C.Blue
+$advSendBtn.ForeColor                 = $C.Text
+$advSendBtn.FlatStyle                 = [Windows.Forms.FlatStyle]::Flat
 $advSendBtn.FlatAppearance.BorderSize = 0
-$advSendBtn.Font                    = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
-$advSendBtn.Cursor                  = [Windows.Forms.Cursors]::Hand
+$advSendBtn.Font                      = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
+$advSendBtn.Cursor                    = [Windows.Forms.Cursors]::Hand
 $advSendBtn.Add_Click({ Send-AdvisorMessage })
 $inputPnl.Controls.Add($advSendBtn)
 
-$advClearBtn                        = New-Object Windows.Forms.Button
-$advClearBtn.Text                   = "Clear"
-$advClearBtn.Location               = [Drawing.Point]::new(950, 9)
-$advClearBtn.Size                   = [Drawing.Size]::new(50, 34)
-$advClearBtn.BackColor              = $C.BgCard2
-$advClearBtn.ForeColor              = $C.SubText
-$advClearBtn.FlatStyle              = [Windows.Forms.FlatStyle]::Flat
-$advClearBtn.FlatAppearance.BorderColor = $C.Border
-$advClearBtn.FlatAppearance.BorderSize  = 1
-$advClearBtn.Font                   = New-Object Drawing.Font("Segoe UI Variable", 8.5)
-$advClearBtn.Cursor                 = [Windows.Forms.Cursors]::Hand
+$advClearBtn                              = New-Object Windows.Forms.Button
+$advClearBtn.Text                         = "Clear"
+$advClearBtn.Location                     = [Drawing.Point]::new(950, 9)
+$advClearBtn.Size                         = [Drawing.Size]::new(50, 34)
+$advClearBtn.BackColor                    = $C.BgCard2
+$advClearBtn.ForeColor                    = $C.SubText
+$advClearBtn.FlatStyle                    = [Windows.Forms.FlatStyle]::Flat
+$advClearBtn.FlatAppearance.BorderColor   = $C.Border
+$advClearBtn.FlatAppearance.BorderSize    = 1
+$advClearBtn.Font                         = New-Object Drawing.Font("Segoe UI Variable", 8.5)
+$advClearBtn.Cursor                       = [Windows.Forms.Cursors]::Hand
 $advClearBtn.Add_Click({
-    $script:advisorChat.Clear()
+    $script:advChatFlow.Controls.Clear()
     $script:advisorGreeted = $false
 })
 $inputPnl.Controls.Add($advClearBtn)
 
-# -- Chat Helper Functions --
-function Add-ChatMessage {
-    param([string]$Sender, [string]$Message, [Drawing.Color]$SenderColor)
-    $rtb = $script:advisorChat
+# ── Metrics update timer (3s, only when advisor tab active) ───────────────
+$script:advMetricsTimer          = New-Object Windows.Forms.Timer
+$script:advMetricsTimer.Interval = 3000
+$script:advMetricsTimer.Add_Tick({
+    if ($tabs.SelectedTab -ne $advisorTab) { return }
     try {
+        $d  = $script:DataCache
+        $hs = [int]$script:lastHealthScore
+        $script:advCpuLbl.Text  = "⚡  CPU   $($d['CpuPct'])%"
+        $script:advRamLbl.Text  = "💾  RAM   $($d['RamPct'])%"
+        $script:advDiskLbl.Text = "💿  Disk  $($d['DPct'])%"
+        $hsLabel = if ($hs -ge 90) { "Excellent" } elseif ($hs -ge 75) { "Good" } elseif ($hs -ge 55) { "Fair" } elseif ($hs -gt 0) { "Poor" } else { "--" }
+        $script:advHsLbl.Text   = "🏥  Health  $hsLabel"
+        $script:advCpuLbl.ForeColor  = if ($d['CpuPct']  -gt 80) { $C.Red } elseif ($d['CpuPct']  -gt 60) { $C.Yellow } else { $C.Blue   }
+        $script:advRamLbl.ForeColor  = if ($d['RamPct']  -gt 85) { $C.Red } elseif ($d['RamPct']  -gt 70) { $C.Yellow } else { $C.Purple }
+        $script:advDiskLbl.ForeColor = if ($d['DPct']    -gt 90) { $C.Red } elseif ($d['DPct']    -gt 80) { $C.Yellow } else { $C.Yellow }
+        $script:advHsLbl.ForeColor   = if ($hs -ge 75)  { $C.Green } elseif ($hs -ge 55) { $C.Yellow } elseif ($hs -gt 0) { $C.Red } else { $C.SubText }
+    } catch { }
+})
+$script:advMetricsTimer.Start()
+
+# ── Typing delay timer (350ms — gives "AI thinking" feel) ────────────────
+$script:advTypingTimer          = New-Object Windows.Forms.Timer
+$script:advTypingTimer.Interval = 350
+$script:advTypingTimer.Add_Tick({
+    $script:advTypingTimer.Stop()
+    $script:advTypingLbl.Visible      = $false
+    $script:advisorInput.Enabled      = $true
+    $script:advisorInput.Focus()
+    try   { $response = Build-AdvisorResponse -UserMessage $script:advPendingMsg }
+    catch { $response = "Analysis error: $($_.Exception.Message)" }
+    Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $response -SenderColor $C.Blue -IsAdvisor $true
+})
+
+# ── Chat Helper Functions ─────────────────────────────────────────────────
+function Add-ChatMessage {
+    param(
+        [string]$Sender,
+        [string]$Message,
+        [Drawing.Color]$SenderColor,
+        [bool]$IsAdvisor = $true
+    )
+    try {
+        $flow  = $script:advChatFlow
+        $avail = $flow.ClientSize.Width - 24   # account for scrollbar + padding
+
+        # Measure message text height via TextRenderer
+        $font  = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+        $tSize = [Windows.Forms.TextRenderer]::MeasureText(
+                     $Message, $font,
+                     [Drawing.Size]::new($avail - 28, 99999),
+                     [Windows.Forms.TextFormatFlags]::WordBreak)
+        $msgH  = $tSize.Height + 2
+
+        # Bubble panel
+        $bubble             = New-Object Windows.Forms.Panel
+        $bubble.Width       = $avail
+        $bubble.Height      = 42 + $msgH
+        $bubble.BackColor   = if ($IsAdvisor) { $C.BgCard3 } else { $C.BgCard2 }
+        $bubble.Margin      = [Windows.Forms.Padding]::new(0, 0, 0, 8)
+
         # Sender label (bold, colored)
-        $rtb.SelectionStart  = $rtb.TextLength
-        $rtb.SelectionLength = 0
-        $rtb.SelectionColor  = $SenderColor
-        $rtb.SelectionFont   = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
-        $rtb.AppendText($Sender + "`n")
-        # Message body
-        $rtb.SelectionStart  = $rtb.TextLength
-        $rtb.SelectionLength = 0
-        $rtb.SelectionColor  = $C.Text
-        $rtb.SelectionFont   = New-Object Drawing.Font("Segoe UI Variable", 9.5)
-        $rtb.AppendText($Message + "`n`n")
-        $rtb.ScrollToCaret()
-    } catch { Write-Log -Message "Add-ChatMessage error" -Level WARN -ExceptionRecord $_ }
+        $sLbl           = New-Object Windows.Forms.Label
+        $sLbl.Text      = $Sender
+        $sLbl.ForeColor = $SenderColor
+        $sLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
+        $sLbl.AutoSize  = $true
+        $sLbl.Location  = [Drawing.Point]::new(14, 10)
+        $sLbl.BackColor = [Drawing.Color]::Transparent
+
+        # Timestamp label (top-right)
+        $tsLbl           = New-Object Windows.Forms.Label
+        $tsLbl.Text      = (Get-Date -Format "HH:mm")
+        $tsLbl.ForeColor = [Drawing.Color]::FromArgb(85, 142, 142, 147)
+        $tsLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 7.5)
+        $tsLbl.AutoSize  = $true
+        $tsLbl.Location  = [Drawing.Point]::new($avail - 52, 13)
+        $tsLbl.BackColor = [Drawing.Color]::Transparent
+
+        # Message label (auto-wrapped)
+        $mLbl           = New-Object Windows.Forms.Label
+        $mLbl.Text      = $Message
+        $mLbl.ForeColor = $C.Text
+        $mLbl.Font      = $font
+        $mLbl.Size      = [Drawing.Size]::new($avail - 28, $msgH)
+        $mLbl.Location  = [Drawing.Point]::new(14, 32)
+        $mLbl.BackColor = [Drawing.Color]::Transparent
+
+        $bubble.Controls.AddRange(@($sLbl, $tsLbl, $mLbl))
+
+        # Left accent line (Paint event)
+        $aC = $SenderColor
+        $bubble.Add_Paint({
+            param($sp, $pe)
+            $pe.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $pen = New-Object Drawing.Pen($aC, 3)
+            $pe.Graphics.DrawLine($pen, 1, 8, 1, $sp.Height - 8)
+            $pen.Dispose()
+        }.GetNewClosure())
+
+        Add-RoundedRegion $bubble 6
+        $flow.Controls.Add($bubble)
+        $flow.ScrollControlIntoView($bubble)
+    } catch {
+        Write-Log -Message "Add-ChatMessage v2 error" -Level WARN -ExceptionRecord $_
+    }
 }
 
 function Send-AdvisorMessage {
     $userText = $script:advisorInput.Text.Trim()
     if ([string]::IsNullOrWhiteSpace($userText)) { return }
-    $script:advisorInput.Text = ''
-    Add-ChatMessage -Sender "👤 You:" -Message $userText -SenderColor $C.Purple
-    try {
-        $response = Build-AdvisorResponse -UserMessage $userText
-    } catch {
-        $response = "Analysis error: $($_.Exception.Message)"
-    }
-    Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $response -SenderColor $C.Blue
+    $script:advisorInput.Text    = ''
+    $script:advisorInput.Enabled = $false
+    Add-ChatMessage -Sender "👤 You:" -Message $userText -SenderColor $C.Purple -IsAdvisor $false
+    $script:advPendingMsg        = $userText
+    $script:advTypingLbl.Visible = $true
+    [Windows.Forms.Application]::DoEvents()
+    $script:advTypingTimer.Start()
 }
 
 # Enter key → send
@@ -2908,14 +3026,17 @@ $tabs.Add_SelectedIndexChanged({
     }
 
 
-    # ── Advisor tab: show greeting on first visit ────────────────────────────
-    if ($tabs.SelectedTab -eq $advisorTab -and -not $script:advisorGreeted) {
+    # ── Advisor tab: greeting on first visit (double-fire guard: Controls.Count == 0) ──
+    if ($tabs.SelectedTab -eq $advisorTab -and -not $script:advisorGreeted -and $script:advChatFlow.Controls.Count -eq 0) {
         $script:advisorGreeted = $true
-        $ctx = Get-AdvisorContext
-        $hs  = $ctx.HealthScore
+        $hs = [int]$script:lastHealthScore
         $scoreStr = if ($hs -gt 0) { " Current health score: $hs/100." } else { '' }
-        $greeting = "Hello! I'm PC Advisor 🤖 — your built-in AI performance monitoring engine.${scoreStr}`n`nI can analyze: RAM, CPU, Disk, Startup programs, Junk files, and slowness.`nClick a quick-action button above, or type any question!"
-        Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $greeting -SenderColor $C.Blue
+        $greeting = "Hello! I'm PC Advisor — your built-in AI performance engine.${scoreStr}`n`nI can analyze: RAM, CPU, Disk, Startup programs, Junk files, and slowness.`nType your question below or ask for an overview!"
+        Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $greeting -SenderColor $C.Blue -IsAdvisor $true
+        $d = $script:DataCache
+        $script:advCpuLbl.Text  = "⚡  CPU   $($d['CpuPct'])%"
+        $script:advRamLbl.Text  = "💾  RAM   $($d['RamPct'])%"
+        $script:advDiskLbl.Text = "💿  Disk  $($d['DPct'])%"
     }
 
     # ── Plugin tabs: call Refresh-Plugin when tab becomes active ──────────
