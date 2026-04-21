@@ -2572,34 +2572,37 @@ $tabs.Add_SelectedIndexChanged({
     }
 })
 
-# Tab owner-draw event (Neon HUD style)
+# Tab owner-draw event (Deep Space style)
 $tabs.Add_DrawItem({
     param($s2, $de)
     try {
         $g      = $de.Graphics
+        $g.SmoothingMode    = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.TextRenderingHint = [Drawing.Text.TextRenderingHint]::ClearTypeGridFit
         $tab    = $tabs.TabPages[$de.Index]
         $isSel  = ($de.Index -eq $tabs.SelectedIndex)
         $bounds = $de.Bounds
 
-        # Background
-        $bgColor = if ($isSel) { $C.BgCard } else { $C.BgBase }
+        # Background — active tab slightly elevated, inactive stays base
+        $bgColor = if ($isSel) { $C.BgCard3 } else { $C.BgBase }
         $bgBr    = New-Object Drawing.SolidBrush($bgColor)
         $g.FillRectangle($bgBr, $bounds)
         $bgBr.Dispose()
 
-        # Active tab: Neon_Cyan bottom border + side glow
+        # Active tab: indigo bottom accent line (2px solid + 4px soft glow)
         if ($isSel) {
-            $glowPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(40, 6, 182, 212), 4)
-            $g.DrawLine($glowPen, $bounds.Left, $bounds.Bottom - 2, $bounds.Right, $bounds.Bottom - 2)
+            $glowPen = New-Object Drawing.Pen($C.BlueGlow, 5)
+            $g.DrawLine($glowPen, $bounds.Left + 2, $bounds.Bottom - 2, $bounds.Right - 2, $bounds.Bottom - 2)
             $glowPen.Dispose()
             $accentPen = New-Object Drawing.Pen($C.Blue, 2)
-            $g.DrawLine($accentPen, $bounds.Left, $bounds.Bottom - 1, $bounds.Right, $bounds.Bottom - 1)
+            $g.DrawLine($accentPen, $bounds.Left + 4, $bounds.Bottom - 1, $bounds.Right - 4, $bounds.Bottom - 1)
             $accentPen.Dispose()
         }
 
-        # Text
-        $fgColor = if ($isSel) { $C.Text } else { $C.Dim }
-        $font = New-Object Drawing.Font("Segoe UI", 8.5, $(if ($isSel) { [Drawing.FontStyle]::Bold } else { [Drawing.FontStyle]::Regular }))
+        # Text — active: full white; inactive: SubText (#8E8E93) — clearly readable
+        $fgColor = if ($isSel) { $C.Text } else { $C.SubText }
+        $fontStyle = if ($isSel) { [Drawing.FontStyle]::Bold } else { [Drawing.FontStyle]::Regular }
+        $font = New-Object Drawing.Font("Segoe UI Variable", 8.5, $fontStyle)
         $sf   = New-Object Drawing.StringFormat
         $sf.Alignment     = [Drawing.StringAlignment]::Center
         $sf.LineAlignment = [Drawing.StringAlignment]::Center
