@@ -1,5 +1,5 @@
 ﻿# PC-Health-Monitor.ps1
-# Full Windows Forms GUI -- Cyber-HUD Dark Theme -- Live Auto-Refresh
+# Full Windows Forms GUI -- Deep Space Dark Theme -- Live Auto-Refresh
 
 # CATCH BLOCK AUDIT: Found 9 empty catch blocks on the main thread
 # Runspace catch blocks: 1 (inside $cleanBtn.Add_Click Runspace -- handled via $errCount counter, Write-Log not callable from Runspace)
@@ -75,37 +75,39 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms.DataVisualization
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
-# Global monospace fonts
-$script:MonoFont = New-Object Drawing.Font("Consolas", 9)
-$script:MonoBold = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
-$script:UIFont   = New-Object Drawing.Font("Segoe UI",  9)
+# Global fonts — Segoe UI Variable (Win11); falls back to Segoe UI on Win10
+$script:MonoFont = New-Object Drawing.Font("Segoe UI Variable", 9)
+$script:MonoBold = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
+$script:UIFont   = New-Object Drawing.Font("Segoe UI Variable", 9)
+# Keep Consolas for process names / numeric data tables that need fixed-width alignment
+$script:DataFont = New-Object Drawing.Font("Consolas", 8)
 
 # -- Admin Check ---------------------------------------------------------
 $script:isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
 
-# -- Color Palette (Neon HUD Design System) ------------------------------
+# -- Color Palette (Deep Space Design System) ----------------------------
 $C = @{
-    BgBase     = [Drawing.Color]::FromArgb(8,   15,  26)
-    BgCard     = [Drawing.Color]::FromArgb(12,  24,  42)
-    BgCard2    = [Drawing.Color]::FromArgb(10,  20,  35)
-    BgCard3    = [Drawing.Color]::FromArgb(10,  25,  45)
-    Blue       = [Drawing.Color]::FromArgb(6,   182, 212)
-    BlueGlow   = [Drawing.Color]::FromArgb(100, 6,   182, 212)
-    Purple     = [Drawing.Color]::FromArgb(168, 85,  247)
-    PurpleGlow = [Drawing.Color]::FromArgb(100, 168, 85,  247)
-    Green      = [Drawing.Color]::FromArgb(34,  197, 94)
-    Yellow     = [Drawing.Color]::FromArgb(249, 115, 22)
-    Red        = [Drawing.Color]::FromArgb(239, 68,  68)
-    Orange     = [Drawing.Color]::FromArgb(249, 115, 22)
-    Text       = [Drawing.Color]::FromArgb(240, 248, 255)
-    SubText    = [Drawing.Color]::FromArgb(148, 163, 184)
-    Dim        = [Drawing.Color]::FromArgb(71,  85,  105)
+    BgBase     = [Drawing.Color]::FromArgb(13,  13,  15)   # near-black neutral base
+    BgCard     = [Drawing.Color]::FromArgb(22,  22,  25)   # L2 card surface
+    BgCard2    = [Drawing.Color]::FromArgb(18,  18,  20)   # L1 slightly darker
+    BgCard3    = [Drawing.Color]::FromArgb(28,  28,  32)   # L3 header / elevated
+    Blue       = [Drawing.Color]::FromArgb(108, 99,  255)  # indigo accent
+    BlueGlow   = [Drawing.Color]::FromArgb(55,  108, 99,  255)
+    Purple     = [Drawing.Color]::FromArgb(139, 124, 248)  # soft lavender
+    PurpleGlow = [Drawing.Color]::FromArgb(55,  139, 124, 248)
+    Green      = [Drawing.Color]::FromArgb(48,  209, 88)   # Apple-style green
+    Yellow     = [Drawing.Color]::FromArgb(255, 159, 10)   # Apple amber
+    Red        = [Drawing.Color]::FromArgb(255, 59,  48)   # Apple red
+    Orange     = [Drawing.Color]::FromArgb(255, 159, 10)
+    Text       = [Drawing.Color]::FromArgb(245, 245, 247)  # Apple near-white
+    SubText    = [Drawing.Color]::FromArgb(142, 142, 147)  # iOS secondary label
+    Dim        = [Drawing.Color]::FromArgb(58,  58,  60)   # iOS quaternary
     White      = [Drawing.Color]::White
-    DarkRed    = [Drawing.Color]::FromArgb(120, 20,  30)
-    DarkGreen  = [Drawing.Color]::FromArgb(20,  80,  40)
-    Border     = [Drawing.Color]::FromArgb(20,  40,  70)
-    Anomaly    = [Drawing.Color]::FromArgb(168, 85,  247)
+    DarkRed    = [Drawing.Color]::FromArgb(55,  14,  12)
+    DarkGreen  = [Drawing.Color]::FromArgb(12,  44,  22)
+    Border     = [Drawing.Color]::FromArgb(44,  44,  46)   # iOS separator
+    Anomaly    = [Drawing.Color]::FromArgb(139, 124, 248)  # same as Purple
 }
 $script:C = $C   # expose color palette to function scopes (e.g. Show-ScoreInfo)
 
@@ -114,13 +116,13 @@ $script:Colors = @{
     BG_Panel       = $C.BgCard2
     BG_Card        = $C.BgCard
     Neon_Purple    = $C.Purple
-    Neon_Blue      = [Drawing.Color]::FromArgb(59,  130, 246)
+    Neon_Blue      = $C.Blue
     Neon_Cyan      = $C.Blue
     Neon_Green     = $C.Green
     Neon_Red       = $C.Red
     Neon_Orange    = $C.Yellow
     Glow_Purple    = $C.PurpleGlow
-    Glow_Blue      = [Drawing.Color]::FromArgb(100, 59,  130, 246)
+    Glow_Blue      = $C.BlueGlow
     Glow_Cyan      = $C.BlueGlow
     Text_Primary   = $C.Text
     Text_Secondary = $C.SubText
@@ -172,7 +174,7 @@ function New-Lbl($txt, $x, $y, $w, $h, $sz=9, $bold=$false, $col=$null) {
     $l.Size      = [Drawing.Size]::new($w, $h)
     $l.FlatStyle = "Flat"
     $st = if ($bold) { [Drawing.FontStyle]::Bold } else { [Drawing.FontStyle]::Regular }
-    $l.Font      = New-Object Drawing.Font("Segoe UI", $sz, $st)
+    $l.Font      = New-Object Drawing.Font("Segoe UI Variable", $sz, $st)
     $l.ForeColor = if ($col) { $col } else { $C.Text }
     $l.BackColor = [Drawing.Color]::Transparent
     return $l
@@ -189,7 +191,7 @@ function New-Btn($txt, $x, $y, $w, $h, $bg, $fg) {
     $b.FlatAppearance.BorderSize = 0
     $b.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(
         [math]::Min($bg.R+30,255), [math]::Min($bg.G+30,255), [math]::Min($bg.B+30,255))
-    $b.Font   = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $b.Font   = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
     $b.Cursor = [Windows.Forms.Cursors]::Hand
     return $b
 }
@@ -214,17 +216,17 @@ function Style-Grid($g) {
     $g.SelectionMode      = [Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
     $g.ColumnHeadersDefaultCellStyle.BackColor  = $C.BgCard2
     $g.ColumnHeadersDefaultCellStyle.ForeColor  = $C.Blue
-    $g.ColumnHeadersDefaultCellStyle.Font       = New-Object Drawing.Font("Segoe UI", 8, [Drawing.FontStyle]::Bold)
+    $g.ColumnHeadersDefaultCellStyle.Font       = New-Object Drawing.Font("Segoe UI Variable", 8, [Drawing.FontStyle]::Bold)
     $g.ColumnHeadersHeightSizeMode = [Windows.Forms.DataGridViewColumnHeadersHeightSizeMode]::DisableResizing
     $g.ColumnHeadersHeight = 32
     $g.DefaultCellStyle.BackColor          = $C.BgCard
     $g.DefaultCellStyle.ForeColor          = $C.Text
-    $g.DefaultCellStyle.Font               = New-Object Drawing.Font("Consolas", 8)
-    $g.DefaultCellStyle.SelectionBackColor = [Drawing.Color]::FromArgb(60, 59, 130, 246)
+    $g.DefaultCellStyle.Font               = New-Object Drawing.Font("Segoe UI Variable", 8)
+    $g.DefaultCellStyle.SelectionBackColor = [Drawing.Color]::FromArgb(60, 108, 99, 255)
     $g.DefaultCellStyle.SelectionForeColor = $C.Text
     $g.DefaultCellStyle.Padding            = New-Object Windows.Forms.Padding(4,0,4,0)
     $g.AlternatingRowsDefaultCellStyle.BackColor = $C.BgCard2
-    $g.Font = New-Object Drawing.Font("Consolas", 8)
+    $g.Font = New-Object Drawing.Font("Segoe UI Variable", 8)
     $g.RowTemplate.Height = 26
     $g.EnableHeadersVisualStyles = $false
     Enable-DoubleBuffer $g
@@ -241,37 +243,32 @@ function Add-Col($grid, $header, $fillW=100) {
 
 # -- GDI+ Helpers --------------------------------------------------------
 function Draw-CircleGauge {
-    param($Graphics, $CenterX, $CenterY, $Radius, $Pct, $Color, $TrackColor, $Thick = 6)
+    # Deep Space minimal gauge — thin arc, no glow, large center number
+    param($Graphics, $CenterX, $CenterY, $Radius, $Pct, $Color, $TrackColor, $Thick = 4)
     try {
         $g = $Graphics
-        $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.SmoothingMode    = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.TextRenderingHint = [Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 
-        $startAngle  = 135.0
-        $sweepTotal  = 270.0
+        $startAngle = 135.0
+        $sweepTotal = 270.0
         $rect = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY - $Radius, $Radius * 2, $Radius * 2)
 
-        # Track arc
-        $trackPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(50, 30, 80, 120), $Thick)
+        # Threshold-based arc color (semantic, not decorative)
+        $arcColor = if ($Pct -gt 85)     { $script:Colors.Neon_Red    }
+                    elseif ($Pct -gt 60) { $script:Colors.Neon_Orange  }
+                    else                 { $script:Colors.Neon_Green   }
+
+        # Track — very subtle, same hue as arc at 18% opacity
+        $trackPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(46, $arcColor.R, $arcColor.G, $arcColor.B), $Thick)
         $trackPen.StartCap = [Drawing.Drawing2D.LineCap]::Round
         $trackPen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
         $g.DrawArc($trackPen, $rect, $startAngle, $sweepTotal)
         $trackPen.Dispose()
 
-        # Threshold-based arc color
-        $arcColor = if ($Pct -gt 85)     { $script:Colors.Neon_Red    }
-                    elseif ($Pct -gt 60) { $script:Colors.Neon_Orange  }
-                    else                 { $script:Colors.Neon_Green   }
-
+        # Value arc — clean, no glow
         $sweep = [math]::Max(0.0, [math]::Min($sweepTotal, ($Pct / 100.0) * $sweepTotal))
-        if ($sweep -gt 2) {
-            # Outer glow pass
-            $glowPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(55, $arcColor.R, $arcColor.G, $arcColor.B), ($Thick + 5))
-            $glowPen.StartCap = [Drawing.Drawing2D.LineCap]::Round
-            $glowPen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
-            $g.DrawArc($glowPen, $rect, $startAngle, $sweep)
-            $glowPen.Dispose()
-
-            # Main arc
+        if ($sweep -gt 1) {
             $arcPen = New-Object Drawing.Pen($arcColor, $Thick)
             $arcPen.StartCap = [Drawing.Drawing2D.LineCap]::Round
             $arcPen.EndCap   = [Drawing.Drawing2D.LineCap]::Round
@@ -279,47 +276,62 @@ function Draw-CircleGauge {
             $arcPen.Dispose()
         }
 
-        # Center fill circle
-        $innerR = [math]::Max(4, $Radius - $Thick - 3)
-        $innerRect = [Drawing.RectangleF]::new($CenterX - $innerR, $CenterY - $innerR, $innerR * 2, $innerR * 2)
-        $centerBr = New-Object Drawing.SolidBrush($script:Colors.BG_Primary)
-        $g.FillEllipse($centerBr, $innerRect)
-        $centerBr.Dispose()
-
-        # Value label in center
-        $font  = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
-        $sf    = New-Object Drawing.StringFormat
+        # Center number — large, non-bold, feels "thin" at scale
+        $numStr = "$([math]::Round($Pct))"
+        $font   = New-Object Drawing.Font("Segoe UI Variable", 13, [Drawing.FontStyle]::Regular)
+        $sf     = New-Object Drawing.StringFormat
         $sf.Alignment     = [Drawing.StringAlignment]::Center
         $sf.LineAlignment = [Drawing.StringAlignment]::Center
-        $brush = New-Object Drawing.SolidBrush($arcColor)
-        $textRect = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY - $Radius, $Radius * 2, $Radius * 2)
-        $g.DrawString("$([math]::Round($Pct))%", $font, $brush, $textRect, $sf)
+        $brush  = New-Object Drawing.SolidBrush($arcColor)
+        # Nudge text rect slightly upward to leave room for "%" unit below
+        $numRect = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY - $Radius - 5, $Radius * 2, $Radius * 2)
+        $g.DrawString($numStr, $font, $brush, $numRect, $sf)
         $brush.Dispose()
         $font.Dispose()
+
+        # "%" unit — small, dimmed, below the number
+        $unitFont  = New-Object Drawing.Font("Segoe UI Variable", 7, [Drawing.FontStyle]::Regular)
+        $unitBrush = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(140, $arcColor.R, $arcColor.G, $arcColor.B))
+        $unitRect  = [Drawing.RectangleF]::new($CenterX - $Radius, $CenterY + 8, $Radius * 2, 14)
+        $g.DrawString('%', $unitFont, $unitBrush, $unitRect, $sf)
+        $unitBrush.Dispose()
+        $unitFont.Dispose()
         $sf.Dispose()
     } catch { }
 }
 
 function Draw-GlowBorder {
+    # Deep Space card border — subtle 1px edge + 2px left accent strip
     param($Graphics, $Width, $Height, $AccentColor, $AccentThick = 2)
     try {
         $g = $Graphics
         $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
 
-        # Subtle outer glow
-        $glowPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(50, $AccentColor.R, $AccentColor.G, $AccentColor.B), ($AccentThick + 2))
-        $g.DrawRectangle($glowPen, 1, 1, $Width - 3, $Height - 3)
-        $glowPen.Dispose()
-
-        # Dark structural border
-        $borderPen = New-Object Drawing.Pen($C.Border, 1)
+        # 1px outer border at 12% white — barely visible, gives depth
+        $borderPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(30, 255, 255, 255), 1)
         $g.DrawRectangle($borderPen, 0, 0, $Width - 1, $Height - 1)
         $borderPen.Dispose()
 
-        # Neon top accent line
-        $accentPen = New-Object Drawing.Pen($AccentColor, $AccentThick)
-        $g.DrawLine($accentPen, 0, 0, $Width, 0)
+        # Left accent strip — 2px, accent color at 70% opacity
+        $accentPen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(178, $AccentColor.R, $AccentColor.G, $AccentColor.B), $AccentThick)
+        $g.DrawLine($accentPen, 0, 4, 0, $Height - 4)
         $accentPen.Dispose()
+    } catch { }
+}
+
+function Add-RoundedRegion {
+    # Clips a WinForms panel/control to a rounded-rectangle shape
+    param($Control, [int]$Radius = 10)
+    try {
+        $w = $Control.Width; $h = $Control.Height
+        $d = $Radius * 2
+        $path = New-Object Drawing.Drawing2D.GraphicsPath
+        $path.AddArc(0,        0,        $d, $d, 180, 90)
+        $path.AddArc($w - $d,  0,        $d, $d, 270, 90)
+        $path.AddArc($w - $d,  $h - $d,  $d, $d,   0, 90)
+        $path.AddArc(0,        $h - $d,  $d, $d,  90, 90)
+        $path.CloseFigure()
+        $Control.Region = New-Object Drawing.Region($path)
     } catch { }
 }
 
@@ -946,7 +958,7 @@ $refreshBtn.ForeColor = $C.Blue
 $refreshBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
 $refreshBtn.FlatAppearance.BorderColor = $C.Blue
 $refreshBtn.FlatAppearance.BorderSize  = 1
-$refreshBtn.Font      = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
+$refreshBtn.Font      = New-Object Drawing.Font("Segoe UI Variable", 8, [Drawing.FontStyle]::Bold)
 $refreshBtn.Cursor    = [Windows.Forms.Cursors]::Hand
 $titlePnl.Controls.Add($refreshBtn)
 
@@ -998,7 +1010,7 @@ if (-not $script:isAdmin) {
     $warnLbl.Text      = "   Running without Administrator rights - some features may be limited"
     $warnLbl.Location  = [Drawing.Point]::new(6, 3)
     $warnLbl.Size      = [Drawing.Size]::new(900, 16)
-    $warnLbl.Font      = New-Object Drawing.Font("Consolas", 8)
+    $warnLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 8)
     $warnLbl.ForeColor = $C.Yellow
     $warnLbl.BackColor = [Drawing.Color]::Transparent
     $warnPnl.Controls.Add($warnLbl)
@@ -1041,7 +1053,7 @@ $sbVersionLbl = New-Object Windows.Forms.Label
 $sbVersionLbl.Text      = "  ● PC Health Monitor v3.1"
 $sbVersionLbl.Location  = [Drawing.Point]::new(0, 4)
 $sbVersionLbl.Size      = [Drawing.Size]::new(240, 14)
-$sbVersionLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$sbVersionLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 7)
 $sbVersionLbl.ForeColor = $C.Dim
 $sbVersionLbl.BackColor = [Drawing.Color]::Transparent
 $statusBar.Controls.Add($sbVersionLbl)
@@ -1051,7 +1063,7 @@ $script:sbTimeLbl = New-Object Windows.Forms.Label
 $script:sbTimeLbl.Text      = ""
 $script:sbTimeLbl.Location  = [Drawing.Point]::new(380, 4)
 $script:sbTimeLbl.Size      = [Drawing.Size]::new(300, 14)
-$script:sbTimeLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$script:sbTimeLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 7)
 $script:sbTimeLbl.ForeColor = $C.Dim
 $script:sbTimeLbl.BackColor = [Drawing.Color]::Transparent
 $script:sbTimeLbl.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
@@ -1064,7 +1076,7 @@ $sbAdminLbl = New-Object Windows.Forms.Label
 $sbAdminLbl.Text      = "$sbAdminTxt  "
 $sbAdminLbl.Location  = [Drawing.Point]::new(820, 4)
 $sbAdminLbl.Size      = [Drawing.Size]::new(240, 14)
-$sbAdminLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$sbAdminLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 7)
 $sbAdminLbl.ForeColor = $sbAdminClr
 $sbAdminLbl.BackColor = [Drawing.Color]::Transparent
 $sbAdminLbl.TextAlign = [Drawing.ContentAlignment]::MiddleRight
@@ -1184,51 +1196,55 @@ foreach ($cd in $cardDefs) {
         }
     })
 
+    # Value label — Segoe UI Variable, slightly larger, non-bold for elegant thin feel
     $valLbl = New-Object Windows.Forms.Label
     $valLbl.Text      = $cd.Val
-    $valLbl.Location  = [Drawing.Point]::new(100, 12)
-    $valLbl.Size      = [Drawing.Size]::new(112, 26)
-    $valLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+    $valLbl.Location  = [Drawing.Point]::new(100, 10)
+    $valLbl.Size      = [Drawing.Size]::new(114, 26)
+    $valLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
     $valLbl.ForeColor = $cd.Color
     $valLbl.BackColor = [Drawing.Color]::Transparent
     $cp.Controls.Add($valLbl)
     $UI[$cd.Key + "ValLbl"] = $valLbl
 
+    # Card title — small caps feel, subdued
     $cardTitleLbl = New-Object Windows.Forms.Label
-    $cardTitleLbl.Text      = $cd.Title
-    $cardTitleLbl.Location  = [Drawing.Point]::new(100, 42)
-    $cardTitleLbl.Size      = [Drawing.Size]::new(112, 18)
-    $cardTitleLbl.Font      = New-Object Drawing.Font("Segoe UI", 8)
+    $cardTitleLbl.Text      = $cd.Title.ToUpper()
+    $cardTitleLbl.Location  = [Drawing.Point]::new(100, 40)
+    $cardTitleLbl.Size      = [Drawing.Size]::new(114, 16)
+    $cardTitleLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 7, [Drawing.FontStyle]::Bold)
     $cardTitleLbl.ForeColor = $C.SubText
     $cardTitleLbl.BackColor = [Drawing.Color]::Transparent
     $cp.Controls.Add($cardTitleLbl)
 
+    # Percentage label
     $pctLbl = New-Object Windows.Forms.Label
     $pctLbl.Text      = "$pct%"
-    $pctLbl.Location  = [Drawing.Point]::new(100, 64)
+    $pctLbl.Location  = [Drawing.Point]::new(100, 60)
     $pctLbl.Size      = [Drawing.Size]::new(90, 20)
-    $pctLbl.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $pctLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 9)
     $pctLbl.ForeColor = Pct-Color $pct
     $pctLbl.BackColor = [Drawing.Color]::Transparent
     $cp.Controls.Add($pctLbl)
     $UI[$cd.Key + "PctLbl"] = $pctLbl
 
-    # Thin 4px fill bar
+    # Thin 3px fill bar — accent color
     $barTrack = New-Object Windows.Forms.Panel
-    $barTrack.Location  = [Drawing.Point]::new(100, 88)
-    $barTrack.Size      = [Drawing.Size]::new(112, 4)
-    $barTrack.BackColor = $C.BgCard2
+    $barTrack.Location  = [Drawing.Point]::new(100, 87)
+    $barTrack.Size      = [Drawing.Size]::new(114, 3)
+    $barTrack.BackColor = $C.Dim
     $cp.Controls.Add($barTrack)
 
     $barFill = New-Object Windows.Forms.Panel
-    $fw = [math]::Max(0, [math]::Min(112, [int](($pct / 100.0) * 112)))
+    $fw = [math]::Max(0, [math]::Min(114, [int](($pct / 100.0) * 114)))
     $barFill.Location  = [Drawing.Point]::new(0, 0)
-    $barFill.Size      = [Drawing.Size]::new($fw, 4)
+    $barFill.Size      = [Drawing.Size]::new($fw, 3)
     $barFill.BackColor = Pct-Color $pct
     $barTrack.Controls.Add($barFill)
     $UI[$cd.Key + "BarFill"] = $barFill
 
     $UI[$cd.Key + "Card"] = $cp
+    Add-RoundedRegion $cp 10   # clip to rounded rect — corners show tab background
     $tab1.Controls.Add($cp)
 }
 
@@ -1388,7 +1404,7 @@ $script:scoreNumLbl = New-Object Windows.Forms.Label
 $script:scoreNumLbl.Text      = '--'
 $script:scoreNumLbl.Location  = [Drawing.Point]::new(14, 10)
 $script:scoreNumLbl.Size      = [Drawing.Size]::new(90, 56)
-$script:scoreNumLbl.Font      = New-Object Drawing.Font("Consolas", 28, [Drawing.FontStyle]::Bold)
+$script:scoreNumLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 28, [Drawing.FontStyle]::Bold)
 $script:scoreNumLbl.ForeColor = $C.Dim
 $script:scoreNumLbl.BackColor = [Drawing.Color]::Transparent
 $script:scoreNumLbl.TextAlign = [Drawing.ContentAlignment]::MiddleRight
@@ -1399,7 +1415,7 @@ $script:scoreOf100Lbl = New-Object Windows.Forms.Label
 $script:scoreOf100Lbl.Text      = '/ 100'
 $script:scoreOf100Lbl.Location  = [Drawing.Point]::new(106, 38)
 $script:scoreOf100Lbl.Size      = [Drawing.Size]::new(56, 22)
-$script:scoreOf100Lbl.Font      = New-Object Drawing.Font("Consolas", 9)
+$script:scoreOf100Lbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 9)
 $script:scoreOf100Lbl.ForeColor = $C.SubText
 $script:scoreOf100Lbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreOf100Lbl)
@@ -1409,7 +1425,7 @@ $hsHeaderLbl = New-Object Windows.Forms.Label
 $hsHeaderLbl.Text      = 'HEALTH SCORE'
 $hsHeaderLbl.Location  = [Drawing.Point]::new(170, 8)
 $hsHeaderLbl.Size      = [Drawing.Size]::new(200, 14)
-$hsHeaderLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+$hsHeaderLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 7, [Drawing.FontStyle]::Bold)
 $hsHeaderLbl.ForeColor = $C.SubText
 $hsHeaderLbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($hsHeaderLbl)
@@ -1471,6 +1487,7 @@ $scoreInfoBtn.Add_Click({ Show-ScoreInfo })
 $scoreCard.Controls.Add($scoreInfoBtn)
 
 $UI["ScoreCard"] = $scoreCard
+Add-RoundedRegion $scoreCard 10
 $tab1.Controls.Add($scoreCard)
 
 # -- VIP MODE Card -------------------------------------------------------
@@ -1489,7 +1506,7 @@ $vipHeaderLbl = New-Object Windows.Forms.Label
 $vipHeaderLbl.Text      = [char]0x2605 + " VIP MODE"
 $vipHeaderLbl.Location  = [Drawing.Point]::new(12, 12)
 $vipHeaderLbl.Size      = [Drawing.Size]::new(100, 18)
-$vipHeaderLbl.Font      = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
+$vipHeaderLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 8, [Drawing.FontStyle]::Bold)
 $vipHeaderLbl.ForeColor = $C.Blue
 $vipHeaderLbl.BackColor = [Drawing.Color]::Transparent
 $vipCard.Controls.Add($vipHeaderLbl)
@@ -1500,7 +1517,7 @@ $script:vipCombo.Size          = [Drawing.Size]::new(430, 26)
 $script:vipCombo.DropDownStyle = [Windows.Forms.ComboBoxStyle]::DropDownList
 $script:vipCombo.BackColor     = $C.BgCard2
 $script:vipCombo.ForeColor     = $C.Text
-$script:vipCombo.Font          = New-Object Drawing.Font("Consolas", 8)
+$script:vipCombo.Font          = New-Object Drawing.Font("Segoe UI Variable", 8)
 $script:vipCombo.FlatStyle     = [Windows.Forms.FlatStyle]::Flat
 $vipCard.Controls.Add($script:vipCombo)
 
@@ -1518,7 +1535,7 @@ $vipCard.Controls.Add($vipRefreshBtn)
 $script:vipBtn = New-Btn "SET VIP" 584 8 116 26 $C.BgCard2 $C.Yellow
 $script:vipBtn.FlatAppearance.BorderColor = $C.Yellow
 $script:vipBtn.FlatAppearance.BorderSize  = 1
-$script:vipBtn.Font   = New-Object Drawing.Font("Consolas", 8, [Drawing.FontStyle]::Bold)
+$script:vipBtn.Font   = New-Object Drawing.Font("Segoe UI Variable", 8, [Drawing.FontStyle]::Bold)
 $script:vipBtn.Cursor = [Windows.Forms.Cursors]::Hand
 $vipToolTip.SetToolTip($script:vipBtn, "Elevate selected app to High CPU priority")
 $script:vipBtn.Add_Click({
@@ -1556,12 +1573,13 @@ $script:vipStatusLbl = New-Object Windows.Forms.Label
 $script:vipStatusLbl.Text         = "No VIP active"
 $script:vipStatusLbl.Location     = [Drawing.Point]::new(706, 11)
 $script:vipStatusLbl.Size         = [Drawing.Size]::new(306, 20)
-$script:vipStatusLbl.Font         = New-Object Drawing.Font("Consolas", 8)
+$script:vipStatusLbl.Font         = New-Object Drawing.Font("Segoe UI Variable", 8)
 $script:vipStatusLbl.ForeColor    = $C.Dim
 $script:vipStatusLbl.BackColor    = [Drawing.Color]::Transparent
 $script:vipStatusLbl.AutoEllipsis = $true
 $vipCard.Controls.Add($script:vipStatusLbl)
 
+Add-RoundedRegion $vipCard 10
 $tab1.Controls.Add($vipCard)
 
 # -- CPU History Chart ---------------------------------------------------
@@ -1607,7 +1625,7 @@ $procTitleLbl = New-Object Windows.Forms.Label
 $procTitleLbl.Text      = "  Top 25 Processes by RAM"
 $procTitleLbl.Location  = [Drawing.Point]::new(15, 393)
 $procTitleLbl.Size      = [Drawing.Size]::new(500, 26)
-$procTitleLbl.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
+$procTitleLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 11, [Drawing.FontStyle]::Bold)
 $procTitleLbl.ForeColor = $C.Blue
 $procTitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab1.Controls.Add($procTitleLbl)
@@ -1636,7 +1654,7 @@ $anomalyCol.DefaultCellStyle.Font      = $script:MonoFont
 [void]$pGrid.Columns.Add($anomalyCol)
 $anomalyCol.HeaderCell.Style.ForeColor = $C.Anomaly
 $anomalyCol.HeaderCell.Style.BackColor = $C.BgCard3
-$anomalyCol.HeaderCell.Style.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+$anomalyCol.HeaderCell.Style.Font      = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
 
 $killCol = New-Object System.Windows.Forms.DataGridViewButtonColumn
 $killCol.Name            = "Kill"
@@ -1827,7 +1845,7 @@ $s2TitleLbl = New-Object Windows.Forms.Label
 $s2TitleLbl.Text      = "  Apps that start automatically with Windows"
 $s2TitleLbl.Location  = [Drawing.Point]::new(15, 15)
 $s2TitleLbl.Size      = [Drawing.Size]::new(700, 26)
-$s2TitleLbl.Font      = New-Object Drawing.Font("Consolas", 11, [Drawing.FontStyle]::Bold)
+$s2TitleLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 11, [Drawing.FontStyle]::Bold)
 $s2TitleLbl.ForeColor = $C.Blue
 $s2TitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab2.Controls.Add($s2TitleLbl)
@@ -1836,7 +1854,7 @@ $s2SubLbl = New-Object Windows.Forms.Label
 $s2SubLbl.Text      = "  Disabling an app here stops it from launching on startup. You can re-enable it later."
 $s2SubLbl.Location  = [Drawing.Point]::new(15, 43)
 $s2SubLbl.Size      = [Drawing.Size]::new(900, 18)
-$s2SubLbl.Font      = New-Object Drawing.Font("Consolas", 8)
+$s2SubLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 8)
 $s2SubLbl.ForeColor = $C.Dim
 $s2SubLbl.BackColor = [Drawing.Color]::Transparent
 $tab2.Controls.Add($s2SubLbl)
@@ -1847,7 +1865,7 @@ $s2CountLbl.Text      = if ($startups.Count -eq 0)  { "  No startup apps found �
                         else                           { "  $($startups.Count) apps start with Windows — consider disabling some." }
 $s2CountLbl.Location  = [Drawing.Point]::new(15, 63)
 $s2CountLbl.Size      = [Drawing.Size]::new(400, 20)
-$s2CountLbl.Font      = New-Object Drawing.Font("Consolas", 9)
+$s2CountLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 9)
 $s2CountLbl.ForeColor = $C.Yellow
 $s2CountLbl.BackColor = [Drawing.Color]::Transparent
 $tab2.Controls.Add($s2CountLbl)
@@ -1874,7 +1892,7 @@ $disableCol.UseColumnTextForButtonValue = $true
 $disableCol.FillWeight = 80
 $disableCol.DefaultCellStyle.BackColor = $C.DarkRed
 $disableCol.DefaultCellStyle.ForeColor = $C.White
-$disableCol.DefaultCellStyle.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+$disableCol.DefaultCellStyle.Font      = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
 $disableCol.DefaultCellStyle.Alignment = [Windows.Forms.DataGridViewContentAlignment]::MiddleCenter
 [void]$sGrid.Columns.Add($disableCol)
 
@@ -1907,7 +1925,7 @@ $sGrid.Add_CellPainting({
     $sf = New-Object Drawing.StringFormat
     $sf.Alignment     = [Drawing.StringAlignment]::Center
     $sf.LineAlignment = [Drawing.StringAlignment]::Center
-    $font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $font = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
     $ep.Graphics.DrawString($displayText, $font, (New-Object Drawing.SolidBrush($C.White)), ([Drawing.RectangleF]$rect), $sf)
 })
 
@@ -1979,7 +1997,7 @@ $cleanTitleLbl = New-Object Windows.Forms.Label
 $cleanTitleLbl.Text      = "  Junk Files - Recoverable Space"
 $cleanTitleLbl.Location  = [Drawing.Point]::new(15, 15)
 $cleanTitleLbl.Size      = [Drawing.Size]::new(500, 28)
-$cleanTitleLbl.Font      = New-Object Drawing.Font("Consolas", 12, [Drawing.FontStyle]::Bold)
+$cleanTitleLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 12, [Drawing.FontStyle]::Bold)
 $cleanTitleLbl.ForeColor = $C.Blue
 $cleanTitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab3.Controls.Add($cleanTitleLbl)
@@ -1988,7 +2006,7 @@ $cleanTotalLbl = New-Object Windows.Forms.Label
 $cleanTotalLbl.Text      = "  Total found: $totalJunkGB GB across $($junkItems.Count) locations"
 $cleanTotalLbl.Location  = [Drawing.Point]::new(15, 45)
 $cleanTotalLbl.Size      = [Drawing.Size]::new(600, 22)
-$cleanTotalLbl.Font      = New-Object Drawing.Font("Consolas", 9)
+$cleanTotalLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 9)
 $cleanTotalLbl.ForeColor = $C.Red
 $cleanTotalLbl.BackColor = [Drawing.Color]::Transparent
 $tab3.Controls.Add($cleanTotalLbl)
@@ -2059,7 +2077,7 @@ foreach ($ji in $junkItems) {
     $nameLbl.Text      = $ji.Name
     $nameLbl.Location  = [Drawing.Point]::new(12, 8)
     $nameLbl.Size      = [Drawing.Size]::new(230, 20)
-    $nameLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+    $nameLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
     $nameLbl.ForeColor = $C.Text
     $nameLbl.BackColor = [Drawing.Color]::Transparent
     $rPnl.Controls.Add($nameLbl)
@@ -2068,7 +2086,7 @@ foreach ($ji in $junkItems) {
     $sizeLbl.Text      = "$($ji.SizeMB) MB"
     $sizeLbl.Location  = [Drawing.Point]::new(250, 8)
     $sizeLbl.Size      = [Drawing.Size]::new(100, 20)
-    $sizeLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+    $sizeLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
     $sizeLbl.ForeColor = $sColor
     $sizeLbl.BackColor = [Drawing.Color]::Transparent
     $rPnl.Controls.Add($sizeLbl)
@@ -2077,7 +2095,7 @@ foreach ($ji in $junkItems) {
     $filesLbl.Text      = "$($ji.Files) files"
     $filesLbl.Location  = [Drawing.Point]::new(357, 8)
     $filesLbl.Size      = [Drawing.Size]::new(70, 20)
-    $filesLbl.Font      = New-Object Drawing.Font("Consolas", 9)
+    $filesLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 9)
     $filesLbl.ForeColor = $C.SubText
     $filesLbl.BackColor = [Drawing.Color]::Transparent
     $rPnl.Controls.Add($filesLbl)
@@ -2086,7 +2104,7 @@ foreach ($ji in $junkItems) {
     $pathLbl.Text      = $ji.Path
     $pathLbl.Location  = [Drawing.Point]::new(12, 32)
     $pathLbl.Size      = [Drawing.Size]::new(560, 16)
-    $pathLbl.Font      = New-Object Drawing.Font("Consolas", 7)
+    $pathLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 7)
     $pathLbl.ForeColor = $C.Dim
     $pathLbl.BackColor = [Drawing.Color]::Transparent
     $rPnl.Controls.Add($pathLbl)
@@ -2129,7 +2147,7 @@ foreach ($ji in $junkItems) {
     $cleanBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
     $cleanBtn.FlatAppearance.BorderColor = $C.Red
     $cleanBtn.FlatAppearance.BorderSize  = 1
-    $cleanBtn.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $cleanBtn.Font      = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
     $cleanBtn.Cursor    = [Windows.Forms.Cursors]::Hand
 
     $cleanBtn.Tag = @{ Path = $ji.Path; Name = $ji.Name; SizeLbl = $sizeLbl; FilesLbl = $filesLbl }
@@ -2303,7 +2321,7 @@ $cleanAllBtn.BackColor = $C.DarkRed
 $cleanAllBtn.ForeColor = $C.White
 $cleanAllBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
 $cleanAllBtn.FlatAppearance.BorderSize = 0
-$cleanAllBtn.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+$cleanAllBtn.Font      = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
 $cleanAllBtn.Cursor    = [Windows.Forms.Cursors]::Hand
 $cleanAllBtn.Add_MouseEnter({ $cleanAllBtn.BackColor = [Drawing.Color]::FromArgb(215, 60, 80) })
 $cleanAllBtn.Add_MouseLeave({ $cleanAllBtn.BackColor = $C.DarkRed })
@@ -2380,7 +2398,7 @@ $tfHeaderLbl = New-Object Windows.Forms.Label
 $tfHeaderLbl.Text      = "  TOP 10 LARGEST FOLDERS  --  C:\"
 $tfHeaderLbl.Location  = [Drawing.Point]::new(4, 8)
 $tfHeaderLbl.Size      = [Drawing.Size]::new(800, 20)
-$tfHeaderLbl.Font      = New-Object Drawing.Font("Consolas", 10, [Drawing.FontStyle]::Bold)
+$tfHeaderLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
 $tfHeaderLbl.ForeColor = $C.Blue
 $tfHeaderLbl.BackColor = [Drawing.Color]::Transparent
 $tfHeaderPnl.Controls.Add($tfHeaderLbl)
@@ -2400,7 +2418,7 @@ $script:tfPlaceholder = New-Object Windows.Forms.Label
 $script:tfPlaceholder.Text      = "Click SCAN to analyze disk usage on C:\"
 $script:tfPlaceholder.Location  = [Drawing.Point]::new(0, 152)
 $script:tfPlaceholder.Size      = [Drawing.Size]::new(1020, 36)
-$script:tfPlaceholder.Font      = New-Object Drawing.Font("Consolas", 9)
+$script:tfPlaceholder.Font      = New-Object Drawing.Font("Segoe UI Variable", 9)
 $script:tfPlaceholder.ForeColor = $C.Dim
 $script:tfPlaceholder.BackColor = [Drawing.Color]::Transparent
 $script:tfPlaceholder.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
@@ -2451,7 +2469,7 @@ for ($tfI = 0; $tfI -lt 10; $tfI++) {
     $pLbl.Text         = ""
     $pLbl.Location     = [Drawing.Point]::new(40, 2)
     $pLbl.Size         = [Drawing.Size]::new(720, 32)
-    $pLbl.Font         = New-Object Drawing.Font("Consolas", 9)
+    $pLbl.Font         = New-Object Drawing.Font("Segoe UI Variable", 9)
     $pLbl.ForeColor    = $C.Text
     $pLbl.BackColor    = [Drawing.Color]::Transparent
     $pLbl.AutoEllipsis = $true
@@ -2463,7 +2481,7 @@ for ($tfI = 0; $tfI -lt 10; $tfI++) {
     $sLbl.Text      = ""
     $sLbl.Location  = [Drawing.Point]::new(764, 2)
     $sLbl.Size      = [Drawing.Size]::new(90, 32)
-    $sLbl.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
+    $sLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
     $sLbl.ForeColor = $C.Yellow
     $sLbl.BackColor = [Drawing.Color]::Transparent
     $sLbl.TextAlign = [Drawing.ContentAlignment]::MiddleRight
