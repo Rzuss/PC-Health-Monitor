@@ -1152,6 +1152,229 @@ function Refresh-VipCombo {
     if ($script:vipCombo.Items.Count -gt 0) { $script:vipCombo.SelectedIndex = 0 }
 }
 
+
+# ========================================================================
+# PC ADVISOR — Rule-Based AI Engine  (No External API Required)
+# ========================================================================
+
+function Get-AdvisorContext {
+    $d  = $script:DataCache
+    $bd = $script:scoreBreakdown
+    [PSCustomObject]@{
+        CpuPct       = [int]$d['CpuPct']
+        RamPct       = [int]$d['RamPct']
+        UsedRAM      = $d['UsedRAM']
+        DPct         = [int]$d['DPct']
+        DFree        = $d['DFree']
+        DTotal       = $d['DTotal']
+        Procs        = if ($d['Procs']) { $d['Procs'] } else { @() }
+        HealthScore  = [int]$script:lastHealthScore
+        StartupCount = if ($script:StartupItems) { @($script:StartupItems | Where-Object { $_.Enabled }).Count } else { 0 }
+        StartupItems = $script:StartupItems
+        JunkGB       = if ($bd -and $bd.Junk) { [double]$bd.Junk } else { 0.0 }
+    }
+}
+
+function Advise-Overview {
+    param($ctx)
+    $hs = $ctx.HealthScore
+    if ($hs -eq 0) { return "עדיין אוסף נתונים... המתן כמה שניות ונסה שוב." }
+    $scoreLabel = if ($hs -ge 90) { "מצוין" } elseif ($hs -ge 75) { "טוב" } elseif ($hs -ge 55) { "בינוני" } else { "חלש" }
+    $icon       = if ($hs -ge 90) { "🟢" } elseif ($hs -ge 75) { "🟡" } elseif ($hs -ge 55) { "🟠" } else { "🔴" }
+    $lines      = @("$icon ציון בריאות: $hs/100 — $scoreLabel")
+    if ($ctx.CpuPct       -gt 80) { $lines += "• CPU גבוה ($($ctx.CpuPct)%) — אפשר לסגור תהליכים כבדים" }
+    if ($ctx.RamPct       -gt 85) { $lines += "• RAM עמוס ($($ctx.RamPct)%) — שקול לסגור כרטיסיות דפדפן" }
+    if ($ctx.DPct         -gt 90) { $lines += "• דיסק C כמעט מלא ($($ctx.DPct)%) — הרץ ניקוי זבל" }
+    if ($ctx.StartupCount -gt 8)  { $lines += "• $($ctx.StartupCount) תוכניות Startup — שוקל לכבות חלקן?" }
+    if ($lines.Count -eq 1) { $lines += "✅ לא זיהיתי בעיות פעילות — המחשב נראה תקין." }
+    return ($lines -join "`n")
+}
+
+function Advise-RAM {
+    param($ctx)
+    $pct   = $ctx.RamPct
+    $used  = $ctx.UsedRAM
+    $status = if ($pct -lt 60) { "✅ RAM תקין" } elseif ($pct -lt 80) { "🟡 RAM בינוני" } elseif ($pct -lt 90) { "🟠 RAM עמוס" } else { "🔴 RAM קריטי" }
+    $lines = @("$status — שימוש: $used GB ($pct%)")
+    $procs = @($ctx.Procs | Sort-Object RamMB -Descending | Select-Object -First 5)
+    if ($procs.Count -gt 0) {
+        $lines += "צורכי זיכרון עיקריים:"
+        foreach ($p in $procs) { $lines += "  • $($p.Name) — $([math]::Round([double]$p.RamMB))MB" }
+    }
+    if ($pct -gt 80) {
+        $lines += ""
+        $lines += "המלצות:"
+        $lines += "• סגור כרטיסיות דפדפן לא נחוצות (כל כרטיסייה ~100MB)"
+        $lines += "• בדוק אם Teams / Outlook פועלים ברקע"
+        if ($pct -gt 90) { $lines += "• שקול הוספת RAM — 16GB אידיאלי לשימוש יומי" }
+    }
+    return ($lines -join "`n")
+}
+
+function Advise-CPU {
+    param($ctx)
+    $pct    = $ctx.CpuPct
+    $status = if ($pct -lt 40) { "✅ CPU רגוע" } elseif ($pct -lt 70) { "🟡 CPU בינוני" } elseif ($pct -lt 90) { "🟠 CPU עמוס" } else { "🔴 CPU עמוס מאוד" }
+    $lines  = @("$status — שימוש: $pct%")
+    $procs  = @($ctx.Procs | Sort-Object CpuSec -Descending | Select-Object -First 5)
+    if ($procs.Count -gt 0) {
+        $lines += "תהליכים לפי פעילות:"
+        foreach ($p in $procs) { $lines += "  • $($p.Name) (PID $($p.Id))" }
+    }
+    if ($pct -gt 70) {
+        $lines += ""
+        $lines += "המלצות:"
+        $lines += "• בדוק אם Windows Update פועל ברקע (WaasMedic / TiWorker)"
+        $lines += "• בדוק אם Antivirus scan פעיל"
+        if ($pct -gt 85) { $lines += "• אם הבעיה נמשכת — שקול הפעלה מחדש" }
+    }
+    return ($lines -join "`n")
+}
+
+function Advise-Disk {
+    param($ctx)
+    $pct    = $ctx.DPct
+    $free   = $ctx.DFree
+    $total  = $ctx.DTotal
+    $status = if ($pct -lt 70) { "✅ דיסק תקין" } elseif ($pct -lt 85) { "🟡 דיסק מתמלא" } elseif ($pct -lt 95) { "🟠 מקום פנוי נמוך" } else { "🔴 דיסק כמעט מלא" }
+    $lines  = @("$status — $free GB פנויים מתוך $total GB ($pct% בשימוש)")
+    if ($pct -gt 80) {
+        $lines += ""
+        $lines += "המלצות:"
+        $lines += "• הרץ Junk Cleaner בלשונית המתאימה"
+        $lines += "• בדוק Storage לתיקיות הגדולות ביותר"
+        $lines += "• הסר תוכניות שלא בשימוש: הגדרות → אפליקציות"
+        try { if ([double]$free -lt 10) { $lines += "• פחות מ-10GB פנויים — ביצועי Windows נפגעים ישירות" } } catch {}
+    }
+    return ($lines -join "`n")
+}
+
+function Advise-Startup {
+    param($ctx)
+    $items = $ctx.StartupItems
+    if (-not $items -or @($items).Count -eq 0) {
+        return "נתוני Startup עדיין לא נטענו. עבור ללשונית 'Startup Apps' ונסה שוב."
+    }
+    $enabled = @($items | Where-Object { $_.Enabled })
+    $countE  = $enabled.Count
+    $status  = if ($countE -le 5) { "✅ Startup תקין" } elseif ($countE -le 10) { "🟡 Startup בינוני" } else { "🔴 Startup כבד" }
+    $lines   = @("$status — $countE תוכניות עולות עם Windows")
+    if ($countE -gt 5) {
+        $lines += ""
+        $lines += "דוגמאות לתוכניות שניתן לשקול לכבות:"
+        foreach ($s in ($enabled | Select-Object -First 5)) { $lines += "  • $($s.Name)" }
+        $lines += ""
+        $lines += "לניהול: לשונית 'Startup Apps' ← בחר תוכנה ← 'Disable'"
+    }
+    return ($lines -join "`n")
+}
+
+function Advise-Clean {
+    param($ctx)
+    $junkGB  = [double]$ctx.JunkGB
+    $diskPct = $ctx.DPct
+    $lines   = @()
+    if ($junkGB -gt 1) {
+        $lines += "🟠 נמצאו כ-$([math]::Round($junkGB,1)) GB קבצי זבל"
+        $lines += "• פתח לשונית 'Junk Cleaner' ולחץ Clean לניקוי"
+    } elseif ($junkGB -gt 0.05) {
+        $lines += "🟡 נמצאו $([math]::Round($junkGB*1024))MB קבצי זבל"
+        $lines += "• ניתן לנקות דרך לשונית 'Junk Cleaner'"
+    } else {
+        $lines += "✅ לא אותרו קבצי זבל משמעותיים"
+    }
+    if ($diskPct -gt 85) {
+        $lines += ""
+        $lines += "• הדיסק עמוס ($diskPct%) — בדוק גם לשונית 'Storage'"
+    }
+    $lines += ""
+    $lines += "💡 Windows Temp מתמלא מחדש תוך דקות — זה נורמלי. Teams ו-Windows Update יוצרים קבצים זמניים ללא הרף."
+    return ($lines -join "`n")
+}
+
+function Advise-Health {
+    param($ctx)
+    $hs = $ctx.HealthScore
+    if ($hs -eq 0) { return "ציון הבריאות עדיין מחושב. המתן שניה ונסה שוב." }
+    $label = if ($hs -ge 90) { "מצוין" } elseif ($hs -ge 75) { "טוב" } elseif ($hs -ge 55) { "בינוני" } else { "חלש" }
+    $icon  = if ($hs -ge 90) { "🟢" } elseif ($hs -ge 75) { "🟡" } elseif ($hs -ge 55) { "🟠" } else { "🔴" }
+    $lines = @("$icon ציון בריאות: $hs/100 ($label)")
+    $lines += ""
+    $lines += "פירוט:"
+    $lines += "• CPU: $($ctx.CpuPct)% שימוש"
+    $lines += "• RAM: $($ctx.RamPct)% ($($ctx.UsedRAM) GB)"
+    $lines += "• Disk C: $($ctx.DPct)% מלא ($($ctx.DFree) GB פנוי)"
+    $lines += "• Startup: $($ctx.StartupCount) תוכניות"
+    if ($hs -lt 75) {
+        $lines += ""
+        $lines += "לשיפור הציון:"
+        if ($ctx.CpuPct       -gt 70) { $lines += "• הורד עומס CPU" }
+        if ($ctx.RamPct       -gt 80) { $lines += "• פנה זיכרון RAM" }
+        if ($ctx.DPct         -gt 85) { $lines += "• נקה דיסק C" }
+        if ($ctx.StartupCount -gt 8)  { $lines += "• כבה תוכניות Startup" }
+    }
+    return ($lines -join "`n")
+}
+
+function Advise-Slow {
+    param($ctx)
+    $lines    = @("🔍 אנליזת איטיות — מה עלול לגרום להאטה:")
+    $hasIssue = $false
+    if ($ctx.RamPct -gt 85) {
+        $lines += ""; $lines += "🔴 RAM עמוס ($($ctx.RamPct)%) — הגורם הסביר #1 לאיטיות"
+        $lines += "   ← סגור כרטיסיות דפדפן ואפליקציות"; $hasIssue = $true
+    }
+    if ($ctx.CpuPct -gt 75) {
+        $lines += ""; $lines += "🟠 CPU גבוה ($($ctx.CpuPct)%) — תהליך ברקע גוזל משאבים"
+        $lines += "   ← פתח Task Manager (Ctrl+Shift+Esc) לבדיקה"; $hasIssue = $true
+    }
+    if ($ctx.DPct -gt 90) {
+        $lines += ""; $lines += "🟠 דיסק כמעט מלא ($($ctx.DPct)%) — Windows מתקשה לפעול"
+        $lines += "   ← הרץ Junk Cleaner"; $hasIssue = $true
+    }
+    if ($ctx.StartupCount -gt 10) {
+        $lines += ""; $lines += "🟡 $($ctx.StartupCount) תוכניות Startup — מאיטות עלייה"
+        $lines += "   ← כבה חלקן ב-Startup Apps"; $hasIssue = $true
+    }
+    if (-not $hasIssue) {
+        $lines = @("✅ המחשב נראה תקין על פי הנתונים הנוכחיים")
+        $lines += "• אם חווה איטיות ספציפית — פרט באיזה פעולה (גלישה / עריכה / משחק)"
+        $lines += "• ייתכן שהאיטיות קשורה לחיבור אינטרנט או לאפליקציה ספציפית"
+    }
+    return ($lines -join "`n")
+}
+
+function Build-AdvisorResponse {
+    param([string]$UserMessage)
+    $ctx = Get-AdvisorContext
+    $msg = $UserMessage.ToLower().Trim()
+    $isHello    = $msg -match '^(שלום|היי|hi|hello|hey|yo|sup|בוקר|ערב|מה נשמע|מה קורה)$'
+    $isSlow     = $msg -match 'איט|slow|hang|תקוע|freeze|קפא|האט|לאג|lag'
+    $isRAM      = $msg -match '\bram\b|זיכרון|memory'
+    $isCPU      = $msg -match '\bcpu\b|מעבד|processor'
+    $isDisk     = $msg -match 'disk|דיסק|storage|אחסון|מקום|space'
+    $isClean    = $msg -match 'clean|נקי|זבל|junk|פנה|ניקוי'
+    $isStartup  = $msg -match 'startup|אתחול|עלייה|boot|תוכניות אתחול'
+    $isHealth   = $msg -match 'ציון|score|health|בריאות|grade'
+    $isOverview = $msg -match 'סקירה|overview|summary|מצב|status|report|דוח|כללי|general'
+    if ($isHello) {
+        $hs = $ctx.HealthScore
+        $scoreStr = if ($hs -gt 0) { " ציון הבריאות כרגע: $hs/100." } else { '' }
+        return "שלום! אני PC Advisor — מנוע ניתוח AI מובנה.${scoreStr}`n`nאוכל לנתח: RAM, CPU, דיסק, Startup, ניקוי זבל, ציון בריאות ואיטיות. שאל אותי בחופשיות!"
+    }
+    if ($isSlow)    { return Advise-Slow    -ctx $ctx }
+    if ($isRAM)     { return Advise-RAM     -ctx $ctx }
+    if ($isCPU)     { return Advise-CPU     -ctx $ctx }
+    if ($isDisk)    { return Advise-Disk    -ctx $ctx }
+    if ($isClean)   { return Advise-Clean   -ctx $ctx }
+    if ($isStartup) { return Advise-Startup -ctx $ctx }
+    if ($isHealth)  { return Advise-Health  -ctx $ctx }
+    if ($isOverview){ return Advise-Overview -ctx $ctx }
+    $resp  = Advise-Overview -ctx $ctx
+    $resp += "`n`n---`n💬 נסה לשאול על: RAM | CPU | דיסק | Startup | ניקוי | ציון בריאות | מחשב איטי"
+    return $resp
+}
+
 # ========================================================================
 # TAB 1 -- DASHBOARD
 # ========================================================================
@@ -2522,6 +2745,162 @@ $script:tfScanBtn.Add_Click({ Invoke-TopFolderScan })
 $tabs.TabPages.Add($tab3)
 $tabs.TabPages.Add($diskUsageTab)
 
+# ========================================================================
+# TAB 5 -- PC ADVISOR (AI CHAT)
+# ========================================================================
+$advisorTab           = New-Object Windows.Forms.TabPage
+$advisorTab.Text      = "  PC Advisor  "
+$advisorTab.BackColor = $C.BgBase
+
+$script:advisorGreeted = $false
+
+$advPnl = New-Pnl 0 0 1040 590 $C.BgBase
+$advisorTab.Controls.Add($advPnl)
+
+# -- Header --
+$advHdrLbl            = New-Lbl "🤖  PC Advisor" 16 8 500 28 $C.BgBase
+$advHdrLbl.ForeColor  = $C.Blue
+$advHdrLbl.Font       = New-Object Drawing.Font("Segoe UI Variable", 12, [Drawing.FontStyle]::Bold)
+$advPnl.Controls.Add($advHdrLbl)
+
+$advSubLbl            = New-Lbl "מנוע ניתוח AI מובנה — שאל שאלה חופשית בעברית או באנגלית" 16 38 700 20 $C.BgBase
+$advSubLbl.ForeColor  = $C.SubText
+$advSubLbl.Font       = New-Object Drawing.Font("Segoe UI Variable", 8.5)
+$advPnl.Controls.Add($advSubLbl)
+
+# -- Quick Action Buttons (5) --
+$quickDefs = @(
+    @{ Text = "📊 סקירה כללית"; Msg = "סקירה כללית"     }
+    @{ Text = "💾 RAM";          Msg = "זיכרון RAM"       }
+    @{ Text = "⚡ CPU";          Msg = "מעבד CPU"         }
+    @{ Text = "💿 דיסק";         Msg = "דיסק C"           }
+    @{ Text = "🚀 Startup";      Msg = "תוכניות אתחול"   }
+)
+
+$qBtnX = 16; $qBtnY = 64; $qBtnW = 190; $qBtnH = 30; $qBtnGap = 8
+foreach ($qd in $quickDefs) {
+    $qBtn                               = New-Object Windows.Forms.Button
+    $qBtn.Text                          = $qd.Text
+    $qBtn.Location                      = [Drawing.Point]::new($qBtnX, $qBtnY)
+    $qBtn.Size                          = [Drawing.Size]::new($qBtnW, $qBtnH)
+    $qBtn.BackColor                     = $C.BgCard
+    $qBtn.ForeColor                     = $C.SubText
+    $qBtn.FlatStyle                     = [Windows.Forms.FlatStyle]::Flat
+    $qBtn.FlatAppearance.BorderColor    = $C.Border
+    $qBtn.FlatAppearance.BorderSize     = 1
+    $qBtn.Font                          = New-Object Drawing.Font("Segoe UI Variable", 8.5)
+    $qBtn.Cursor                        = [Windows.Forms.Cursors]::Hand
+    $qdMsg                              = $qd.Msg
+    $qBtn.Add_Click({ $script:advisorInput.Text = $qdMsg; Send-AdvisorMessage }.GetNewClosure())
+    $advPnl.Controls.Add($qBtn)
+    $qBtnX += $qBtnW + $qBtnGap
+}
+
+# -- Chat History RichTextBox --
+$script:advisorChat             = New-Object Windows.Forms.RichTextBox
+$script:advisorChat.Location    = [Drawing.Point]::new(16, 104)
+$script:advisorChat.Size        = [Drawing.Size]::new(1008, 384)
+$script:advisorChat.BackColor   = $C.BgCard
+$script:advisorChat.ForeColor   = $C.Text
+$script:advisorChat.Font        = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+$script:advisorChat.ReadOnly    = $true
+$script:advisorChat.BorderStyle = [Windows.Forms.BorderStyle]::None
+$script:advisorChat.ScrollBars  = [Windows.Forms.RichTextBoxScrollBars]::Vertical
+$script:advisorChat.DetectUrls  = $false
+Add-RoundedRegion $script:advisorChat 8
+$advPnl.Controls.Add($script:advisorChat)
+
+# -- Input Panel --
+$inputPnl         = New-Pnl 16 498 1008 52 $C.BgCard
+Add-RoundedRegion $inputPnl 8
+$advPnl.Controls.Add($inputPnl)
+
+$script:advisorInput                = New-Object Windows.Forms.TextBox
+$script:advisorInput.Location       = [Drawing.Point]::new(10, 12)
+$script:advisorInput.Size           = [Drawing.Size]::new(844, 28)
+$script:advisorInput.BackColor      = $C.BgCard
+$script:advisorInput.ForeColor      = $C.Text
+$script:advisorInput.Font           = New-Object Drawing.Font("Segoe UI Variable", 10)
+$script:advisorInput.BorderStyle    = [Windows.Forms.BorderStyle]::None
+try { $script:advisorInput.PlaceholderText = "שאל שאלה... (Enter לשליחה)" } catch {}
+$inputPnl.Controls.Add($script:advisorInput)
+
+$advSendBtn                         = New-Object Windows.Forms.Button
+$advSendBtn.Text                    = "שלח"
+$advSendBtn.Location                = [Drawing.Point]::new(862, 9)
+$advSendBtn.Size                    = [Drawing.Size]::new(80, 34)
+$advSendBtn.BackColor               = $C.Blue
+$advSendBtn.ForeColor               = $C.Text
+$advSendBtn.FlatStyle               = [Windows.Forms.FlatStyle]::Flat
+$advSendBtn.FlatAppearance.BorderSize = 0
+$advSendBtn.Font                    = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
+$advSendBtn.Cursor                  = [Windows.Forms.Cursors]::Hand
+$advSendBtn.Add_Click({ Send-AdvisorMessage })
+$inputPnl.Controls.Add($advSendBtn)
+
+$advClearBtn                        = New-Object Windows.Forms.Button
+$advClearBtn.Text                   = "נקה"
+$advClearBtn.Location               = [Drawing.Point]::new(950, 9)
+$advClearBtn.Size                   = [Drawing.Size]::new(50, 34)
+$advClearBtn.BackColor              = $C.BgCard2
+$advClearBtn.ForeColor              = $C.SubText
+$advClearBtn.FlatStyle              = [Windows.Forms.FlatStyle]::Flat
+$advClearBtn.FlatAppearance.BorderColor = $C.Border
+$advClearBtn.FlatAppearance.BorderSize  = 1
+$advClearBtn.Font                   = New-Object Drawing.Font("Segoe UI Variable", 8.5)
+$advClearBtn.Cursor                 = [Windows.Forms.Cursors]::Hand
+$advClearBtn.Add_Click({
+    $script:advisorChat.Clear()
+    $script:advisorGreeted = $false
+})
+$inputPnl.Controls.Add($advClearBtn)
+
+# -- Chat Helper Functions --
+function Add-ChatMessage {
+    param([string]$Sender, [string]$Message, [Drawing.Color]$SenderColor)
+    $rtb = $script:advisorChat
+    try {
+        # Sender label (bold, colored)
+        $rtb.SelectionStart  = $rtb.TextLength
+        $rtb.SelectionLength = 0
+        $rtb.SelectionColor  = $SenderColor
+        $rtb.SelectionFont   = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
+        $rtb.AppendText($Sender + "`n")
+        # Message body
+        $rtb.SelectionStart  = $rtb.TextLength
+        $rtb.SelectionLength = 0
+        $rtb.SelectionColor  = $C.Text
+        $rtb.SelectionFont   = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+        $rtb.AppendText($Message + "`n`n")
+        $rtb.ScrollToCaret()
+    } catch { Write-Log -Message "Add-ChatMessage error" -Level WARN -ExceptionRecord $_ }
+}
+
+function Send-AdvisorMessage {
+    $userText = $script:advisorInput.Text.Trim()
+    if ([string]::IsNullOrWhiteSpace($userText)) { return }
+    $script:advisorInput.Text = ''
+    Add-ChatMessage -Sender "👤 אתה:" -Message $userText -SenderColor $C.Purple
+    try {
+        $response = Build-AdvisorResponse -UserMessage $userText
+    } catch {
+        $response = "שגיאה בניתוח: $($_.Exception.Message)"
+    }
+    Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $response -SenderColor $C.Blue
+}
+
+# Enter key → send
+$script:advisorInput.Add_KeyDown({
+    param($s3, $ke)
+    if ($ke.KeyCode -eq [Windows.Forms.Keys]::Enter) {
+        $ke.SuppressKeyPress = $true
+        Send-AdvisorMessage
+    }
+})
+
+$tabs.TabPages.Add($advisorTab)
+
+
 # Security tab removed
 
 # -- Plugin Tabs ---------------------------------------------------------
@@ -2558,6 +2937,17 @@ $tabs.Add_SelectedIndexChanged({
         } else {
             Update-TopFolderPanel         # already scanned → just refresh display
         }
+    }
+
+
+    # ── Advisor tab: show greeting on first visit ────────────────────────────
+    if ($tabs.SelectedTab -eq $advisorTab -and -not $script:advisorGreeted) {
+        $script:advisorGreeted = $true
+        $ctx = Get-AdvisorContext
+        $hs  = $ctx.HealthScore
+        $scoreStr = if ($hs -gt 0) { " ציון הבריאות כרגע: $hs/100." } else { '' }
+        $greeting = "שלום! אני PC Advisor — מנוע ניתוח AI מובנה לבקרת ביצועים.${scoreStr}`n`nאוכל לנתח: RAM, CPU, דיסק, Startup, ניקוי זבל ואיטיות.`nלחץ על כפתורי הקיצור למעלה או כתוב שאלה חופשית!"
+        Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $greeting -SenderColor $C.Blue
     }
 
     # ── Plugin tabs: call Refresh-Plugin when tab becomes active ──────────
