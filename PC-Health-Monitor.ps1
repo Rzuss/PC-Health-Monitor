@@ -1178,35 +1178,35 @@ function Get-AdvisorContext {
 function Advise-Overview {
     param($ctx)
     $hs = $ctx.HealthScore
-    if ($hs -eq 0) { return "עדיין אוסף נתונים... המתן כמה שניות ונסה שוב." }
-    $scoreLabel = if ($hs -ge 90) { "מצוין" } elseif ($hs -ge 75) { "טוב" } elseif ($hs -ge 55) { "בינוני" } else { "חלש" }
+    if ($hs -eq 0) { return "Still collecting data... Wait a few seconds and try again." }
+    $scoreLabel = if ($hs -ge 90) { "Excellent" } elseif ($hs -ge 75) { "Good" } elseif ($hs -ge 55) { "Fair" } else { "Poor" }
     $icon       = if ($hs -ge 90) { "🟢" } elseif ($hs -ge 75) { "🟡" } elseif ($hs -ge 55) { "🟠" } else { "🔴" }
-    $lines      = @("$icon ציון בריאות: $hs/100 — $scoreLabel")
-    if ($ctx.CpuPct       -gt 80) { $lines += "• CPU גבוה ($($ctx.CpuPct)%) — אפשר לסגור תהליכים כבדים" }
-    if ($ctx.RamPct       -gt 85) { $lines += "• RAM עמוס ($($ctx.RamPct)%) — שקול לסגור כרטיסיות דפדפן" }
-    if ($ctx.DPct         -gt 90) { $lines += "• דיסק C כמעט מלא ($($ctx.DPct)%) — הרץ ניקוי זבל" }
-    if ($ctx.StartupCount -gt 8)  { $lines += "• $($ctx.StartupCount) תוכניות Startup — שוקל לכבות חלקן?" }
-    if ($lines.Count -eq 1) { $lines += "✅ לא זיהיתי בעיות פעילות — המחשב נראה תקין." }
+    $lines      = @("$icon Health Score: $hs/100 — $scoreLabel")
+    if ($ctx.CpuPct       -gt 80) { $lines += "  • CPU high ($($ctx.CpuPct)%) — consider closing heavy processes" }
+    if ($ctx.RamPct       -gt 85) { $lines += "  • RAM loaded ($($ctx.RamPct)%) — try closing browser tabs" }
+    if ($ctx.DPct         -gt 90) { $lines += "  • Disk C nearly full ($($ctx.DPct)%) — run Junk Cleaner" }
+    if ($ctx.StartupCount -gt 8)  { $lines += "  • $($ctx.StartupCount) Startup programs — consider disabling some" }
+    if ($lines.Count -eq 1) { $lines += "  ✅ No active issues detected — your PC looks healthy." }
     return ($lines -join "`n")
 }
 
 function Advise-RAM {
     param($ctx)
-    $pct   = $ctx.RamPct
-    $used  = $ctx.UsedRAM
-    $status = if ($pct -lt 60) { "✅ RAM תקין" } elseif ($pct -lt 80) { "🟡 RAM בינוני" } elseif ($pct -lt 90) { "🟠 RAM עמוס" } else { "🔴 RAM קריטי" }
-    $lines = @("$status — שימוש: $used GB ($pct%)")
-    $procs = @($ctx.Procs | Sort-Object RamMB -Descending | Select-Object -First 5)
+    $pct    = $ctx.RamPct
+    $used   = $ctx.UsedRAM
+    $status = if ($pct -lt 60) { "✅ RAM OK" } elseif ($pct -lt 80) { "🟡 RAM moderate" } elseif ($pct -lt 90) { "🟠 RAM high" } else { "🔴 RAM critical" }
+    $lines  = @("$status — Usage: $used GB ($pct%)")
+    $procs  = @($ctx.Procs | Sort-Object RamMB -Descending | Select-Object -First 5)
     if ($procs.Count -gt 0) {
-        $lines += "צורכי זיכרון עיקריים:"
-        foreach ($p in $procs) { $lines += "  • $($p.Name) — $([math]::Round([double]$p.RamMB))MB" }
+        $lines += "Top memory consumers:"
+        foreach ($p in $procs) { $lines += "  • $($p.Name) — $([math]::Round([double]$p.RamMB)) MB" }
     }
     if ($pct -gt 80) {
         $lines += ""
-        $lines += "המלצות:"
-        $lines += "• סגור כרטיסיות דפדפן לא נחוצות (כל כרטיסייה ~100MB)"
-        $lines += "• בדוק אם Teams / Outlook פועלים ברקע"
-        if ($pct -gt 90) { $lines += "• שקול הוספת RAM — 16GB אידיאלי לשימוש יומי" }
+        $lines += "Recommendations:"
+        $lines += "  • Close unused browser tabs (~100 MB each)"
+        $lines += "  • Check if Teams / Outlook are running in the background"
+        if ($pct -gt 90) { $lines += "  • Consider upgrading RAM — 16 GB is ideal for daily use" }
     }
     return ($lines -join "`n")
 }
@@ -1214,19 +1214,19 @@ function Advise-RAM {
 function Advise-CPU {
     param($ctx)
     $pct    = $ctx.CpuPct
-    $status = if ($pct -lt 40) { "✅ CPU רגוע" } elseif ($pct -lt 70) { "🟡 CPU בינוני" } elseif ($pct -lt 90) { "🟠 CPU עמוס" } else { "🔴 CPU עמוס מאוד" }
-    $lines  = @("$status — שימוש: $pct%")
+    $status = if ($pct -lt 40) { "✅ CPU idle" } elseif ($pct -lt 70) { "🟡 CPU moderate" } elseif ($pct -lt 90) { "🟠 CPU high" } else { "🔴 CPU very high" }
+    $lines  = @("$status — Usage: $pct%")
     $procs  = @($ctx.Procs | Sort-Object CpuSec -Descending | Select-Object -First 5)
     if ($procs.Count -gt 0) {
-        $lines += "תהליכים לפי פעילות:"
+        $lines += "Processes by activity:"
         foreach ($p in $procs) { $lines += "  • $($p.Name) (PID $($p.Id))" }
     }
     if ($pct -gt 70) {
         $lines += ""
-        $lines += "המלצות:"
-        $lines += "• בדוק אם Windows Update פועל ברקע (WaasMedic / TiWorker)"
-        $lines += "• בדוק אם Antivirus scan פעיל"
-        if ($pct -gt 85) { $lines += "• אם הבעיה נמשכת — שקול הפעלה מחדש" }
+        $lines += "Recommendations:"
+        $lines += "  • Check if Windows Update is running in background (WaasMedic / TiWorker)"
+        $lines += "  • Check if an Antivirus scan is active"
+        if ($pct -gt 85) { $lines += "  • If the issue persists — consider restarting your PC" }
     }
     return ($lines -join "`n")
 }
@@ -1236,15 +1236,15 @@ function Advise-Disk {
     $pct    = $ctx.DPct
     $free   = $ctx.DFree
     $total  = $ctx.DTotal
-    $status = if ($pct -lt 70) { "✅ דיסק תקין" } elseif ($pct -lt 85) { "🟡 דיסק מתמלא" } elseif ($pct -lt 95) { "🟠 מקום פנוי נמוך" } else { "🔴 דיסק כמעט מלא" }
-    $lines  = @("$status — $free GB פנויים מתוך $total GB ($pct% בשימוש)")
+    $status = if ($pct -lt 70) { "✅ Disk healthy" } elseif ($pct -lt 85) { "🟡 Disk filling up" } elseif ($pct -lt 95) { "🟠 Low free space" } else { "🔴 Disk nearly full" }
+    $lines  = @("$status — $free GB free of $total GB ($pct% used)")
     if ($pct -gt 80) {
         $lines += ""
-        $lines += "המלצות:"
-        $lines += "• הרץ Junk Cleaner בלשונית המתאימה"
-        $lines += "• בדוק Storage לתיקיות הגדולות ביותר"
-        $lines += "• הסר תוכניות שלא בשימוש: הגדרות → אפליקציות"
-        try { if ([double]$free -lt 10) { $lines += "• פחות מ-10GB פנויים — ביצועי Windows נפגעים ישירות" } } catch {}
+        $lines += "Recommendations:"
+        $lines += "  • Run Junk Cleaner from the dedicated tab"
+        $lines += "  • Check the Storage tab for your largest folders"
+        $lines += "  • Uninstall unused apps: Settings → Apps"
+        try { if ([double]$free -lt 10) { $lines += "  • ⚠️ Less than 10 GB free — Windows performance is directly impacted" } } catch {}
     }
     return ($lines -join "`n")
 }
@@ -1253,18 +1253,18 @@ function Advise-Startup {
     param($ctx)
     $items = $ctx.StartupItems
     if (-not $items -or @($items).Count -eq 0) {
-        return "נתוני Startup עדיין לא נטענו. עבור ללשונית 'Startup Apps' ונסה שוב."
+        return "Startup data not yet loaded. Visit the 'Startup Apps' tab and try again."
     }
     $enabled = @($items | Where-Object { $_.Enabled })
     $countE  = $enabled.Count
-    $status  = if ($countE -le 5) { "✅ Startup תקין" } elseif ($countE -le 10) { "🟡 Startup בינוני" } else { "🔴 Startup כבד" }
-    $lines   = @("$status — $countE תוכניות עולות עם Windows")
+    $status  = if ($countE -le 5) { "✅ Startup healthy" } elseif ($countE -le 10) { "🟡 Startup moderate" } else { "🔴 Startup heavy" }
+    $lines   = @("$status — $countE programs launch with Windows")
     if ($countE -gt 5) {
         $lines += ""
-        $lines += "דוגמאות לתוכניות שניתן לשקול לכבות:"
+        $lines += "Examples you could consider disabling:"
         foreach ($s in ($enabled | Select-Object -First 5)) { $lines += "  • $($s.Name)" }
         $lines += ""
-        $lines += "לניהול: לשונית 'Startup Apps' ← בחר תוכנה ← 'Disable'"
+        $lines += "To manage: open 'Startup Apps' tab → select a program → click 'Disable'"
     }
     return ($lines -join "`n")
 }
@@ -1275,71 +1275,71 @@ function Advise-Clean {
     $diskPct = $ctx.DPct
     $lines   = @()
     if ($junkGB -gt 1) {
-        $lines += "🟠 נמצאו כ-$([math]::Round($junkGB,1)) GB קבצי זבל"
-        $lines += "• פתח לשונית 'Junk Cleaner' ולחץ Clean לניקוי"
+        $lines += "🟠 Found ~$([math]::Round($junkGB,1)) GB of junk files"
+        $lines += "  • Open the 'Junk Cleaner' tab and click Clean"
     } elseif ($junkGB -gt 0.05) {
-        $lines += "🟡 נמצאו $([math]::Round($junkGB*1024))MB קבצי זבל"
-        $lines += "• ניתן לנקות דרך לשונית 'Junk Cleaner'"
+        $lines += "🟡 Found $([math]::Round($junkGB*1024)) MB of junk files"
+        $lines += "  • Clean them via the 'Junk Cleaner' tab"
     } else {
-        $lines += "✅ לא אותרו קבצי זבל משמעותיים"
+        $lines += "✅ No significant junk files detected"
     }
     if ($diskPct -gt 85) {
         $lines += ""
-        $lines += "• הדיסק עמוס ($diskPct%) — בדוק גם לשונית 'Storage'"
+        $lines += "  • Disk is loaded ($diskPct%) — also check the 'Storage' tab"
     }
     $lines += ""
-    $lines += "💡 Windows Temp מתמלא מחדש תוך דקות — זה נורמלי. Teams ו-Windows Update יוצרים קבצים זמניים ללא הרף."
+    $lines += "💡 Tip: Windows Temp refills within minutes after cleaning — this is normal. Teams and Windows Update constantly recreate temp files."
     return ($lines -join "`n")
 }
 
 function Advise-Health {
     param($ctx)
     $hs = $ctx.HealthScore
-    if ($hs -eq 0) { return "ציון הבריאות עדיין מחושב. המתן שניה ונסה שוב." }
-    $label = if ($hs -ge 90) { "מצוין" } elseif ($hs -ge 75) { "טוב" } elseif ($hs -ge 55) { "בינוני" } else { "חלש" }
+    if ($hs -eq 0) { return "Health Score is still being calculated. Wait a moment and try again." }
+    $label = if ($hs -ge 90) { "Excellent" } elseif ($hs -ge 75) { "Good" } elseif ($hs -ge 55) { "Fair" } else { "Poor" }
     $icon  = if ($hs -ge 90) { "🟢" } elseif ($hs -ge 75) { "🟡" } elseif ($hs -ge 55) { "🟠" } else { "🔴" }
-    $lines = @("$icon ציון בריאות: $hs/100 ($label)")
+    $lines = @("$icon Health Score: $hs/100 ($label)")
     $lines += ""
-    $lines += "פירוט:"
-    $lines += "• CPU: $($ctx.CpuPct)% שימוש"
-    $lines += "• RAM: $($ctx.RamPct)% ($($ctx.UsedRAM) GB)"
-    $lines += "• Disk C: $($ctx.DPct)% מלא ($($ctx.DFree) GB פנוי)"
-    $lines += "• Startup: $($ctx.StartupCount) תוכניות"
+    $lines += "Breakdown:"
+    $lines += "  • CPU: $($ctx.CpuPct)% usage"
+    $lines += "  • RAM: $($ctx.RamPct)% ($($ctx.UsedRAM) GB)"
+    $lines += "  • Disk C: $($ctx.DPct)% full ($($ctx.DFree) GB free)"
+    $lines += "  • Startup: $($ctx.StartupCount) programs"
     if ($hs -lt 75) {
         $lines += ""
-        $lines += "לשיפור הציון:"
-        if ($ctx.CpuPct       -gt 70) { $lines += "• הורד עומס CPU" }
-        if ($ctx.RamPct       -gt 80) { $lines += "• פנה זיכרון RAM" }
-        if ($ctx.DPct         -gt 85) { $lines += "• נקה דיסק C" }
-        if ($ctx.StartupCount -gt 8)  { $lines += "• כבה תוכניות Startup" }
+        $lines += "To improve your score:"
+        if ($ctx.CpuPct       -gt 70) { $lines += "  • Reduce CPU load — close heavy applications" }
+        if ($ctx.RamPct       -gt 80) { $lines += "  • Free up RAM — close tabs and apps" }
+        if ($ctx.DPct         -gt 85) { $lines += "  • Clean Disk C — run Junk Cleaner" }
+        if ($ctx.StartupCount -gt 8)  { $lines += "  • Disable Startup programs — visit Startup Apps tab" }
     }
     return ($lines -join "`n")
 }
 
 function Advise-Slow {
     param($ctx)
-    $lines    = @("🔍 אנליזת איטיות — מה עלול לגרום להאטה:")
+    $lines    = @("🔍 Slowness Analysis — potential causes:")
     $hasIssue = $false
     if ($ctx.RamPct -gt 85) {
-        $lines += ""; $lines += "🔴 RAM עמוס ($($ctx.RamPct)%) — הגורם הסביר #1 לאיטיות"
-        $lines += "   ← סגור כרטיסיות דפדפן ואפליקציות"; $hasIssue = $true
+        $lines += ""; $lines += "🔴 RAM overloaded ($($ctx.RamPct)%) — most likely cause #1"
+        $lines += "   ← Close browser tabs and background apps"; $hasIssue = $true
     }
     if ($ctx.CpuPct -gt 75) {
-        $lines += ""; $lines += "🟠 CPU גבוה ($($ctx.CpuPct)%) — תהליך ברקע גוזל משאבים"
-        $lines += "   ← פתח Task Manager (Ctrl+Shift+Esc) לבדיקה"; $hasIssue = $true
+        $lines += ""; $lines += "🟠 CPU high ($($ctx.CpuPct)%) — a background process is consuming resources"
+        $lines += "   ← Open Task Manager (Ctrl+Shift+Esc) to investigate"; $hasIssue = $true
     }
     if ($ctx.DPct -gt 90) {
-        $lines += ""; $lines += "🟠 דיסק כמעט מלא ($($ctx.DPct)%) — Windows מתקשה לפעול"
-        $lines += "   ← הרץ Junk Cleaner"; $hasIssue = $true
+        $lines += ""; $lines += "🟠 Disk nearly full ($($ctx.DPct)%) — Windows is struggling"
+        $lines += "   ← Run Junk Cleaner"; $hasIssue = $true
     }
     if ($ctx.StartupCount -gt 10) {
-        $lines += ""; $lines += "🟡 $($ctx.StartupCount) תוכניות Startup — מאיטות עלייה"
-        $lines += "   ← כבה חלקן ב-Startup Apps"; $hasIssue = $true
+        $lines += ""; $lines += "🟡 $($ctx.StartupCount) Startup programs — slowing boot time"
+        $lines += "   ← Disable some via the Startup Apps tab"; $hasIssue = $true
     }
     if (-not $hasIssue) {
-        $lines = @("✅ המחשב נראה תקין על פי הנתונים הנוכחיים")
-        $lines += "• אם חווה איטיות ספציפית — פרט באיזה פעולה (גלישה / עריכה / משחק)"
-        $lines += "• ייתכן שהאיטיות קשורה לחיבור אינטרנט או לאפליקציה ספציפית"
+        $lines = @("✅ PC looks healthy based on current data")
+        $lines += "  • If you're experiencing specific slowness — describe which action (browsing / editing / gaming)"
+        $lines += "  • The issue may be related to your internet connection or a specific application"
     }
     return ($lines -join "`n")
 }
@@ -1348,19 +1348,19 @@ function Build-AdvisorResponse {
     param([string]$UserMessage)
     $ctx = Get-AdvisorContext
     $msg = $UserMessage.ToLower().Trim()
-    $isHello    = $msg -match '^(שלום|היי|hi|hello|hey|yo|sup|בוקר|ערב|מה נשמע|מה קורה)$'
-    $isSlow     = $msg -match 'איט|slow|hang|תקוע|freeze|קפא|האט|לאג|lag'
-    $isRAM      = $msg -match '\bram\b|זיכרון|memory'
-    $isCPU      = $msg -match '\bcpu\b|מעבד|processor'
-    $isDisk     = $msg -match 'disk|דיסק|storage|אחסון|מקום|space'
-    $isClean    = $msg -match 'clean|נקי|זבל|junk|פנה|ניקוי'
-    $isStartup  = $msg -match 'startup|אתחול|עלייה|boot|תוכניות אתחול'
-    $isHealth   = $msg -match 'ציון|score|health|בריאות|grade'
-    $isOverview = $msg -match 'סקירה|overview|summary|מצב|status|report|דוח|כללי|general'
+    $isHello    = $msg -match '^(hello|hi|hey|yo|sup|שלום|היי|בוקר|ערב|מה נשמע)$'
+    $isSlow     = $msg -match 'slow|hang|freeze|lag|stutter|stuck|איט|תקוע|קפא|האט|לאג'
+    $isRAM      = $msg -match '\bram\b|memory|זיכרון'
+    $isCPU      = $msg -match '\bcpu\b|processor|מעבד'
+    $isDisk     = $msg -match 'disk|storage|space|דיסק|אחסון|מקום'
+    $isClean    = $msg -match 'clean|junk|temp|זבל|ניקוי|פנה'
+    $isStartup  = $msg -match 'startup|boot|אתחול|עלייה'
+    $isHealth   = $msg -match 'health|score|grade|ציון|בריאות'
+    $isOverview = $msg -match 'overview|summary|status|report|general|סקירה|מצב|כללי'
     if ($isHello) {
         $hs = $ctx.HealthScore
-        $scoreStr = if ($hs -gt 0) { " ציון הבריאות כרגע: $hs/100." } else { '' }
-        return "שלום! אני PC Advisor — מנוע ניתוח AI מובנה.${scoreStr}`n`nאוכל לנתח: RAM, CPU, דיסק, Startup, ניקוי זבל, ציון בריאות ואיטיות. שאל אותי בחופשיות!"
+        $scoreStr = if ($hs -gt 0) { " Current health score: $hs/100." } else { '' }
+        return "Hello! I'm PC Advisor — your built-in AI performance engine.${scoreStr}`n`nI can analyze: RAM, CPU, Disk, Startup programs, Junk files, Health Score, and slowness. Just ask!"
     }
     if ($isSlow)    { return Advise-Slow    -ctx $ctx }
     if ($isRAM)     { return Advise-RAM     -ctx $ctx }
@@ -1371,7 +1371,7 @@ function Build-AdvisorResponse {
     if ($isHealth)  { return Advise-Health  -ctx $ctx }
     if ($isOverview){ return Advise-Overview -ctx $ctx }
     $resp  = Advise-Overview -ctx $ctx
-    $resp += "`n`n---`n💬 נסה לשאול על: RAM | CPU | דיסק | Startup | ניקוי | ציון בריאות | מחשב איטי"
+    $resp += "`n`n---`n💬 Try asking about: RAM | CPU | Disk | Startup | Junk | Health Score | Slow PC"
     return $resp
 }
 
@@ -2761,16 +2761,16 @@ $advisorTab.Controls.Add($advPnl)
 $advHdrLbl            = New-Lbl "🤖  PC Advisor" 16 8 500 28 12 $true $C.Blue
 $advPnl.Controls.Add($advHdrLbl)
 
-$advSubLbl            = New-Lbl "מנוע ניתוח AI מובנה — שאל שאלה חופשית בעברית או באנגלית" 16 38 700 20 8.5 $false $C.SubText
+$advSubLbl            = New-Lbl "Built-in AI analysis engine — ask anything, anytime" 16 38 700 20 8.5 $false $C.SubText
 $advPnl.Controls.Add($advSubLbl)
 
 # -- Quick Action Buttons (5) --
 $quickDefs = @(
-    @{ Text = "📊 סקירה כללית"; Msg = "סקירה כללית"     }
-    @{ Text = "💾 RAM";          Msg = "זיכרון RAM"       }
-    @{ Text = "⚡ CPU";          Msg = "מעבד CPU"         }
-    @{ Text = "💿 דיסק";         Msg = "דיסק C"           }
-    @{ Text = "🚀 Startup";      Msg = "תוכניות אתחול"   }
+    @{ Text = "📊 Overview"; Msg = "overview"  }
+    @{ Text = "💾 RAM";      Msg = "ram"       }
+    @{ Text = "⚡ CPU";      Msg = "cpu"       }
+    @{ Text = "💿 Disk";     Msg = "disk"      }
+    @{ Text = "🚀 Startup";  Msg = "startup"   }
 )
 
 $qBtnX = 16; $qBtnY = 64; $qBtnW = 190; $qBtnH = 30; $qBtnGap = 8
@@ -2818,11 +2818,11 @@ $script:advisorInput.BackColor      = $C.BgCard
 $script:advisorInput.ForeColor      = $C.Text
 $script:advisorInput.Font           = New-Object Drawing.Font("Segoe UI Variable", 10)
 $script:advisorInput.BorderStyle    = [Windows.Forms.BorderStyle]::None
-try { $script:advisorInput.PlaceholderText = "שאל שאלה... (Enter לשליחה)" } catch {}
+try { $script:advisorInput.PlaceholderText = "Ask a question... (press Enter to send)" } catch {}
 $inputPnl.Controls.Add($script:advisorInput)
 
 $advSendBtn                         = New-Object Windows.Forms.Button
-$advSendBtn.Text                    = "שלח"
+$advSendBtn.Text                    = "Send"
 $advSendBtn.Location                = [Drawing.Point]::new(862, 9)
 $advSendBtn.Size                    = [Drawing.Size]::new(80, 34)
 $advSendBtn.BackColor               = $C.Blue
@@ -2835,7 +2835,7 @@ $advSendBtn.Add_Click({ Send-AdvisorMessage })
 $inputPnl.Controls.Add($advSendBtn)
 
 $advClearBtn                        = New-Object Windows.Forms.Button
-$advClearBtn.Text                   = "נקה"
+$advClearBtn.Text                   = "Clear"
 $advClearBtn.Location               = [Drawing.Point]::new(950, 9)
 $advClearBtn.Size                   = [Drawing.Size]::new(50, 34)
 $advClearBtn.BackColor              = $C.BgCard2
@@ -2876,11 +2876,11 @@ function Send-AdvisorMessage {
     $userText = $script:advisorInput.Text.Trim()
     if ([string]::IsNullOrWhiteSpace($userText)) { return }
     $script:advisorInput.Text = ''
-    Add-ChatMessage -Sender "👤 אתה:" -Message $userText -SenderColor $C.Purple
+    Add-ChatMessage -Sender "👤 You:" -Message $userText -SenderColor $C.Purple
     try {
         $response = Build-AdvisorResponse -UserMessage $userText
     } catch {
-        $response = "שגיאה בניתוח: $($_.Exception.Message)"
+        $response = "Analysis error: $($_.Exception.Message)"
     }
     Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $response -SenderColor $C.Blue
 }
@@ -2941,8 +2941,8 @@ $tabs.Add_SelectedIndexChanged({
         $script:advisorGreeted = $true
         $ctx = Get-AdvisorContext
         $hs  = $ctx.HealthScore
-        $scoreStr = if ($hs -gt 0) { " ציון הבריאות כרגע: $hs/100." } else { '' }
-        $greeting = "שלום! אני PC Advisor — מנוע ניתוח AI מובנה לבקרת ביצועים.${scoreStr}`n`nאוכל לנתח: RAM, CPU, דיסק, Startup, ניקוי זבל ואיטיות.`nלחץ על כפתורי הקיצור למעלה או כתוב שאלה חופשית!"
+        $scoreStr = if ($hs -gt 0) { " Current health score: $hs/100." } else { '' }
+        $greeting = "Hello! I'm PC Advisor 🤖 — your built-in AI performance monitoring engine.${scoreStr}`n`nI can analyze: RAM, CPU, Disk, Startup programs, Junk files, and slowness.`nClick a quick-action button above, or type any question!"
         Add-ChatMessage -Sender "🤖 PC Advisor:" -Message $greeting -SenderColor $C.Blue
     }
 
