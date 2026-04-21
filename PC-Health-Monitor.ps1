@@ -2132,17 +2132,6 @@ foreach ($ji in $junkItems) {
     $cleanBtn.Font      = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
     $cleanBtn.Cursor    = [Windows.Forms.Cursors]::Hand
 
-    $skipBtn = New-Object Windows.Forms.Button
-    $skipBtn.Text      = "Skip"
-    $skipBtn.Location  = [Drawing.Point]::new(892, 10)
-    $skipBtn.Size      = [Drawing.Size]::new(80, 36)
-    $skipBtn.BackColor = $C.BgCard2
-    $skipBtn.ForeColor = $C.Dim
-    $skipBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-    $skipBtn.FlatAppearance.BorderSize = 0
-    $skipBtn.Font      = New-Object Drawing.Font("Consolas", 9)
-    $skipBtn.Cursor    = [Windows.Forms.Cursors]::Hand
-
     $cleanBtn.Tag = @{ Path = $ji.Path; Name = $ji.Name; SizeLbl = $sizeLbl; FilesLbl = $filesLbl }
 
     $needsAdmin = $adminRequiredNames -contains $ji.Name
@@ -2301,15 +2290,7 @@ foreach ($ji in $junkItems) {
         $script:pollTimer.Start()
     })
 
-    $skipBtn.Add_Click({
-        param($sender, $e)
-        $sender.Enabled = $false
-        $sender.Text    = "Skipped"
-        $logBox.AppendText("`nSkipped.")
-        $logBox.ScrollToCaret()
-    })
-
-    $rPnl.Controls.AddRange(@($cleanBtn, $skipBtn))
+    $rPnl.Controls.Add($cleanBtn)
     $tab3.Controls.Add($rPnl)
     $rY += 62
 }
