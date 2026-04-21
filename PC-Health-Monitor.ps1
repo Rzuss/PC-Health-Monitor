@@ -2758,14 +2758,10 @@ $advPnl = New-Pnl 0 0 1040 590 $C.BgBase
 $advisorTab.Controls.Add($advPnl)
 
 # -- Header --
-$advHdrLbl            = New-Lbl "🤖  PC Advisor" 16 8 500 28 $C.BgBase
-$advHdrLbl.ForeColor  = $C.Blue
-$advHdrLbl.Font       = New-Object Drawing.Font("Segoe UI Variable", 12, [Drawing.FontStyle]::Bold)
+$advHdrLbl            = New-Lbl "🤖  PC Advisor" 16 8 500 28 12 $true $C.Blue
 $advPnl.Controls.Add($advHdrLbl)
 
-$advSubLbl            = New-Lbl "מנוע ניתוח AI מובנה — שאל שאלה חופשית בעברית או באנגלית" 16 38 700 20 $C.BgBase
-$advSubLbl.ForeColor  = $C.SubText
-$advSubLbl.Font       = New-Object Drawing.Font("Segoe UI Variable", 8.5)
+$advSubLbl            = New-Lbl "מנוע ניתוח AI מובנה — שאל שאלה חופשית בעברית או באנגלית" 16 38 700 20 8.5 $false $C.SubText
 $advPnl.Controls.Add($advSubLbl)
 
 # -- Quick Action Buttons (5) --
