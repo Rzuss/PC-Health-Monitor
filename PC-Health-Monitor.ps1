@@ -2501,6 +2501,8 @@ for ($tfI = 0; $tfI -lt 10; $tfI++) {
     $script:tfContainer.Controls.Add($rowPnl)
 }
 
+$script:tfAutoScanned = $false   # triggers auto-scan on first Storage tab visit
+
 $script:tfScanBtn.Add_Click({ Invoke-TopFolderScan })
 
 $tabs.TabPages.Add($tab3)
@@ -2534,9 +2536,14 @@ foreach ($manifest in $Script:LoadedPlugins) {
 # Auto-trigger first security scan when user navigates to Security tab
 # Also calls Refresh-Plugin for any plugin tab that becomes active
 $tabs.Add_SelectedIndexChanged({
-    # ── Top Folders tab: refresh panel from cache on entry ────────────────
+    # ── Storage tab: auto-scan on first visit; subsequent visits use cache ──
     if ($tabs.SelectedTab -eq $diskUsageTab) {
-        Update-TopFolderPanel
+        if (-not $script:tfAutoScanned) {
+            $script:tfAutoScanned = $true
+            Invoke-TopFolderScan          # first visit → kick off background scan
+        } else {
+            Update-TopFolderPanel         # already scanned → just refresh display
+        }
     }
 
     # ── Plugin tabs: call Refresh-Plugin when tab becomes active ──────────
