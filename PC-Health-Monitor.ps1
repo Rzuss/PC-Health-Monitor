@@ -2200,14 +2200,16 @@ foreach ($ji in $junkItems) {
             }
 
             # Pass 1: delete each file individually — a locked file never blocks others
+            # Exclude the app's own log file (always open/locked inside %TEMP%)
             Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue |
-                Where-Object { -not $_.PSIsContainer } |
+                Where-Object { -not $_.PSIsContainer -and $_.Name -ne 'PCHealth-Monitor.log' } |
                 Sort-Object FullName -Descending |
                 ForEach-Object {
                     try {
-                        $totalBytes += $_.Length
+                        $fileBytes = $_.Length
                         Remove-Item $_.FullName -Force -ErrorAction Stop
                         $del++
+                        $totalBytes += $fileBytes   # BUG-FIX: count bytes ONLY after confirmed delete
                     } catch { $errCount++ }
                 }
 
@@ -2227,11 +2229,12 @@ foreach ($ji in $junkItems) {
                 Start-Sleep -Milliseconds 2000   # let Explorer stabilise before rescan
             }
 
-            # Rescan to get actual remaining size (not assume 0)
+            # Rescan — exclude app log; null-safe Measure-Object (.Sum can be $null on empty set)
             $remaining = Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue |
-                         Where-Object { -not $_.PSIsContainer }
+                         Where-Object { -not $_.PSIsContainer -and $_.Name -ne 'PCHealth-Monitor.log' }
             $remCount  = @($remaining).Count
-            $remMB     = [math]::Round(($remaining | Measure-Object Length -Sum -ErrorAction SilentlyContinue).Sum / 1MB, 1)
+            $remRaw    = ($remaining | Measure-Object Length -Sum -ErrorAction SilentlyContinue).Sum
+            $remMB     = if ($remRaw) { [math]::Round([long]$remRaw / 1MB, 1) } else { 0.0 }
 
             $pending['Bytes']    = $totalBytes
             $pending['Name']     = $name
@@ -2241,18 +2244,21 @@ foreach ($ji in $junkItems) {
 
             $msg = "  Done - removed $del files ($errCount locked/skipped) | $remMB MB remaining"
             $formObj.Invoke([Action]{
-                $btn.Text        = "Done"
-                $btn.BackColor   = $dg
                 $log.AppendText($msg)
                 $log.ScrollToCaret()
-                $prog.Visible    = $false
+                $prog.Visible = $false
                 if ($remMB -le 0) {
+                    $btn.Text        = "Done"
+                    $btn.BackColor   = $dg
                     $szLbl.Text      = "0 MB"
                     $szLbl.ForeColor = $green
                     $fLbl.Text       = "0 files"
                 } else {
+                    # Partial clean — locked files remain; show amber state clearly
+                    $btn.Text        = "Partial"
+                    $btn.BackColor   = [Drawing.Color]::FromArgb(160, 90, 0)
                     $szLbl.Text      = "$remMB MB"
-                    $szLbl.ForeColor = [Drawing.Color]::FromArgb(255, 200, 100)  # amber — partial clean
+                    $szLbl.ForeColor = [Drawing.Color]::FromArgb(255, 200, 100)
                     $fLbl.Text       = "$remCount locked"
                 }
             })
@@ -2341,16 +2347,25 @@ $cleanAllBtn.Add_Click({
             $logBox.AppendText("`nCleaning: $($ji2.Path)")
             [Windows.Forms.Application]::DoEvents()
             $del=0; $errCount=0
-            Get-ChildItem $ji2.Path -Force -EA SilentlyContinue | ForEach-Object {
-                try {
-                    $totalCleanedBytes += $_.Length
-                    Remove-Item $_.FullName -Force -Recurse -EA Stop
-                    $del++
-                } catch {
-                    Write-Log -Message "Clean All: failed to remove item from $($ji2.Name)" -Level WARN -ExceptionRecord $_
-                    $errCount++
+            # Recurse into subdirs; exclude app log (locked); count bytes ONLY after confirmed delete
+            Get-ChildItem $ji2.Path -Recurse -Force -EA SilentlyContinue |
+                Where-Object { -not $_.PSIsContainer -and $_.Name -ne 'PCHealth-Monitor.log' } |
+                Sort-Object FullName -Descending |
+                ForEach-Object {
+                    try {
+                        $fb = $_.Length
+                        Remove-Item $_.FullName -Force -EA Stop
+                        $del++
+                        $totalCleanedBytes += $fb   # only after confirmed delete
+                    } catch {
+                        Write-Log -Message "Clean All: failed to remove item from $($ji2.Name)" -Level WARN -ExceptionRecord $_
+                        $errCount++
+                    }
                 }
-            }
+            # Remove now-empty subdirs (best-effort)
+            Get-ChildItem $ji2.Path -Recurse -Force -EA SilentlyContinue |
+                Where-Object { $_.PSIsContainer } | Sort-Object FullName -Descending |
+                ForEach-Object { try { Remove-Item $_.FullName -Force -EA Stop } catch {} }
             $logBox.AppendText("  -> $del removed, $errCount skipped")
             $cleanedNames += $ji2.Name
         }
