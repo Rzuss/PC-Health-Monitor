@@ -2764,38 +2764,10 @@ $advPnl.Controls.Add($advHdrLbl)
 $advSubLbl            = New-Lbl "Built-in AI analysis engine — ask anything, anytime" 16 38 700 20 8.5 $false $C.SubText
 $advPnl.Controls.Add($advSubLbl)
 
-# -- Quick Action Buttons (5) --
-$quickDefs = @(
-    @{ Text = "📊 Overview"; Msg = "overview"  }
-    @{ Text = "💾 RAM";      Msg = "ram"       }
-    @{ Text = "⚡ CPU";      Msg = "cpu"       }
-    @{ Text = "💿 Disk";     Msg = "disk"      }
-    @{ Text = "🚀 Startup";  Msg = "startup"   }
-)
-
-$qBtnX = 16; $qBtnY = 64; $qBtnW = 190; $qBtnH = 30; $qBtnGap = 8
-foreach ($qd in $quickDefs) {
-    $qBtn                               = New-Object Windows.Forms.Button
-    $qBtn.Text                          = $qd.Text
-    $qBtn.Location                      = [Drawing.Point]::new($qBtnX, $qBtnY)
-    $qBtn.Size                          = [Drawing.Size]::new($qBtnW, $qBtnH)
-    $qBtn.BackColor                     = $C.BgCard
-    $qBtn.ForeColor                     = $C.SubText
-    $qBtn.FlatStyle                     = [Windows.Forms.FlatStyle]::Flat
-    $qBtn.FlatAppearance.BorderColor    = $C.Border
-    $qBtn.FlatAppearance.BorderSize     = 1
-    $qBtn.Font                          = New-Object Drawing.Font("Segoe UI Variable", 8.5)
-    $qBtn.Cursor                        = [Windows.Forms.Cursors]::Hand
-    $qdMsg                              = $qd.Msg
-    $qBtn.Add_Click({ $script:advisorInput.Text = $qdMsg; Send-AdvisorMessage }.GetNewClosure())
-    $advPnl.Controls.Add($qBtn)
-    $qBtnX += $qBtnW + $qBtnGap
-}
-
 # -- Chat History RichTextBox --
 $script:advisorChat             = New-Object Windows.Forms.RichTextBox
-$script:advisorChat.Location    = [Drawing.Point]::new(16, 104)
-$script:advisorChat.Size        = [Drawing.Size]::new(1008, 384)
+$script:advisorChat.Location    = [Drawing.Point]::new(16, 64)
+$script:advisorChat.Size        = [Drawing.Size]::new(1008, 424)
 $script:advisorChat.BackColor   = $C.BgCard
 $script:advisorChat.ForeColor   = $C.Text
 $script:advisorChat.Font        = New-Object Drawing.Font("Segoe UI Variable", 9.5)
