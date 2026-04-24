@@ -196,6 +196,81 @@ function New-Btn($txt, $x, $y, $w, $h, $bg, $fg) {
     return $b
 }
 
+# Helper — standardized (i) information button (28x28, rounded, blue border)
+function New-InfoBtn {
+    param([int]$X, [int]$Y, [string]$Title, [string]$Body, $Parent)
+    $btn                                  = New-Object Windows.Forms.Button
+    $btn.Size                             = [Drawing.Size]::new(28, 28)
+    $btn.Location                         = [Drawing.Point]::new($X, $Y)
+    $btn.Text                             = "i"
+    $btn.Font                             = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
+    $btn.BackColor                        = $C.BgCard
+    $btn.ForeColor                        = $C.Blue
+    $btn.FlatStyle                        = [Windows.Forms.FlatStyle]::Flat
+    $btn.FlatAppearance.BorderColor       = $C.Blue
+    $btn.FlatAppearance.BorderSize        = 1
+    $btn.Cursor                           = [Windows.Forms.Cursors]::Hand
+    $btn.TextAlign                        = [Drawing.ContentAlignment]::MiddleCenter
+    Add-RoundedRegion $btn 14
+    $capturedTitle = $Title
+    $capturedBody  = $Body
+    $btn.Add_Click({
+        $dlg               = New-Object Windows.Forms.Form
+        $dlg.Text          = $capturedTitle
+        $dlg.Size          = [Drawing.Size]::new(560, 440)
+        $dlg.StartPosition = "CenterParent"
+        $dlg.BackColor     = [Drawing.Color]::FromArgb(13, 13, 15)
+        $dlg.ForeColor     = [Drawing.Color]::FromArgb(245, 245, 247)
+        $dlg.FormBorderStyle = [Windows.Forms.FormBorderStyle]::FixedDialog
+        $dlg.MaximizeBox   = $false; $dlg.MinimizeBox = $false
+        $dlg.TopMost       = $true
+
+        $titleLbl          = New-Object Windows.Forms.Label
+        $titleLbl.Text     = $capturedTitle
+        $titleLbl.Location = [Drawing.Point]::new(20, 16)
+        $titleLbl.Size     = [Drawing.Size]::new(520, 26)
+        $titleLbl.Font     = New-Object Drawing.Font("Segoe UI Variable", 12, [Drawing.FontStyle]::Bold)
+        $titleLbl.ForeColor = [Drawing.Color]::FromArgb(108, 99, 255)
+        $titleLbl.BackColor = [Drawing.Color]::Transparent
+        $dlg.Controls.Add($titleLbl)
+
+        $divPnl            = New-Object Windows.Forms.Panel
+        $divPnl.Location   = [Drawing.Point]::new(20, 46)
+        $divPnl.Size       = [Drawing.Size]::new(520, 1)
+        $divPnl.BackColor  = [Drawing.Color]::FromArgb(44, 44, 46)
+        $dlg.Controls.Add($divPnl)
+
+        $bodyBox           = New-Object Windows.Forms.RichTextBox
+        $bodyBox.Location  = [Drawing.Point]::new(20, 56)
+        $bodyBox.Size      = [Drawing.Size]::new(520, 310)
+        $bodyBox.Text      = $capturedBody
+        $bodyBox.Font      = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+        $bodyBox.ForeColor = [Drawing.Color]::FromArgb(245, 245, 247)
+        $bodyBox.BackColor = [Drawing.Color]::FromArgb(13, 13, 15)
+        $bodyBox.BorderStyle = [Windows.Forms.BorderStyle]::None
+        $bodyBox.ReadOnly  = $true
+        $bodyBox.ScrollBars = [Windows.Forms.RichTextBoxScrollBars]::Vertical
+        $dlg.Controls.Add($bodyBox)
+
+        $okBtn             = New-Object Windows.Forms.Button
+        $okBtn.Text        = "Got it"
+        $okBtn.Location    = [Drawing.Point]::new(200, 378)
+        $okBtn.Size        = [Drawing.Size]::new(160, 36)
+        $okBtn.Font        = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
+        $okBtn.BackColor   = [Drawing.Color]::FromArgb(108, 99, 255)
+        $okBtn.ForeColor   = [Drawing.Color]::FromArgb(245, 245, 247)
+        $okBtn.FlatStyle   = [Windows.Forms.FlatStyle]::Flat
+        $okBtn.FlatAppearance.BorderSize = 0
+        $okBtn.Cursor      = [Windows.Forms.Cursors]::Hand
+        $okBtn.Add_Click({ $dlg.Close() })
+        $dlg.Controls.Add($okBtn)
+        $dlg.AcceptButton  = $okBtn
+        [void]$dlg.ShowDialog()
+    }.GetNewClosure())
+    if ($Parent) { $Parent.Controls.Add($btn) }
+    return $btn
+}
+
 function New-Pnl($x, $y, $w, $h, $col) {
     $p = New-Object Windows.Forms.Panel
     $p.Location  = [Drawing.Point]::new($x, $y)
@@ -1627,7 +1702,7 @@ $script:scoreMsg1Lbl.Text      = '  Calculating your PC health score...'
 $script:scoreMsg1Lbl.Location  = [Drawing.Point]::new(170, 52)
 $script:scoreMsg1Lbl.Size      = [Drawing.Size]::new(760, 16)
 $script:scoreMsg1Lbl.Font      = New-Object Drawing.Font("Segoe UI", 8)
-$script:scoreMsg1Lbl.ForeColor = $C.Dim
+$script:scoreMsg1Lbl.ForeColor = $C.SubText
 $script:scoreMsg1Lbl.BackColor = [Drawing.Color]::Transparent
 $scoreCard.Controls.Add($script:scoreMsg1Lbl)
 
@@ -1645,15 +1720,17 @@ $scoreCard.Controls.Add($script:scoreMsg2Lbl)
 # (i) Info button — top right of card
 $scoreInfoBtn = New-Object Windows.Forms.Button
 $scoreInfoBtn.Text      = "i"
-$scoreInfoBtn.Location  = [Drawing.Point]::new(984, 28)
-$scoreInfoBtn.Size      = [Drawing.Size]::new(26, 26)
-$scoreInfoBtn.BackColor = $C.BgCard2
+$scoreInfoBtn.Location  = [Drawing.Point]::new(984, 26)
+$scoreInfoBtn.Size      = [Drawing.Size]::new(28, 28)
+$scoreInfoBtn.BackColor = $C.BgCard
 $scoreInfoBtn.ForeColor = $C.Blue
 $scoreInfoBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
 $scoreInfoBtn.FlatAppearance.BorderColor = $C.Blue
 $scoreInfoBtn.FlatAppearance.BorderSize  = 1
-$scoreInfoBtn.Font      = New-Object Drawing.Font("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+$scoreInfoBtn.Font      = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
 $scoreInfoBtn.Cursor    = [Windows.Forms.Cursors]::Hand
+$scoreInfoBtn.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+Add-RoundedRegion $scoreInfoBtn 14
 $scoreInfoBtn.Add_Click({ Show-ScoreInfo })
 $scoreCard.Controls.Add($scoreInfoBtn)
 
@@ -1717,7 +1794,7 @@ $script:vipBtn.Add_Click({
         $script:vipBtn.BackColor = $C.BgCard2
         $script:vipBtn.ForeColor = $C.Yellow
         $script:vipStatusLbl.Text      = "No VIP active"
-        $script:vipStatusLbl.ForeColor = $C.Dim
+        $script:vipStatusLbl.ForeColor = $C.SubText
         $vipCard.Invalidate()
     } else {
         # Toggle ON — elevate selected process
@@ -1740,12 +1817,36 @@ $script:vipBtn.Add_Click({
 })
 $vipCard.Controls.Add($script:vipBtn)
 
+[void](New-InfoBtn 984 7 'VIP MODE — About This Feature' @"
+VIP MODE — Process Priority Elevation
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Elevates one application to HIGH CPU priority so Windows schedules it more aggressively — it gets more processing time than other running apps.
+
+WHAT IT DOES:
+  • Select any running app from the dropdown
+  • Click SET VIP — priority is raised to High
+  • All other apps stay at Normal priority
+
+USE CASES:
+  Gaming · Video calls · Music production · Encoding
+
+WHAT IT DOES NOT DO:
+  • Does not close or kill any other process
+  • Does not affect GPU, RAM, or network bandwidth
+  • One app at a time only
+
+ON CLEAR:
+  The original priority is restored automatically.
+  Nothing is left changed after you click CLEAR VIP.
+"@ $vipCard)
+
 $script:vipStatusLbl = New-Object Windows.Forms.Label
 $script:vipStatusLbl.Text         = "No VIP active"
 $script:vipStatusLbl.Location     = [Drawing.Point]::new(706, 11)
 $script:vipStatusLbl.Size         = [Drawing.Size]::new(306, 20)
 $script:vipStatusLbl.Font         = New-Object Drawing.Font("Segoe UI Variable", 8)
-$script:vipStatusLbl.ForeColor    = $C.Dim
+$script:vipStatusLbl.ForeColor    = $C.SubText
 $script:vipStatusLbl.BackColor    = [Drawing.Color]::Transparent
 $script:vipStatusLbl.AutoEllipsis = $true
 $vipCard.Controls.Add($script:vipStatusLbl)
@@ -2021,12 +2122,34 @@ $s2TitleLbl.ForeColor = $C.Blue
 $s2TitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab2.Controls.Add($s2TitleLbl)
 
+[void](New-InfoBtn 1000 12 'Startup Apps — About This Feature' @"
+STARTUP APPS — Boot-Time Manager
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Lists every application configured to launch automatically when Windows starts. Too many startup apps slow your boot time and consume RAM from the moment you log in.
+
+HOW IT WORKS:
+  • Toggle the checkbox next to any app to enable/disable it
+  • Disabled apps remain installed — only auto-launch is stopped
+  • Changes take effect on the NEXT Windows startup
+
+RECOMMENDATION:
+  Keep under 5 startup apps for fast boot times.
+
+SAFE TO DISABLE:
+  Spotify · Teams · Discord · OneDrive · Steam
+  (Launch them manually when you need them)
+
+KEEP ENABLED:
+  Antivirus · Audio drivers · Essential system utilities
+"@ $tab2)
+
 $s2SubLbl = New-Object Windows.Forms.Label
 $s2SubLbl.Text      = "  Disabling an app here stops it from launching on startup. You can re-enable it later."
 $s2SubLbl.Location  = [Drawing.Point]::new(15, 43)
 $s2SubLbl.Size      = [Drawing.Size]::new(900, 18)
 $s2SubLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 8)
-$s2SubLbl.ForeColor = $C.Dim
+$s2SubLbl.ForeColor = $C.SubText
 $s2SubLbl.BackColor = [Drawing.Color]::Transparent
 $tab2.Controls.Add($s2SubLbl)
 
@@ -2172,6 +2295,29 @@ $cleanTitleLbl.Font      = New-Object Drawing.Font("Segoe UI Variable", 12, [Dra
 $cleanTitleLbl.ForeColor = $C.Blue
 $cleanTitleLbl.BackColor = [Drawing.Color]::Transparent
 $tab3.Controls.Add($cleanTitleLbl)
+
+[void](New-InfoBtn 1000 12 'Junk Cleaner — About This Feature' @"
+JUNK CLEANER — Disk Space Recovery
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Scans and removes temporary files, cached data, and leftover files that Windows and applications accumulate over time.
+
+WHAT IT TARGETS:
+  • Windows Temp folder (%TEMP%)
+  • System Temp (C:\Windows\Temp)
+  • Software Distribution download cache
+  • Recycle Bin contents
+
+HOW TO USE:
+  • Check the boxes next to locations you want to clean
+  • Click CLEAN SELECTED to delete those files
+  • The folder icon opens the location in Explorer
+
+SAFETY:
+  • Targets temporary files only — no personal data is touched
+  • Each row shows exact size before you confirm
+  • Files in use by Windows are automatically skipped
+"@ $tab3)
 
 $cleanTotalLbl = New-Object Windows.Forms.Label
 $cleanTotalLbl.Text      = "  Total found: $totalJunkGB GB across $($junkItems.Count) locations"
@@ -2578,6 +2724,27 @@ $script:tfScanBtn = New-Btn "SCAN" 870 4 140 28 $C.BgCard2 $C.Blue
 $script:tfScanBtn.FlatAppearance.BorderColor = $C.Blue
 $script:tfScanBtn.FlatAppearance.BorderSize  = 1
 $tfHeaderPnl.Controls.Add($script:tfScanBtn)
+[void](New-InfoBtn 830 4 'Storage Analyzer — About This Feature' @"
+STORAGE ANALYZER — Top 10 Largest Folders
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Scans drive C: and lists the 10 largest folders by total size, helping you pinpoint exactly where your disk space is being consumed.
+
+HOW TO USE:
+  • Click SCAN to start (may take 30–90 seconds on large drives)
+  • Results show folder path, size, and file count
+  • Click the folder icon to open any location in Explorer
+
+COMMON SPACE HOGS:
+  Downloads · Games · Old Installers · Video files
+  Virtualization images (VM, WSL) · Node modules
+
+TIP:
+  After identifying a large folder, decide whether to:
+  — Delete it entirely (if no longer needed)
+  — Move it to an external drive or secondary disk
+  — Compress it using Windows' built-in compression
+"@ \$tfHeaderPnl)
 $diskUsageTab.Controls.Add($tfHeaderPnl)
 
 # Container panel for the 10 folder rows
@@ -2888,6 +3055,29 @@ $dhScanBtn = New-Btn "Scan Disks" 820 14 200 44 $C.Blue $C.Text
 $dhScanBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
 $dhPnl.Controls.Add($dhScanBtn)
 
+[void](New-InfoBtn 760 14 'Disk Health — About This Feature' @"
+DISK HEALTH — S.M.A.R.T. Monitor
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Reads S.M.A.R.T. (Self-Monitoring, Analysis and Reporting Technology) data directly from your physical drives using the Windows Storage API — no third-party tools required.
+
+WHAT IT SHOWS:
+  • Temperature   — heat above 55°C degrades SSD lifespan
+  • Read Errors   — uncorrected read failures (0 = healthy)
+  • Write Errors  — uncorrected write failures (0 = healthy)
+  • Wear Level    — SSD lifespan indicator (0% = new)
+  • Power-On Hrs  — total hours the drive has been powered
+
+WHAT TO WATCH FOR:
+  • Any Read/Write errors > 0 → back up your data immediately
+  • Temperature > 55°C → check airflow and cooling
+  • Wear Level > 80% → plan for SSD replacement soon
+
+NOTE: Values showing "—" mean your drive controller does
+not expose that S.M.A.R.T. metric via the Windows API.
+Run as Administrator for full access to all drives.
+"@ \$dhPnl)
+
 # Results panel (scrollable)
 $dhResultsPnl                = New-Object Windows.Forms.FlowLayoutPanel
 $dhResultsPnl.Location       = [Drawing.Point]::new(20, 78)
@@ -3003,6 +3193,29 @@ $drvScanBtn = New-Btn "Scan Drivers" 820 14 200 44 $C.Purple $C.Text
 $drvScanBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
 $toolsPnl.Controls.Add($drvScanBtn)
 
+[void](New-InfoBtn 784 14 'Driver Audit — About This Feature' @"
+DRIVER AUDIT — Age & Status Report
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Inventories all installed device drivers and flags those that may be out of date based on their release date.
+
+STATUS DEFINITIONS:
+  Outdated — driver is older than 2 years (update recommended)
+  Aging    — driver is 1–2 years old (monitor for updates)
+  OK       — driver is less than 1 year old (not shown in list)
+
+WHY IT MATTERS:
+  Outdated drivers can cause hardware instability, crashes,
+  security vulnerabilities, and performance degradation.
+
+HOW TO UPDATE A DRIVER:
+  1. Note the Driver Name and Vendor from the list
+  2. Visit the vendor website (Intel, NVIDIA, AMD, etc.)
+  3. Download and install the latest version
+  — OR —
+  Use Windows Update → Advanced Options → Optional Updates
+"@ \$toolsPnl)
+
 # Summary label (updated after scan)
 $drvSummaryLbl = New-Lbl "Click 'Scan Drivers' to detect outdated or aging drivers." 20 44 800 18 8.5 $false $C.SubText
 $toolsPnl.Controls.Add($drvSummaryLbl)
@@ -3103,6 +3316,31 @@ $toolsPnl.Controls.Add($toolsDiv)
 # ── Section B: Auto-Schedule Cleanup ─────────────────────────────────────
 $schedHdr = New-Lbl "🕐  Auto-Schedule Cleanup" 20 320 500 26 12 $true $C.Green
 $toolsPnl.Controls.Add($schedHdr)
+[void](New-InfoBtn 984 318 'Auto-Schedule — About This Feature' @"
+AUTO-SCHEDULE CLEANUP — Task Scheduler
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Creates a Windows Scheduled Task that automatically runs the Junk Cleaner at your chosen day and time — fully unattended, no manual intervention required.
+
+HOW IT WORKS:
+  • Choose Daily or Weekly frequency
+  • Set the time (03:00 AM is recommended — no user activity)
+  • Click CREATE SCHEDULE — Windows Task Scheduler takes over
+  • To cancel at any time: click REMOVE SCHEDULE
+
+WHAT GETS CLEANED (same as Junk Cleaner tab):
+  • Windows Temp folder (%TEMP%)
+  • System Temp (C:\Windows\Temp)
+  • Software Distribution download cache
+  • Recycle Bin contents
+
+LOGS:
+  The scheduled task runs silently in the background.
+  Results are written to the app log file for your review.
+
+NOTE: Requires the PC Health Monitor .ps1 file to remain
+at its current location for the schedule to work.
+"@ \$toolsPnl)
 $schedSub = New-Lbl "Schedule automatic junk cleanup using Windows Task Scheduler" 20 350 600 18 8.5 $false $C.SubText
 $toolsPnl.Controls.Add($schedSub)
 
