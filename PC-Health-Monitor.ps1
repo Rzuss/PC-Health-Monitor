@@ -2710,6 +2710,62 @@ $bPnl.Controls.Add($bHdr)
 $bSub = New-Lbl "Maximize performance by throttling background processes and activating High Performance power plan" 20 46 780 18 8.5 $false $C.SubText
 $bPnl.Controls.Add($bSub)
 
+# Info button (ⓘ)
+$bInfoBtn               = New-Object Windows.Forms.Button
+$bInfoBtn.Size          = [Drawing.Size]::new(28, 28)
+$bInfoBtn.Location      = [Drawing.Point]::new(810, 10)
+$bInfoBtn.Text          = "i"
+$bInfoBtn.Font          = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
+$bInfoBtn.BackColor     = $C.BgCard
+$bInfoBtn.ForeColor     = $C.Blue
+$bInfoBtn.FlatStyle     = [Windows.Forms.FlatStyle]::Flat
+$bInfoBtn.FlatAppearance.BorderColor = $C.Blue
+$bInfoBtn.FlatAppearance.BorderSize  = 1
+$bInfoBtn.Cursor        = [Windows.Forms.Cursors]::Hand
+$bInfoBtn.TextAlign     = [Drawing.ContentAlignment]::MiddleCenter
+Add-RoundedRegion $bInfoBtn 14
+$bPnl.Controls.Add($bInfoBtn)
+
+$bInfoBtn.Add_Click({
+    $msg = @"
+BOOST MODE — How It Works
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Boost Mode is a one-click performance optimizer that temporarily
+reconfigures your system to prioritize active work over background activity.
+
+WHAT IT DOES:
+  • Switches your Windows Power Plan to "High Performance"
+    (prevents CPU throttling and keeps clocks at full speed)
+
+  • Lowers the CPU priority of non-essential background processes
+    (Teams, Discord, Spotify, OneDrive, Chrome, and others)
+    — they keep running, but yield CPU time to your main task
+
+  • Flushes Standby RAM — memory held by idle processes is released
+    back to the system, reducing pressure on available RAM
+
+WHAT IT DOES NOT DO:
+  • Does not kill or close any process
+  • Does not change any permanent system settings
+  • Does not affect network, audio, or display drivers
+
+ON DEACTIVATE:
+  All original process priorities and your previous power plan
+  are restored automatically — nothing is left changed.
+
+BEST USED FOR:
+  Gaming · Video editing · Rendering · Compiling · Heavy multitasking
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"@
+    [Windows.Forms.MessageBox]::Show(
+        $msg,
+        "Boost Mode — Information",
+        [Windows.Forms.MessageBoxButtons]::OK,
+        [Windows.Forms.MessageBoxIcon]::Information
+    ) | Out-Null
+})
+
 # Big BOOST button
 $script:boostBtn          = New-Object Windows.Forms.Button
 $script:boostBtn.Size     = [Drawing.Size]::new(420, 80)
