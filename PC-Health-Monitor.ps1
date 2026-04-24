@@ -2991,10 +2991,14 @@ $drvScanBtn = New-Btn "Scan Drivers" 820 14 200 44 $C.Purple $C.Text
 $drvScanBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
 $toolsPnl.Controls.Add($drvScanBtn)
 
+# Summary label (updated after scan)
+$drvSummaryLbl = New-Lbl "Click 'Scan Drivers' to detect outdated or aging drivers." 20 44 800 18 8.5 $false $C.SubText
+$toolsPnl.Controls.Add($drvSummaryLbl)
+
 # DataGridView for drivers
 $script:drvGrid                          = New-Object Windows.Forms.DataGridView
-$script:drvGrid.Location                 = [Drawing.Point]::new(20, 66)
-$script:drvGrid.Size                     = [Drawing.Size]::new(1000, 230)
+$script:drvGrid.Location                 = [Drawing.Point]::new(20, 70)
+$script:drvGrid.Size                     = [Drawing.Size]::new(1000, 226)
 $script:drvGrid.BackgroundColor          = $C.BgCard
 $script:drvGrid.ForeColor                = $C.Text
 $script:drvGrid.GridColor                = $C.Border
@@ -3017,19 +3021,17 @@ $script:drvGrid.SelectionMode                    = [Windows.Forms.DataGridViewSe
 $script:drvGrid.AutoSizeColumnsMode              = [Windows.Forms.DataGridViewAutoSizeColumnsMode]::None
 $script:drvGrid.ScrollBars                       = [Windows.Forms.ScrollBars]::Vertical
 
-[void]$script:drvGrid.Columns.Add("Icon",    " ")
 [void]$script:drvGrid.Columns.Add("Name",    "Driver Name")
 [void]$script:drvGrid.Columns.Add("Vendor",  "Vendor")
 [void]$script:drvGrid.Columns.Add("Version", "Version")
 [void]$script:drvGrid.Columns.Add("Date",    "Date")
 [void]$script:drvGrid.Columns.Add("Status",  "Status")
 
-$script:drvGrid.Columns["Icon"].Width    = 32
-$script:drvGrid.Columns["Name"].Width    = 370
-$script:drvGrid.Columns["Vendor"].Width  = 180
-$script:drvGrid.Columns["Version"].Width = 140
-$script:drvGrid.Columns["Date"].Width    = 90
-$script:drvGrid.Columns["Status"].Width  = 80
+$script:drvGrid.Columns["Name"].Width    = 420
+$script:drvGrid.Columns["Vendor"].Width  = 200
+$script:drvGrid.Columns["Version"].Width = 150
+$script:drvGrid.Columns["Date"].Width    = 110
+$script:drvGrid.Columns["Status"].Width  = 100
 $script:drvGrid.RowTemplate.Height       = 26
 
 $toolsPnl.Controls.Add($script:drvGrid)
@@ -3039,19 +3041,44 @@ $drvScanBtn.Add_Click({
     $drvScanBtn.Text    = "Scanning..."
     [Windows.Forms.Application]::DoEvents()
     $script:drvGrid.Rows.Clear()
+    $drvSummaryLbl.Text = "Scanning drivers..."
+    [Windows.Forms.Application]::DoEvents()
     try {
-        $drivers = Get-DriverAuditData
-        foreach ($d in $drivers) {
-            $rowIdx = $script:drvGrid.Rows.Add($d.Icon, $d.Name, $d.Vendor, $d.Version, $d.Date, $d.Status)
-            $rowColor = switch ($d.Status) {
-                "Outdated" { [Drawing.Color]::FromArgb(35, 255, 59, 48) }
-                "Aging"    { [Drawing.Color]::FromArgb(30, 255, 159, 10) }
-                default    { $C.BgCard }
+        $allDrivers  = Get-DriverAuditData
+        $totalCount  = $allDrivers.Count
+        # Show only drivers that need attention — sorted Outdated first, then Aging
+        $flagged = $allDrivers | Where-Object { $_.Status -eq "Outdated" -or $_.Status -eq "Aging" } |
+                   Sort-Object { if ($_.Status -eq "Outdated") { 0 } else { 1 } }, Date
+
+        if ($flagged.Count -eq 0) {
+            $drvSummaryLbl.Text      = "All $totalCount drivers are up to date.  No action needed."
+            $drvSummaryLbl.ForeColor = $C.Green
+        } else {
+            $drvSummaryLbl.Text      = "$($flagged.Count) driver(s) need attention out of $totalCount scanned.  Outdated = older than 2 years.  Aging = older than 1 year."
+            $drvSummaryLbl.ForeColor = $C.Yellow
+        }
+
+        foreach ($d in $flagged) {
+            $rowIdx = $script:drvGrid.Rows.Add($d.Name, $d.Vendor, $d.Version, $d.Date, $d.Status)
+            $row = $script:drvGrid.Rows[$rowIdx]
+            if ($d.Status -eq "Outdated") {
+                $row.DefaultCellStyle.BackColor = [Drawing.Color]::FromArgb(40, 255, 59, 48)
+                $row.Cells["Status"].Style.ForeColor = $C.Red
+                $row.Cells["Status"].Style.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
+            } else {
+                $row.DefaultCellStyle.BackColor = [Drawing.Color]::FromArgb(30, 255, 159, 10)
+                $row.Cells["Status"].Style.ForeColor = $C.Yellow
+                $row.Cells["Status"].Style.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
             }
-            $script:drvGrid.Rows[$rowIdx].DefaultCellStyle.BackColor = $rowColor
+        }
+
+        if ($flagged.Count -eq 0) {
+            [void]$script:drvGrid.Rows.Add("No drivers require attention.", "", "", "", "")
         }
     } catch {
-        [void]$script:drvGrid.Rows.Add("❌","Scan failed: $($_.Exception.Message)","","","","")
+        $drvSummaryLbl.Text      = "Scan error: $($_.Exception.Message)"
+        $drvSummaryLbl.ForeColor = $C.Red
+        [void]$script:drvGrid.Rows.Add("Scan failed: $($_.Exception.Message)","","","","")
     }
     $drvScanBtn.Text    = "Scan Drivers"
     $drvScanBtn.Enabled = $true
