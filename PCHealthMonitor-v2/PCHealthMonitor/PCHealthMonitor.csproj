@@ -40,7 +40,7 @@
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
 
     <!-- JSON (settings, license, reports) -->
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
 
     <!-- Async helpers -->
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />

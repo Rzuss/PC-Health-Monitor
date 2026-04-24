@@ -51,7 +51,7 @@
                                                    Foreground="{StaticResource GreenBrush}"/>
                                     </Border>
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                     <TextBlock Text="{Binding Interface}" Style="{StaticResource TextCaptionStyle}"/>
                                     <TextBlock Text="{Binding SizeDisplay}" Style="{StaticResource TextCaptionStyle}"/>
                                     <TextBlock Text="{Binding SerialNumber}" Style="{StaticResource TextCaptionStyle}"/>

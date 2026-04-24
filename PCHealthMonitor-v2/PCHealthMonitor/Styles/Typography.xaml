@@ -89,7 +89,7 @@
         <Setter Property="FontSize"      Value="{StaticResource FontSizeXS}"/>
         <Setter Property="FontWeight"    Value="SemiBold"/>
         <Setter Property="Foreground"    Value="{StaticResource SubTextBrush}"/>
-        <Setter Property="CharacterSpacing" Value="100"/>
+        <!-- CharacterSpacing removed — WPF TextBlock uses Letter-Spacing via Typeface, not a simple DP -->
     </Style>
 
     <!-- Mono: Log output, file paths -->

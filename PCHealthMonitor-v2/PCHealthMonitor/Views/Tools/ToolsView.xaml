@@ -75,7 +75,7 @@
 
                         <!-- Enable toggle -->
                         <StackPanel Grid.Row="0" Grid.ColumnSpan="2"
-                                    Orientation="Horizontal" VerticalAlignment="Center" Spacing="12">
+                                    Orientation="Horizontal" VerticalAlignment="Center">
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding ScheduleEnabled}"/>
                             <TextBlock Text="Enable automatic cleanup" Style="{StaticResource TextBodyStyle}"
@@ -104,7 +104,7 @@
 
                         <!-- Buttons -->
                         <StackPanel Grid.Row="6" Grid.ColumnSpan="2"
-                                    Orientation="Horizontal" Spacing="12">
+                                    Orientation="Horizontal">
                             <Button Content="Save Schedule"
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Command="{Binding SaveScheduleCommand}" Width="140"/>

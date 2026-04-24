@@ -14,8 +14,8 @@
                 <StackPanel>
                     <TextBlock Text="General" Style="{StaticResource TextH3Style}" Margin="0,0,0,16"/>
 
-                    <StackPanel Spacing="14">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
+                    <StackPanel <!-- Spacing not supported in WPF -->>
+                        <StackPanel Orientation="Horizontal" <!-- Spacing not supported in WPF -->>
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding StartWithWindows}"/>
                             <StackPanel>
@@ -25,7 +25,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" Spacing="12">
+                        <StackPanel Orientation="Horizontal" <!-- Spacing not supported in WPF -->>
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding MinimizeToTray}"/>
                             <StackPanel>
@@ -35,7 +35,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" Spacing="12">
+                        <StackPanel Orientation="Horizontal" <!-- Spacing not supported in WPF -->>
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding ShowNotifications}"/>
                             <StackPanel>
@@ -48,7 +48,7 @@
 
                     <Separator Margin="0,16"/>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" <!-- Spacing not supported in WPF -->>
                         <Button Content="Reset Defaults" Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{Binding ResetCommand}" Width="140"/>
                         <Button Content="Save Settings"  Style="{StaticResource PrimaryButtonStyle}"

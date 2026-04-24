@@ -1,0 +1,14 @@
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\PCHealthMonitor.csproj.AssemblyReference.cache
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Styles\Animations.baml
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Styles\Colors.baml
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Styles\Controls.baml
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Views\JunkCleaner\JunkCleanerView.baml
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Views\Network\NetworkView.baml
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\MainWindow.g.cs
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Views\Dashboard\DashboardView.g.cs
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Views\JunkCleaner\JunkCleanerView.g.cs
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\Views\Network\NetworkView.g.cs
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\App.g.cs
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\PCHealthMonitor_MarkupCompile.cache
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Debug\net8.0-windows\PCHealthMonitor_MarkupCompile.lref
