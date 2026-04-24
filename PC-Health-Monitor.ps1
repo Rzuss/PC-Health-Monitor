@@ -1432,19 +1432,7 @@ $script:scoreBreakdown = @{ Cpu=0; Ram=0; Disk=0; Startup=0; Junk=0.0;
                              CpuPen=0; RamPen=0; DiskPen=0; StartupPen=0; JunkPen=0 }
 
 function Show-ScoreInfo {
-    # Build palette inline — WinForms event handlers do not always inherit $script: scope
-    $C = @{
-        BgBase  = [Drawing.Color]::FromArgb(8,   15,  26)
-        BgCard  = [Drawing.Color]::FromArgb(12,  24,  42)
-        BgCard2 = [Drawing.Color]::FromArgb(10,  20,  35)
-        Blue    = [Drawing.Color]::FromArgb(6,   182, 212)
-        Green   = [Drawing.Color]::FromArgb(34,  197, 94)
-        Yellow  = [Drawing.Color]::FromArgb(249, 115, 22)
-        Red     = [Drawing.Color]::FromArgb(239, 68,  68)
-        Text    = [Drawing.Color]::FromArgb(240, 248, 255)
-        SubText = [Drawing.Color]::FromArgb(148, 163, 184)
-        Dim     = [Drawing.Color]::FromArgb(71,  85,  105)
-    }
+    $C = $script:C   # use the main app palette (always initialized at script start)
     $bd = $script:scoreBreakdown
     $f = New-Object Windows.Forms.Form
     $f.Text            = "Health Score — Breakdown"
