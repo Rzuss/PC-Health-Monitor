@@ -3308,6 +3308,7 @@ $script:drvGrid.ReadOnly                         = $true
 $script:drvGrid.SelectionMode                    = [Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
 $script:drvGrid.AutoSizeColumnsMode              = [Windows.Forms.DataGridViewAutoSizeColumnsMode]::None
 $script:drvGrid.ScrollBars                       = [Windows.Forms.ScrollBars]::Vertical
+Enable-DoubleBuffer $script:drvGrid   # prevents GDI scroll paint artifacts
 
 [void]$script:drvGrid.Columns.Add("Name",      "Driver Name")
 [void]$script:drvGrid.Columns.Add("Vendor",    "Vendor")
@@ -3348,11 +3349,12 @@ $drvScanBtn.Add_Click({
             $rowIdx = $script:drvGrid.Rows.Add($d.Name, $d.Vendor, $d.Date, $d.Status, $d.UpdateVia)
             $row = $script:drvGrid.Rows[$rowIdx]
             if ($d.Status -eq "Outdated") {
-                $row.DefaultCellStyle.BackColor      = [Drawing.Color]::FromArgb(40, 255, 59, 48)
+                # Opaque pre-blended against BgCard(22,22,25) — alpha colors cause GDI scroll artifacts
+                $row.DefaultCellStyle.BackColor      = [Drawing.Color]::FromArgb(60, 28, 29)
                 $row.Cells["Status"].Style.ForeColor = $C.Red
                 $row.Cells["Status"].Style.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
             } else {
-                $row.DefaultCellStyle.BackColor      = [Drawing.Color]::FromArgb(30, 255, 159, 10)
+                $row.DefaultCellStyle.BackColor      = [Drawing.Color]::FromArgb(50, 38, 23)
                 $row.Cells["Status"].Style.ForeColor = $C.Yellow
                 $row.Cells["Status"].Style.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
             }
