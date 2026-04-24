@@ -1245,18 +1245,41 @@ $BOOST_TARGETS = @(
 )
 
 function Get-ActivePowerPlan {
+    # Try WMI first (full object); fall back to powercfg output (no admin needed)
     try {
-        return (Get-CimInstance -Namespace root/cimv2/power -ClassName Win32_PowerPlan -ErrorAction Stop |
-                Where-Object { $_.IsActive } | Select-Object -First 1)
-    } catch { return $null }
+        $active = Get-CimInstance -Namespace root/cimv2/power -ClassName Win32_PowerPlan `
+                      -ErrorAction Stop | Where-Object { $_.IsActive } | Select-Object -First 1
+        if ($active) { return $active }
+    } catch {}
+    # Fallback: parse powercfg /getactivescheme
+    try {
+        $line = powercfg /getactivescheme 2>$null
+        if ($line -match '\((.+)\)') { return [pscustomobject]@{ ElementName = $Matches[1] } }
+    } catch {}
+    return $null
 }
 
 function Set-PowerPlanByName {
     param([string]$Name)
+    # 1st attempt — WMI (requires non-RDS admin or standard user on local session)
     try {
-        $plan = Get-CimInstance -Namespace root/cimv2/power -ClassName Win32_PowerPlan |
+        $plan = Get-CimInstance -Namespace root/cimv2/power -ClassName Win32_PowerPlan `
+                    -ErrorAction Stop |
                 Where-Object { $_.ElementName -like "*$Name*" } | Select-Object -First 1
-        if ($plan) { $plan | Invoke-CimMethod -MethodName Activate | Out-Null; return $plan.ElementName }
+        if ($plan) {
+            $plan | Invoke-CimMethod -MethodName Activate -ErrorAction Stop | Out-Null
+            return $plan.ElementName
+        }
+    } catch {}
+    # 2nd attempt — powercfg /list  (works in Terminal Services sessions & without WMI rights)
+    try {
+        $lines = powercfg /list 2>$null
+        $matched = $lines | Where-Object { $_ -match $Name } | Select-Object -First 1
+        if ($matched -and ($matched -match '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})')) {
+            $guid = $Matches[1]
+            powercfg /setactive $guid 2>$null
+            return $Name
+        }
     } catch {}
     return $null
 }
