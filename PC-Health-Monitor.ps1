@@ -1392,27 +1392,64 @@ function Get-DiskHealthData {
 # ========================================================================
 function Get-DriverAuditData {
     $results = [System.Collections.Generic.List[object]]::new()
+
+    # Non-actionable device classes: firmware-embedded, OS-internal, or not user-updatable.
+    # These are the source of bogus "1968" dates (Intel BIOS chipset descriptors, ACPI, etc.)
+    $excludedClasses = @(
+        'System','Computer','Processor','ACPI','Volume','Firmware',
+        'SoftwareComponent','SoftwareDevice','SecurityDevices','Battery',
+        'PrintQueue','DXGKrnl','Unknown','HIDClass'
+    )
+
     try {
-        $cutoffOld  = (Get-Date).AddYears(-2)
-        $cutoffWarn = (Get-Date).AddYears(-1)
+        $cutoffOld    = (Get-Date).AddYears(-2)
+        $cutoffWarn   = (Get-Date).AddYears(-1)
+        $minValidDate = [datetime]'2000-01-01'   # filter out firmware placeholder dates (e.g. 1968)
+
         $drivers = Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop |
-                   Where-Object { $_.DeviceName -and $_.DriverVersion } |
-                   Select-Object DeviceName, Manufacturer, DriverVersion, DriverDate |
+                   Where-Object {
+                       $_.DeviceName -and $_.DriverVersion -and
+                       $_.DeviceClass -notin $excludedClasses -and
+                       ($_.DriverDate -ne $null -and $_.DriverDate -ge $minValidDate)
+                   } |
+                   Select-Object DeviceName, Manufacturer, DriverVersion, DriverDate, DeviceClass |
                    Sort-Object DriverDate
+
         foreach ($d in $drivers) {
-            $age    = if ($d.DriverDate) { $d.DriverDate } else { $null }
-            $status = if (-not $age)        { "Unknown" }
-                      elseif ($age -lt $cutoffOld) { "Outdated" }
+            $age    = $d.DriverDate
+            $status = if ($age -lt $cutoffOld)    { "Outdated" }
                       elseif ($age -lt $cutoffWarn){ "Aging" }
                       else                         { "OK" }
-            $icon   = switch ($status) { "Outdated" { "🔴" } "Aging" { "🟡" } "OK" { "✅" } default { "⚪" } }
+
+            # Only return drivers that need attention — skip OK
+            if ($status -eq "OK") { continue }
+
+            # Build actionable download recommendation based on manufacturer
+            $mfrLow   = if ($d.Manufacturer) { $d.Manufacturer.ToLower() } else { '' }
+            $updateVia = switch -Wildcard ($mfrLow) {
+                '*nvidia*'          { 'nvidia.com/drivers' }
+                '*amd*'             { 'amd.com/support' }
+                '*advanced micro*'  { 'amd.com/support' }
+                '*intel*'           { 'Windows Update / intel.com' }
+                '*realtek*'         { 'Windows Update (Realtek)' }
+                '*qualcomm*'        { 'Windows Update' }
+                '*broadcom*'        { 'Windows Update' }
+                '*microsoft*'       { 'Windows Update' }
+                '*logitech*'        { 'support.logi.com' }
+                '*tp-link*'         { 'tp-link.com/support' }
+                '*asus*'            { 'asus.com/support' }
+                '*dell*'            { 'dell.com/support/drivers' }
+                '*hp*'              { 'support.hp.com' }
+                '*lenovo*'          { 'support.lenovo.com' }
+                default             { 'Windows Update' }
+            }
+
             $results.Add([PSCustomObject]@{
-                Name     = if ($d.DeviceName.Length -gt 45) { $d.DeviceName.Substring(0,45)+'…' } else { $d.DeviceName }
-                Vendor   = if ($d.Manufacturer) { if ($d.Manufacturer.Length -gt 22) { $d.Manufacturer.Substring(0,22)+'…' } else { $d.Manufacturer } } else { '—' }
-                Version  = $d.DriverVersion
-                Date     = if ($d.DriverDate) { $d.DriverDate.ToString("yyyy-MM") } else { '—' }
-                Status   = $status
-                Icon     = $icon
+                Name      = if ($d.DeviceName.Length -gt 50) { $d.DeviceName.Substring(0,50)+'…' } else { $d.DeviceName }
+                Vendor    = if ($d.Manufacturer) { if ($d.Manufacturer.Length -gt 22) { $d.Manufacturer.Substring(0,22)+'…' } else { $d.Manufacturer } } else { '—' }
+                Date      = $d.DriverDate.ToString("yyyy-MM")
+                Status    = $status
+                UpdateVia = $updateVia
             })
         }
     } catch {
@@ -3209,7 +3246,7 @@ $toolsTab.Controls.Add($toolsPnl)
 # ── Section A: Driver Audit ───────────────────────────────────────────────
 $drvHdr = New-Lbl "🔧  Driver Audit" 20 12 400 26 12 $true $C.Purple
 $toolsPnl.Controls.Add($drvHdr)
-$drvSub = New-Lbl "Inventory of installed drivers with age status" 20 42 500 18 8.5 $false $C.SubText
+$drvSub = New-Lbl "Scans for outdated user-actionable drivers and recommends where to download updates" 20 42 700 18 8.5 $false $C.SubText
 $toolsPnl.Controls.Add($drvSub)
 
 $drvScanBtn = New-Btn "Scan Drivers" 820 14 200 44 $C.Purple $C.Text
@@ -3217,26 +3254,29 @@ $drvScanBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.Fon
 $toolsPnl.Controls.Add($drvScanBtn)
 
 [void](New-InfoBtn 784 14 'Driver Audit — About This Feature' @"
-DRIVER AUDIT — Age & Status Report
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DRIVER AUDIT — Actionable Driver Update Scanner
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Inventories all installed device drivers and flags those that may be out of date based on their release date.
+Scans user-updatable device drivers (GPU, Network, Audio, USB, Storage, etc.)
+and flags those with outdated release dates. System/firmware drivers that
+cannot be manually updated are excluded to keep results clean and actionable.
 
 STATUS DEFINITIONS:
-  Outdated — driver is older than 2 years (update recommended)
-  Aging    — driver is 1–2 years old (monitor for updates)
-  OK       — driver is less than 1 year old (not shown in list)
+  Outdated — driver is older than 2 years (update strongly recommended)
+  Aging    — driver is 1–2 years old (check for a newer version)
 
-WHY IT MATTERS:
-  Outdated drivers can cause hardware instability, crashes,
-  security vulnerabilities, and performance degradation.
+UPDATE VIA COLUMN:
+  Each flagged driver shows exactly where to download the update:
+    nvidia.com/drivers      — for NVIDIA GPU drivers
+    amd.com/support         — for AMD GPU / chipset drivers
+    Windows Update          — use Settings → Windows Update →
+                              Advanced Options → Optional Updates
+    Vendor website          — for OEM hardware (Dell, HP, Lenovo, etc.)
 
-HOW TO UPDATE A DRIVER:
-  1. Note the Driver Name and Vendor from the list
-  2. Visit the vendor website (Intel, NVIDIA, AMD, etc.)
-  3. Download and install the latest version
-  — OR —
-  Use Windows Update → Advanced Options → Optional Updates
+HOW TO UPDATE:
+  1. Find the driver name and "Update Via" site in the list
+  2. Download and run the installer from the vendor
+  — OR — open Windows Update and check Optional Updates
 "@ $toolsPnl)
 
 # Summary label (updated after scan)
@@ -3269,17 +3309,17 @@ $script:drvGrid.SelectionMode                    = [Windows.Forms.DataGridViewSe
 $script:drvGrid.AutoSizeColumnsMode              = [Windows.Forms.DataGridViewAutoSizeColumnsMode]::None
 $script:drvGrid.ScrollBars                       = [Windows.Forms.ScrollBars]::Vertical
 
-[void]$script:drvGrid.Columns.Add("Name",    "Driver Name")
-[void]$script:drvGrid.Columns.Add("Vendor",  "Vendor")
-[void]$script:drvGrid.Columns.Add("Version", "Version")
-[void]$script:drvGrid.Columns.Add("Date",    "Date")
-[void]$script:drvGrid.Columns.Add("Status",  "Status")
+[void]$script:drvGrid.Columns.Add("Name",      "Driver Name")
+[void]$script:drvGrid.Columns.Add("Vendor",    "Vendor")
+[void]$script:drvGrid.Columns.Add("Date",      "Driver Date")
+[void]$script:drvGrid.Columns.Add("Status",    "Status")
+[void]$script:drvGrid.Columns.Add("UpdateVia", "Update Via")
 
-$script:drvGrid.Columns["Name"].Width    = 420
-$script:drvGrid.Columns["Vendor"].Width  = 200
-$script:drvGrid.Columns["Version"].Width = 150
-$script:drvGrid.Columns["Date"].Width    = 110
-$script:drvGrid.Columns["Status"].Width  = 100
+$script:drvGrid.Columns["Name"].Width      = 370
+$script:drvGrid.Columns["Vendor"].Width    = 190
+$script:drvGrid.Columns["Date"].Width      = 100
+$script:drvGrid.Columns["Status"].Width    = 85
+$script:drvGrid.Columns["UpdateVia"].Width = 235
 $script:drvGrid.RowTemplate.Height       = 26
 
 $toolsPnl.Controls.Add($script:drvGrid)
@@ -3292,29 +3332,27 @@ $drvScanBtn.Add_Click({
     $drvSummaryLbl.Text = "Scanning drivers..."
     [Windows.Forms.Application]::DoEvents()
     try {
-        $allDrivers  = Get-DriverAuditData
-        $totalCount  = $allDrivers.Count
-        # Show only drivers that need attention — sorted Outdated first, then Aging
-        $flagged = $allDrivers | Where-Object { $_.Status -eq "Outdated" -or $_.Status -eq "Aging" } |
+        # Get-DriverAuditData already returns only Outdated/Aging, pre-filtered for actionable classes
+        $flagged = Get-DriverAuditData |
                    Sort-Object { if ($_.Status -eq "Outdated") { 0 } else { 1 } }, Date
 
         if ($flagged.Count -eq 0) {
-            $drvSummaryLbl.Text      = "All $totalCount drivers are up to date.  No action needed."
+            $drvSummaryLbl.Text      = "No driver updates needed.  All user-actionable drivers are up to date."
             $drvSummaryLbl.ForeColor = $C.Green
         } else {
-            $drvSummaryLbl.Text      = "$($flagged.Count) driver(s) need attention out of $totalCount scanned.  Outdated = older than 2 years.  Aging = older than 1 year."
+            $drvSummaryLbl.Text      = "$($flagged.Count) driver(s) need attention.  Outdated = older than 2 years  |  Aging = older than 1 year.  See 'Update Via' column for download source."
             $drvSummaryLbl.ForeColor = $C.Yellow
         }
 
         foreach ($d in $flagged) {
-            $rowIdx = $script:drvGrid.Rows.Add($d.Name, $d.Vendor, $d.Version, $d.Date, $d.Status)
+            $rowIdx = $script:drvGrid.Rows.Add($d.Name, $d.Vendor, $d.Date, $d.Status, $d.UpdateVia)
             $row = $script:drvGrid.Rows[$rowIdx]
             if ($d.Status -eq "Outdated") {
-                $row.DefaultCellStyle.BackColor = [Drawing.Color]::FromArgb(40, 255, 59, 48)
+                $row.DefaultCellStyle.BackColor      = [Drawing.Color]::FromArgb(40, 255, 59, 48)
                 $row.Cells["Status"].Style.ForeColor = $C.Red
                 $row.Cells["Status"].Style.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
             } else {
-                $row.DefaultCellStyle.BackColor = [Drawing.Color]::FromArgb(30, 255, 159, 10)
+                $row.DefaultCellStyle.BackColor      = [Drawing.Color]::FromArgb(30, 255, 159, 10)
                 $row.Cells["Status"].Style.ForeColor = $C.Yellow
                 $row.Cells["Status"].Style.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
             }
