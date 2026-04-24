@@ -1432,14 +1432,26 @@ $script:scoreBreakdown = @{ Cpu=0; Ram=0; Disk=0; Startup=0; Junk=0.0;
                              CpuPen=0; RamPen=0; DiskPen=0; StartupPen=0; JunkPen=0 }
 
 function Show-ScoreInfo {
-    $C = $script:C   # use the main app palette (always initialized at script start)
+    # Inline colors — avoids WinForms event scope issues with $script: variables
+    $SIC = @{
+        BgBase  = [Drawing.Color]::FromArgb(13,  13,  15)
+        BgCard  = [Drawing.Color]::FromArgb(22,  22,  25)
+        BgCard2 = [Drawing.Color]::FromArgb(18,  18,  20)
+        BgCard3 = [Drawing.Color]::FromArgb(28,  28,  32)
+        Blue    = [Drawing.Color]::FromArgb(108, 99,  255)
+        Green   = [Drawing.Color]::FromArgb(48,  209, 88)
+        Yellow  = [Drawing.Color]::FromArgb(255, 159, 10)
+        Red     = [Drawing.Color]::FromArgb(255, 59,  48)
+        Text    = [Drawing.Color]::FromArgb(245, 245, 247)
+        SubText = [Drawing.Color]::FromArgb(142, 142, 147)
+    }
     $bd = $script:scoreBreakdown
     $f = New-Object Windows.Forms.Form
     $f.Text            = "Health Score — Breakdown"
     $f.Size            = [Drawing.Size]::new(640, 460)
     $f.StartPosition   = "CenterParent"
-    $f.BackColor       = $C.BgBase
-    $f.ForeColor       = $C.Text
+    $f.BackColor       = $SIC.BgBase
+    $f.ForeColor       = $SIC.Text
     $f.FormBorderStyle = [Windows.Forms.FormBorderStyle]::FixedDialog
     $f.MaximizeBox     = $false; $f.MinimizeBox = $false
     $f.TopMost         = $true
@@ -1450,7 +1462,7 @@ function Show-ScoreInfo {
     $tl.Location = [Drawing.Point]::new(20, 16)
     $tl.Size = [Drawing.Size]::new(600, 22)
     $tl.Font = New-Object Drawing.Font("Segoe UI", 11, [Drawing.FontStyle]::Bold)
-    $tl.ForeColor = $C.Blue; $tl.BackColor = [Drawing.Color]::Transparent
+    $tl.ForeColor = $SIC.Blue; $tl.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($tl)
 
     $sl = New-Object Windows.Forms.Label
@@ -1458,7 +1470,7 @@ function Show-ScoreInfo {
     $sl.Location = [Drawing.Point]::new(20, 42)
     $sl.Size = [Drawing.Size]::new(600, 18)
     $sl.Font = New-Object Drawing.Font("Segoe UI", 8)
-    $sl.ForeColor = $C.SubText; $sl.BackColor = [Drawing.Color]::Transparent
+    $sl.ForeColor = $SIC.SubText; $sl.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($sl)
 
     # Table grid
@@ -1496,7 +1508,7 @@ function Show-ScoreInfo {
     foreach ($r in $rows) {
         $ri = $grid.Rows.Add($r)
         $pen = [int]($r[2] -replace '-','')
-        $clr = if ($pen -ge 15) { $C.Red } elseif ($pen -ge 8) { $C.Yellow } else { $C.Green }
+        $clr = if ($pen -ge 15) { $SIC.Red } elseif ($pen -ge 8) { $SIC.Yellow } else { $SIC.Green }
         $grid.Rows[$ri].Cells[2].Style.ForeColor = $clr
         $grid.Rows[$ri].Cells[2].Style.Font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
     }
@@ -1510,7 +1522,7 @@ function Show-ScoreInfo {
     $tRow.Location = [Drawing.Point]::new(20, 308)
     $tRow.Size = [Drawing.Size]::new(600, 22)
     $tRow.Font = New-Object Drawing.Font("Consolas", 9, [Drawing.FontStyle]::Bold)
-    $tRow.ForeColor = $C.Text; $tRow.BackColor = [Drawing.Color]::Transparent
+    $tRow.ForeColor = $SIC.Text; $tRow.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($tRow)
 
     $note = New-Object Windows.Forms.Label
@@ -1518,14 +1530,14 @@ function Show-ScoreInfo {
     $note.Location = [Drawing.Point]::new(20, 338)
     $note.Size = [Drawing.Size]::new(600, 16)
     $note.Font = New-Object Drawing.Font("Segoe UI", 8)
-    $note.ForeColor = $C.SubText; $note.BackColor = [Drawing.Color]::Transparent
+    $note.ForeColor = $SIC.SubText; $note.BackColor = [Drawing.Color]::Transparent
     $f.Controls.Add($note)
 
     $closeBtn = New-Object Windows.Forms.Button
     $closeBtn.Text = "Close"
     $closeBtn.Location = [Drawing.Point]::new(500, 368)
     $closeBtn.Size = [Drawing.Size]::new(120, 34)
-    $closeBtn.BackColor = $C.BgCard2; $closeBtn.ForeColor = $C.Text
+    $closeBtn.BackColor = $SIC.BgCard2; $closeBtn.ForeColor = $SIC.Text
     $closeBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
     $closeBtn.FlatAppearance.BorderSize = 0
     $closeBtn.Font = New-Object Drawing.Font("Segoe UI", 9)
