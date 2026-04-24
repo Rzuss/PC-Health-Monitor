@@ -2744,7 +2744,7 @@ TIP:
   — Delete it entirely (if no longer needed)
   — Move it to an external drive or secondary disk
   — Compress it using Windows' built-in compression
-"@ \$tfHeaderPnl)
+"@ $tfHeaderPnl)
 $diskUsageTab.Controls.Add($tfHeaderPnl)
 
 # Container panel for the 10 folder rows
@@ -3076,7 +3076,7 @@ WHAT TO WATCH FOR:
 NOTE: Values showing "—" mean your drive controller does
 not expose that S.M.A.R.T. metric via the Windows API.
 Run as Administrator for full access to all drives.
-"@ \$dhPnl)
+"@ $dhPnl)
 
 # Results panel (scrollable)
 $dhResultsPnl                = New-Object Windows.Forms.FlowLayoutPanel
@@ -3214,7 +3214,7 @@ HOW TO UPDATE A DRIVER:
   3. Download and install the latest version
   — OR —
   Use Windows Update → Advanced Options → Optional Updates
-"@ \$toolsPnl)
+"@ $toolsPnl)
 
 # Summary label (updated after scan)
 $drvSummaryLbl = New-Lbl "Click 'Scan Drivers' to detect outdated or aging drivers." 20 44 800 18 8.5 $false $C.SubText
@@ -3340,7 +3340,7 @@ LOGS:
 
 NOTE: Requires the PC Health Monitor .ps1 file to remain
 at its current location for the schedule to work.
-"@ \$toolsPnl)
+"@ $toolsPnl)
 $schedSub = New-Lbl "Schedule automatic junk cleanup using Windows Task Scheduler" 20 350 600 18 8.5 $false $C.SubText
 $toolsPnl.Controls.Add($schedSub)
 
