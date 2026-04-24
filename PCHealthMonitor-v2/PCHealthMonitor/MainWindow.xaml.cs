@@ -72,7 +72,7 @@ public partial class MainWindow : Window
             NavigateTo(btn.Tag?.ToString() ?? "Dashboard");
     }
 
-    private void NavigateTo(string page)
+    internal void NavigateTo(string page)
     {
         // Highlight active nav button
         foreach (UIElement el in NavPanel.Children)

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace PCHealthMonitor.Views.Dashboard;
 
@@ -75,24 +76,33 @@ public partial class DashboardView : Page
     }
 
     // ── Arc animation ─────────────────────────────────────────────────────
+    private System.Windows.Threading.DispatcherTimer? _arcTimer;
+
     private void AnimateScoreArc(int score)
     {
-        // Animate number
-        var anim = new Int32Animation(_displayedScore < 0 ? 0 : _displayedScore, score,
-            new Duration(TimeSpan.FromMilliseconds(400)))
+        _arcTimer?.Stop();
+
+        var from      = (double)Math.Max(0, _displayedScore < 0 ? 0 : _displayedScore);
+        var startTime = DateTime.Now;
+        var duration  = TimeSpan.FromMilliseconds(500);
+
+        _arcTimer = new System.Windows.Threading.DispatcherTimer
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            Interval = TimeSpan.FromMilliseconds(16)  // ~60 fps
         };
-        anim.CurrentTimeInvalidated += (s, _) =>
+        _arcTimer.Tick += (_, _) =>
         {
-            if (s is AnimationClock clock && clock.CurrentProgress.HasValue)
-            {
-                var cur = (int)(_displayedScore + (score - _displayedScore) * clock.CurrentProgress.Value);
-                ScoreNumber.Text = cur.ToString();
-                UpdateArcGeometry(cur);
-            }
+            var progress = Math.Min(1.0, (DateTime.Now - startTime).TotalMilliseconds / duration.TotalMilliseconds);
+            // Ease-out cubic: 1 – (1–t)³
+            var eased = 1 - Math.Pow(1 - progress, 3);
+            var cur   = (int)(from + (score - from) * eased);
+            ScoreNumber.Text = cur.ToString();
+            UpdateArcGeometry(cur);
+            if (progress >= 1.0) _arcTimer.Stop();
         };
-        ScoreNumber.BeginAnimation(null, anim); // just for timing; geometry updated in callback above
+        _arcTimer.Start();
+
+        // Immediately set final values (visible if animation ticks lag)
         ScoreNumber.Text = score.ToString();
         UpdateArcGeometry(score);
     }
@@ -132,14 +142,7 @@ public partial class DashboardView : Page
         _vm.RunQuickScanCommand.Execute(null);
     }
 
-    private void ActivateBoostBtn_Click(object sender, RoutedEventArgs e)
-    {
-        // Navigate to Boost tab
-        if (Window.GetWindow(this) is MainWindow mw)
-            mw.GetType().GetMethod("NavigateTo",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.Invoke(mw, new object[] { "Boost" });
-    }
+    private void ActivateBoostBtn_Click(object sender, RoutedEventArgs e) => NavigateMain("Boost");
 
     private void QuickClean_Click(object sender, RoutedEventArgs e)      => NavigateMain("JunkCleaner");
     private void QuickStartup_Click(object sender, RoutedEventArgs e)    => NavigateMain("Startup");
@@ -148,8 +151,6 @@ public partial class DashboardView : Page
     private void NavigateMain(string page)
     {
         if (Window.GetWindow(this) is MainWindow mw)
-            mw.GetType().GetMethod("NavigateTo",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.Invoke(mw, new object[] { page });
+            mw.NavigateTo(page);
     }
 }

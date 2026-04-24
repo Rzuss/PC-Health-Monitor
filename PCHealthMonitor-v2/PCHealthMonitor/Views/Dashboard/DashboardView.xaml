@@ -147,9 +147,9 @@
                 </Border>
 
                 <!-- Mini Gauges stack -->
-                <StackPanel Grid.Column="2" Spacing="12">
+                <StackPanel Grid.Column="2">
                     <!-- CPU Gauge Card -->
-                    <Border Style="{StaticResource Card2Style}">
+                    <Border Style="{StaticResource Card2Style}" Margin="0,0,0,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -183,7 +183,7 @@
                     </Border>
 
                     <!-- RAM Gauge Card -->
-                    <Border Style="{StaticResource Card2Style}">
+                    <Border Style="{StaticResource Card2Style}" Margin="0,0,0,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

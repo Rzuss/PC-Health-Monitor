@@ -41,7 +41,7 @@
                       Style="{StaticResource DarkDataGridStyle}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
-                      IsReadOnly="True">
+                      IsReadOnly="False">
                 <DataGrid.Columns>
                     <DataGridCheckBoxColumn Header="" Binding="{Binding Selected}" Width="44"/>
                     <DataGridTextColumn Header="Category"   Binding="{Binding Name}"        Width="*" MinWidth="180"/>
