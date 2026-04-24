@@ -1154,6 +1154,175 @@ function Refresh-VipCombo {
 
 
 # ========================================================================
+
+# ========================================================================
+# BOOST MODE — Engine Functions
+# ========================================================================
+$script:boostActive      = $false
+$script:boostPriorityMap = @{}
+$script:boostPowerPlan   = $null
+
+$BOOST_TARGETS = @(
+    'Teams','ms-teams','Spotify','Discord','OneDrive','Skype','SkypeApp',
+    'SearchApp','YourPhone','YourPhoneServer','XboxGamingOverlay',
+    'GameBarFTServer','EpicWebHelper','SteamWebHelper','backgroundTaskHost',
+    'OfficeClickToRun','MSOSYNC','MicrosoftEdgeUpdate'
+)
+
+function Get-ActivePowerPlan {
+    try {
+        return (Get-CimInstance -Namespace root/cimv2/power -ClassName Win32_PowerPlan -ErrorAction Stop |
+                Where-Object { $_.IsActive } | Select-Object -First 1)
+    } catch { return $null }
+}
+
+function Set-PowerPlanByName {
+    param([string]$Name)
+    try {
+        $plan = Get-CimInstance -Namespace root/cimv2/power -ClassName Win32_PowerPlan |
+                Where-Object { $_.ElementName -like "*$Name*" } | Select-Object -First 1
+        if ($plan) { $plan | Invoke-CimMethod -MethodName Activate | Out-Null; return $plan.ElementName }
+    } catch {}
+    return $null
+}
+
+function Enable-BoostMode {
+    $script:boostPriorityMap = @{}
+    $log = [System.Collections.Generic.List[string]]::new()
+
+    # 1. High Performance power plan
+    $script:boostPowerPlan = Get-ActivePowerPlan
+    $hp = Set-PowerPlanByName -Name "High performance"
+    if (-not $hp) { $hp = Set-PowerPlanByName -Name "High" }
+    $log.Add("Power Plan: $(if ($hp) { "→ $hp" } else { "unchanged" })")
+
+    # 2. Lower priority of background processes
+    $lowered = 0
+    foreach ($name in $BOOST_TARGETS) {
+        $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
+        foreach ($p in $procs) {
+            try {
+                $script:boostPriorityMap[$p.Id] = $p.PriorityClass
+                $p.PriorityClass = [Diagnostics.ProcessPriorityClass]::BelowNormal
+                $lowered++
+            } catch {}
+        }
+    }
+    if ($lowered -gt 0) { $log.Add("Background processes throttled: $lowered") }
+
+    # 3. Flush Standby RAM
+    try {
+        if (-not ([System.Management.Automation.PSTypeName]'BoostMemUtil').Type) {
+            Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public class BoostMemUtil {
+    [DllImport("ntdll.dll")] public static extern uint NtSetSystemInformation(int InfoClass, IntPtr Info, int Length);
+    public static void FlushStandby() {
+        IntPtr p = System.Runtime.InteropServices.Marshal.AllocHGlobal(4);
+        System.Runtime.InteropServices.Marshal.WriteInt32(p, 4);
+        NtSetSystemInformation(80, p, 4);
+        System.Runtime.InteropServices.Marshal.FreeHGlobal(p);
+    }
+}
+'@ -ErrorAction SilentlyContinue
+        }
+        [BoostMemUtil]::FlushStandby()
+        $log.Add("Standby RAM: flushed")
+    } catch {}
+
+    $script:boostActive = $true
+    return $log
+}
+
+function Disable-BoostMode {
+    $log = [System.Collections.Generic.List[string]]::new()
+
+    # Restore power plan
+    if ($script:boostPowerPlan) {
+        try {
+            $script:boostPowerPlan | Invoke-CimMethod -MethodName Activate | Out-Null
+            $log.Add("Power Plan: restored to $($script:boostPowerPlan.ElementName)")
+        } catch { $log.Add("Power Plan: could not restore") }
+    }
+
+    # Restore process priorities
+    $restored = 0
+    foreach ($id in @($script:boostPriorityMap.Keys)) {
+        try {
+            $p = Get-Process -Id $id -ErrorAction Stop
+            if (-not $p.HasExited) { $p.PriorityClass = $script:boostPriorityMap[$id]; $restored++ }
+        } catch {}
+    }
+    $script:boostPriorityMap = @{}
+    if ($restored -gt 0) { $log.Add("Process priorities: restored ($restored)") }
+
+    $script:boostActive = $false
+    return $log
+}
+
+# ========================================================================
+# DISK HEALTH — Engine Functions
+# ========================================================================
+function Get-DiskHealthData {
+    $results = [System.Collections.Generic.List[object]]::new()
+    try {
+        $disks = Get-PhysicalDisk -ErrorAction Stop
+        foreach ($disk in $disks) {
+            $rel = $null
+            try { $rel = $disk | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue } catch {}
+            $results.Add([PSCustomObject]@{
+                FriendlyName      = $disk.FriendlyName
+                MediaType         = $disk.MediaType
+                HealthStatus      = $disk.HealthStatus
+                OperationalStatus = $disk.OperationalStatus
+                SizeGB            = [math]::Round($disk.Size / 1GB, 0)
+                Temperature       = if ($rel -and $rel.Temperature)            { $rel.Temperature }       else { $null }
+                ReadErrors        = if ($rel -and $rel.ReadErrorsUncorrected -ne $null)  { $rel.ReadErrorsUncorrected }  else { 0 }
+                WriteErrors       = if ($rel -and $rel.WriteErrorsUncorrected -ne $null) { $rel.WriteErrorsUncorrected } else { 0 }
+                WearLevel         = if ($rel -and $rel.Wear -ne $null)         { $rel.Wear }              else { $null }
+                PowerOnHours      = if ($rel -and $rel.PowerOnHours -ne $null) { $rel.PowerOnHours }      else { $null }
+            })
+        }
+    } catch {
+        Write-Log -Message "Get-DiskHealthData error" -Level WARN -ExceptionRecord $_
+    }
+    return $results
+}
+
+# ========================================================================
+# DRIVER AUDIT — Engine Functions
+# ========================================================================
+function Get-DriverAuditData {
+    $results = [System.Collections.Generic.List[object]]::new()
+    try {
+        $cutoffOld  = (Get-Date).AddYears(-2)
+        $cutoffWarn = (Get-Date).AddYears(-1)
+        $drivers = Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop |
+                   Where-Object { $_.DeviceName -and $_.DriverVersion } |
+                   Select-Object DeviceName, Manufacturer, DriverVersion, DriverDate |
+                   Sort-Object DriverDate
+        foreach ($d in $drivers) {
+            $age    = if ($d.DriverDate) { $d.DriverDate } else { $null }
+            $status = if (-not $age)        { "Unknown" }
+                      elseif ($age -lt $cutoffOld) { "Outdated" }
+                      elseif ($age -lt $cutoffWarn){ "Aging" }
+                      else                         { "OK" }
+            $icon   = switch ($status) { "Outdated" { "🔴" } "Aging" { "🟡" } "OK" { "✅" } default { "⚪" } }
+            $results.Add([PSCustomObject]@{
+                Name     = if ($d.DeviceName.Length -gt 45) { $d.DeviceName.Substring(0,45)+'…' } else { $d.DeviceName }
+                Vendor   = if ($d.Manufacturer) { if ($d.Manufacturer.Length -gt 22) { $d.Manufacturer.Substring(0,22)+'…' } else { $d.Manufacturer } } else { '—' }
+                Version  = $d.DriverVersion
+                Date     = if ($d.DriverDate) { $d.DriverDate.ToString("yyyy-MM") } else { '—' }
+                Status   = $status
+                Icon     = $icon
+            })
+        }
+    } catch {
+        Write-Log -Message "Get-DriverAuditData error" -Level WARN -ExceptionRecord $_
+    }
+    return $results
+}
+
 # ========================================================================
 # TAB 1 -- DASHBOARD
 # ========================================================================
@@ -2524,6 +2693,439 @@ $script:tfScanBtn.Add_Click({ Invoke-TopFolderScan })
 $tabs.TabPages.Add($tab3)
 $tabs.TabPages.Add($diskUsageTab)
 
+
+# ========================================================================
+# TAB 5 -- BOOST MODE
+# ========================================================================
+$boostTab           = New-Object Windows.Forms.TabPage
+$boostTab.Text      = "  Boost  "
+$boostTab.BackColor = $C.BgBase
+
+$bPnl = New-Pnl 0 0 1040 580 $C.BgBase
+$boostTab.Controls.Add($bPnl)
+
+# Header
+$bHdr = New-Lbl "⚡  Boost Mode" 20 12 600 30 13 $true $C.Yellow
+$bPnl.Controls.Add($bHdr)
+$bSub = New-Lbl "Maximize performance by throttling background processes and activating High Performance power plan" 20 46 780 18 8.5 $false $C.SubText
+$bPnl.Controls.Add($bSub)
+
+# Big BOOST button
+$script:boostBtn          = New-Object Windows.Forms.Button
+$script:boostBtn.Size     = [Drawing.Size]::new(420, 80)
+$script:boostBtn.Location = [Drawing.Point]::new(310, 78)
+$script:boostBtn.Text     = "⚡  ACTIVATE BOOST"
+$script:boostBtn.Font     = New-Object Drawing.Font("Segoe UI Variable", 15, [Drawing.FontStyle]::Bold)
+$script:boostBtn.BackColor = $C.Yellow
+$script:boostBtn.ForeColor = [Drawing.Color]::FromArgb(15,15,18)
+$script:boostBtn.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+$script:boostBtn.FlatAppearance.BorderSize = 0
+$script:boostBtn.Cursor   = [Windows.Forms.Cursors]::Hand
+Add-RoundedRegion $script:boostBtn 12
+$bPnl.Controls.Add($script:boostBtn)
+
+# Status badge
+$script:boostStatusLbl          = New-Lbl "Status: Ready" 20 176 400 22 9 $false $C.SubText
+$bPnl.Controls.Add($script:boostStatusLbl)
+
+# Divider
+$bDiv = New-Pnl 20 205 1000 1 $C.Border
+$bPnl.Controls.Add($bDiv)
+
+# Action log (RichTextBox)
+$script:boostLog              = New-Object Windows.Forms.RichTextBox
+$script:boostLog.Location     = [Drawing.Point]::new(20, 215)
+$script:boostLog.Size         = [Drawing.Size]::new(1000, 160)
+$script:boostLog.BackColor    = $C.BgCard
+$script:boostLog.ForeColor    = $C.Text
+$script:boostLog.Font         = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+$script:boostLog.ReadOnly     = $true
+$script:boostLog.BorderStyle  = [Windows.Forms.BorderStyle]::None
+$script:boostLog.ScrollBars   = [Windows.Forms.RichTextBoxScrollBars]::Vertical
+Add-RoundedRegion $script:boostLog 8
+$bPnl.Controls.Add($script:boostLog)
+
+# Target process list (info panel)
+$bInfoPnl = New-Pnl 20 390 1000 160 $C.BgCard
+Add-RoundedRegion $bInfoPnl 8
+$bPnl.Controls.Add($bInfoPnl)
+
+$bInfoHdr = New-Lbl "Background processes that will be throttled:" 14 10 700 18 8.5 $true $C.SubText
+$bInfoPnl.Controls.Add($bInfoHdr)
+
+$bTargetStr = ($BOOST_TARGETS | Select-Object -First 10) -join "  •  "
+$bTargetLbl = New-Lbl "•  $bTargetStr  + more" 14 32 970 80 8.5 $false $C.Dim
+$bTargetLbl.MaximumSize = [Drawing.Size]::new(970, 0)
+$bTargetLbl.AutoSize    = $true
+$bInfoPnl.Controls.Add($bTargetLbl)
+
+$bNoteLbl = New-Lbl "⚠️  Boost Mode temporarily lowers process priority — no processes are killed. All settings restore automatically when deactivated." 14 110 970 30 8 $false $C.SubText
+$bInfoPnl.Controls.Add($bNoteLbl)
+
+# Boost button click handler
+$script:boostBtn.Add_Click({
+    if (-not $script:boostActive) {
+        $script:boostBtn.Enabled  = $false
+        $script:boostBtn.Text     = "Working..."
+        [Windows.Forms.Application]::DoEvents()
+        try {
+            $log = Enable-BoostMode
+            $script:boostLog.Clear()
+            $script:boostLog.SelectionColor = $C.Green
+            $script:boostLog.SelectionFont  = New-Object Drawing.Font("Segoe UI Variable", 9.5, [Drawing.FontStyle]::Bold)
+            $script:boostLog.AppendText("✅  Boost Mode ACTIVATED`n`n")
+            $script:boostLog.SelectionColor = $C.Text
+            $script:boostLog.SelectionFont  = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+            foreach ($l in $log) { $script:boostLog.AppendText("  • $l`n") }
+            $script:boostStatusLbl.Text      = "Status: 🟢 ACTIVE — PC optimized for performance"
+            $script:boostStatusLbl.ForeColor = $C.Green
+            $script:boostBtn.Text            = "⏹  DEACTIVATE BOOST"
+            $script:boostBtn.BackColor       = $C.Green
+        } catch {
+            $script:boostLog.AppendText("❌ Error: $($_.Exception.Message)`n")
+        }
+        $script:boostBtn.Enabled = $true
+    } else {
+        $script:boostBtn.Enabled = $false
+        $script:boostBtn.Text    = "Restoring..."
+        [Windows.Forms.Application]::DoEvents()
+        try {
+            $log = Disable-BoostMode
+            $script:boostLog.Clear()
+            $script:boostLog.SelectionColor = $C.SubText
+            $script:boostLog.SelectionFont  = New-Object Drawing.Font("Segoe UI Variable", 9.5, [Drawing.FontStyle]::Bold)
+            $script:boostLog.AppendText("🔄  Boost Mode DEACTIVATED`n`n")
+            $script:boostLog.SelectionColor = $C.Text
+            $script:boostLog.SelectionFont  = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+            foreach ($l in $log) { $script:boostLog.AppendText("  • $l`n") }
+            $script:boostStatusLbl.Text      = "Status: Ready"
+            $script:boostStatusLbl.ForeColor = $C.SubText
+            $script:boostBtn.Text            = "⚡  ACTIVATE BOOST"
+            $script:boostBtn.BackColor       = $C.Yellow
+        } catch {
+            $script:boostLog.AppendText("❌ Error: $($_.Exception.Message)`n")
+        }
+        $script:boostBtn.Enabled = $true
+    }
+    Add-RoundedRegion $script:boostBtn 12
+})
+
+$tabs.TabPages.Add($boostTab)
+
+# ========================================================================
+# TAB 6 -- DISK HEALTH (S.M.A.R.T)
+# ========================================================================
+$diskHealthTab           = New-Object Windows.Forms.TabPage
+$diskHealthTab.Text      = "  Disk Health  "
+$diskHealthTab.BackColor = $C.BgBase
+
+$dhPnl = New-Pnl 0 0 1040 580 $C.BgBase
+$diskHealthTab.Controls.Add($dhPnl)
+
+# Header
+$dhHdr = New-Lbl "🔬  Disk Health" 20 12 600 30 13 $true $C.Blue
+$dhPnl.Controls.Add($dhHdr)
+$dhSub = New-Lbl "S.M.A.R.T. data, temperature, error counts and wear level for all physical drives" 20 46 780 18 8.5 $false $C.SubText
+$dhPnl.Controls.Add($dhSub)
+
+$dhScanBtn = New-Btn "Scan Disks" 820 14 200 44 $C.Blue $C.Text
+$dhScanBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
+$dhPnl.Controls.Add($dhScanBtn)
+
+# Results panel (scrollable)
+$dhResultsPnl                = New-Object Windows.Forms.FlowLayoutPanel
+$dhResultsPnl.Location       = [Drawing.Point]::new(20, 78)
+$dhResultsPnl.Size           = [Drawing.Size]::new(1000, 480)
+$dhResultsPnl.FlowDirection  = [Windows.Forms.FlowDirection]::TopDown
+$dhResultsPnl.WrapContents   = $false
+$dhResultsPnl.AutoScroll     = $true
+$dhResultsPnl.BackColor      = $C.BgBase
+$dhPnl.Controls.Add($dhResultsPnl)
+
+function Render-DiskHealthCard {
+    param($disk)
+
+    $bgColor = switch ($disk.HealthStatus) {
+        "Healthy"   { $C.BgCard  }
+        "Warning"   { [Drawing.Color]::FromArgb(40, 255, 159, 10)  }
+        default     { [Drawing.Color]::FromArgb(40, 255, 59,  48)  }
+    }
+    $statusIcon = switch ($disk.HealthStatus) {
+        "Healthy" { "✅" } "Warning" { "⚠️" } default { "🔴" }
+    }
+
+    $card               = New-Object Windows.Forms.Panel
+    $card.Width         = 978
+    $card.Height        = 170
+    $card.BackColor     = $bgColor
+    $card.Margin        = [Windows.Forms.Padding]::new(0, 0, 0, 10)
+    Add-RoundedRegion $card 8
+
+    # Left accent
+    $acColor = switch ($disk.HealthStatus) { "Healthy" { $C.Green } "Warning" { $C.Yellow } default { $C.Red } }
+    $card.Add_Paint({
+        param($s4, $pe)
+        $pen = New-Object Drawing.Pen($acColor, 3)
+        $pe.Graphics.DrawLine($pen, 1, 8, 1, $s4.Height - 8)
+        $pen.Dispose()
+    }.GetNewClosure())
+
+    # Title row
+    $mediaIcon = if ($disk.MediaType -eq 'SSD' -or $disk.MediaType -eq 'Unspecified') { "💾" } else { "🖴" }
+    $titleLbl  = New-Lbl "$mediaIcon  $($disk.FriendlyName)   $statusIcon $($disk.HealthStatus)" 14 12 700 22 10 $true $C.Text
+    $card.Controls.Add($titleLbl)
+
+    $sizeLbl = New-Lbl "$($disk.SizeGB) GB  ·  $($disk.MediaType)" 700 14 250 18 8.5 $false $C.SubText
+    $card.Controls.Add($sizeLbl)
+
+    # Metrics grid
+    $metrics = @(
+        @{ Label="Temperature";  Val = if ($disk.Temperature)  { "$($disk.Temperature)°C" } else { "—" } }
+        @{ Label="Read Errors";  Val = "$($disk.ReadErrors)" }
+        @{ Label="Write Errors"; Val = "$($disk.WriteErrors)" }
+        @{ Label="Wear Level";   Val = if ($disk.WearLevel -ne $null) { "$($disk.WearLevel)%" } else { "—" } }
+        @{ Label="Power-On Hrs"; Val = if ($disk.PowerOnHours) { "$($disk.PowerOnHours) h" } else { "—" } }
+    )
+
+    $mx = 14; $my = 44
+    foreach ($m in $metrics) {
+        $lbl = New-Lbl $m.Label $mx $my 120 16 8 $false $C.SubText; $card.Controls.Add($lbl)
+        $valColor = $C.Text
+        if ($m.Label -eq "Temperature" -and $disk.Temperature -gt 55) { $valColor = $C.Red }
+        elseif ($m.Label -eq "Temperature" -and $disk.Temperature -gt 45) { $valColor = $C.Yellow }
+        elseif (($m.Label -eq "Read Errors" -or $m.Label -eq "Write Errors") -and [int]$m.Val -gt 0) { $valColor = $C.Red }
+        $val = New-Lbl $m.Val $mx 62 120 18 9 $true $valColor; $card.Controls.Add($val)
+        $mx += 190
+    }
+
+    return $card
+}
+
+$dhScanBtn.Add_Click({
+    $dhScanBtn.Enabled = $false
+    $dhScanBtn.Text    = "Scanning..."
+    [Windows.Forms.Application]::DoEvents()
+    $dhResultsPnl.Controls.Clear()
+    try {
+        $disks = Get-DiskHealthData
+        if ($disks.Count -eq 0) {
+            $noLbl = New-Lbl "No physical disks found or access denied. Run as Administrator for full data." 0 20 960 24 9 $false $C.SubText
+            $dhResultsPnl.Controls.Add($noLbl)
+        } else {
+            foreach ($d in $disks) {
+                $card = Render-DiskHealthCard -disk $d
+                $dhResultsPnl.Controls.Add($card)
+            }
+        }
+    } catch {
+        $errLbl = New-Lbl "Scan error: $($_.Exception.Message)" 0 20 960 24 9 $false $C.Red
+        $dhResultsPnl.Controls.Add($errLbl)
+    }
+    $dhScanBtn.Text    = "Scan Disks"
+    $dhScanBtn.Enabled = $true
+})
+
+$tabs.TabPages.Add($diskHealthTab)
+
+# ========================================================================
+# TAB 7 -- TOOLS  (Driver Audit + Auto-Schedule Cleanup)
+# ========================================================================
+$toolsTab           = New-Object Windows.Forms.TabPage
+$toolsTab.Text      = "  Tools  "
+$toolsTab.BackColor = $C.BgBase
+
+$toolsPnl = New-Pnl 0 0 1040 580 $C.BgBase
+$toolsTab.Controls.Add($toolsPnl)
+
+# ── Section A: Driver Audit ───────────────────────────────────────────────
+$drvHdr = New-Lbl "🔧  Driver Audit" 20 12 400 26 12 $true $C.Purple
+$toolsPnl.Controls.Add($drvHdr)
+$drvSub = New-Lbl "Inventory of installed drivers with age status" 20 42 500 18 8.5 $false $C.SubText
+$toolsPnl.Controls.Add($drvSub)
+
+$drvScanBtn = New-Btn "Scan Drivers" 820 14 200 44 $C.Purple $C.Text
+$drvScanBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 10, [Drawing.FontStyle]::Bold)
+$toolsPnl.Controls.Add($drvScanBtn)
+
+# DataGridView for drivers
+$script:drvGrid                          = New-Object Windows.Forms.DataGridView
+$script:drvGrid.Location                 = [Drawing.Point]::new(20, 66)
+$script:drvGrid.Size                     = [Drawing.Size]::new(1000, 230)
+$script:drvGrid.BackgroundColor          = $C.BgCard
+$script:drvGrid.ForeColor                = $C.Text
+$script:drvGrid.GridColor                = $C.Border
+$script:drvGrid.DefaultCellStyle.BackColor       = $C.BgCard
+$script:drvGrid.DefaultCellStyle.ForeColor       = $C.Text
+$script:drvGrid.DefaultCellStyle.Font            = New-Object Drawing.Font("Segoe UI Variable", 8.5)
+$script:drvGrid.DefaultCellStyle.SelectionBackColor = $C.BgCard3
+$script:drvGrid.DefaultCellStyle.SelectionForeColor = $C.Text
+$script:drvGrid.ColumnHeadersDefaultCellStyle.BackColor = $C.BgCard3
+$script:drvGrid.ColumnHeadersDefaultCellStyle.ForeColor = $C.SubText
+$script:drvGrid.ColumnHeadersDefaultCellStyle.Font      = New-Object Drawing.Font("Segoe UI Variable", 8.5, [Drawing.FontStyle]::Bold)
+$script:drvGrid.ColumnHeadersBorderStyle         = [Windows.Forms.DataGridViewHeaderBorderStyle]::None
+$script:drvGrid.EnableHeadersVisualStyles        = $false
+$script:drvGrid.BorderStyle                      = [Windows.Forms.BorderStyle]::None
+$script:drvGrid.RowHeadersVisible                = $false
+$script:drvGrid.AllowUserToAddRows               = $false
+$script:drvGrid.AllowUserToDeleteRows            = $false
+$script:drvGrid.ReadOnly                         = $true
+$script:drvGrid.SelectionMode                    = [Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
+$script:drvGrid.AutoSizeColumnsMode              = [Windows.Forms.DataGridViewAutoSizeColumnsMode]::None
+$script:drvGrid.ScrollBars                       = [Windows.Forms.ScrollBars]::Vertical
+
+[void]$script:drvGrid.Columns.Add("Icon",    " ")
+[void]$script:drvGrid.Columns.Add("Name",    "Driver Name")
+[void]$script:drvGrid.Columns.Add("Vendor",  "Vendor")
+[void]$script:drvGrid.Columns.Add("Version", "Version")
+[void]$script:drvGrid.Columns.Add("Date",    "Date")
+[void]$script:drvGrid.Columns.Add("Status",  "Status")
+
+$script:drvGrid.Columns["Icon"].Width    = 32
+$script:drvGrid.Columns["Name"].Width    = 370
+$script:drvGrid.Columns["Vendor"].Width  = 180
+$script:drvGrid.Columns["Version"].Width = 140
+$script:drvGrid.Columns["Date"].Width    = 90
+$script:drvGrid.Columns["Status"].Width  = 80
+$script:drvGrid.RowTemplate.Height       = 26
+
+$toolsPnl.Controls.Add($script:drvGrid)
+
+$drvScanBtn.Add_Click({
+    $drvScanBtn.Enabled = $false
+    $drvScanBtn.Text    = "Scanning..."
+    [Windows.Forms.Application]::DoEvents()
+    $script:drvGrid.Rows.Clear()
+    try {
+        $drivers = Get-DriverAuditData
+        foreach ($d in $drivers) {
+            $rowIdx = $script:drvGrid.Rows.Add($d.Icon, $d.Name, $d.Vendor, $d.Version, $d.Date, $d.Status)
+            $rowColor = switch ($d.Status) {
+                "Outdated" { [Drawing.Color]::FromArgb(35, 255, 59, 48) }
+                "Aging"    { [Drawing.Color]::FromArgb(30, 255, 159, 10) }
+                default    { $C.BgCard }
+            }
+            $script:drvGrid.Rows[$rowIdx].DefaultCellStyle.BackColor = $rowColor
+        }
+    } catch {
+        [void]$script:drvGrid.Rows.Add("❌","Scan failed: $($_.Exception.Message)","","","","")
+    }
+    $drvScanBtn.Text    = "Scan Drivers"
+    $drvScanBtn.Enabled = $true
+})
+
+# ── Divider ───────────────────────────────────────────────────────────────
+$toolsDiv = New-Pnl 20 308 1000 1 $C.Border
+$toolsPnl.Controls.Add($toolsDiv)
+
+# ── Section B: Auto-Schedule Cleanup ─────────────────────────────────────
+$schedHdr = New-Lbl "🕐  Auto-Schedule Cleanup" 20 320 500 26 12 $true $C.Green
+$toolsPnl.Controls.Add($schedHdr)
+$schedSub = New-Lbl "Schedule automatic junk cleanup using Windows Task Scheduler" 20 350 600 18 8.5 $false $C.SubText
+$toolsPnl.Controls.Add($schedSub)
+
+# Frequency dropdown
+$schedFreqLbl = New-Lbl "Frequency:" 20 386 90 22 9 $true $C.SubText
+$toolsPnl.Controls.Add($schedFreqLbl)
+
+$script:schedFreqCombo               = New-Object Windows.Forms.ComboBox
+$script:schedFreqCombo.Location      = [Drawing.Point]::new(118, 382)
+$script:schedFreqCombo.Size          = [Drawing.Size]::new(130, 28)
+$script:schedFreqCombo.BackColor     = $C.BgCard
+$script:schedFreqCombo.ForeColor     = $C.Text
+$script:schedFreqCombo.Font          = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+$script:schedFreqCombo.FlatStyle     = [Windows.Forms.FlatStyle]::Flat
+$script:schedFreqCombo.DropDownStyle = [Windows.Forms.ComboBoxStyle]::DropDownList
+[void]$script:schedFreqCombo.Items.AddRange(@("Daily","Weekly"))
+$script:schedFreqCombo.SelectedIndex = 1
+$toolsPnl.Controls.Add($script:schedFreqCombo)
+
+# Time dropdown
+$schedTimeLbl = New-Lbl "At time:" 268 386 70 22 9 $true $C.SubText
+$toolsPnl.Controls.Add($schedTimeLbl)
+
+$script:schedTimeCombo               = New-Object Windows.Forms.ComboBox
+$script:schedTimeCombo.Location      = [Drawing.Point]::new(346, 382)
+$script:schedTimeCombo.Size          = [Drawing.Size]::new(110, 28)
+$script:schedTimeCombo.BackColor     = $C.BgCard
+$script:schedTimeCombo.ForeColor     = $C.Text
+$script:schedTimeCombo.Font          = New-Object Drawing.Font("Segoe UI Variable", 9.5)
+$script:schedTimeCombo.FlatStyle     = [Windows.Forms.FlatStyle]::Flat
+$script:schedTimeCombo.DropDownStyle = [Windows.Forms.ComboBoxStyle]::DropDownList
+0..23 | ForEach-Object { [void]$script:schedTimeCombo.Items.Add(('{0:D2}:00' -f $_)) }
+$script:schedTimeCombo.SelectedIndex = 3   # 03:00
+$toolsPnl.Controls.Add($script:schedTimeCombo)
+
+# Action buttons
+$schedCreateBtn = New-Btn "✅  Create Schedule" 480 378 200 36 $C.Green $C.Text
+$schedCreateBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 9, [Drawing.FontStyle]::Bold)
+$toolsPnl.Controls.Add($schedCreateBtn)
+
+$schedRemoveBtn = New-Btn "🗑  Remove Schedule" 690 378 200 36 $C.BgCard2 $C.SubText
+$schedRemoveBtn.FlatAppearance.BorderColor = $C.Border; $schedRemoveBtn.FlatAppearance.BorderSize = 1
+$schedRemoveBtn.Font = New-Object Drawing.Font("Segoe UI Variable", 9)
+$toolsPnl.Controls.Add($schedRemoveBtn)
+
+# Status label
+$script:schedStatusLbl          = New-Lbl "Schedule: not configured" 20 428 700 20 9 $false $C.SubText
+$toolsPnl.Controls.Add($script:schedStatusLbl)
+
+$SCHED_TASK_NAME = "PCHealthMonitor_AutoClean"
+$SCRIPT_PATH     = $MyInvocation.MyCommand.Path
+
+function Update-ScheduleStatus {
+    $task = Get-ScheduledTask -TaskName $SCHED_TASK_NAME -ErrorAction SilentlyContinue
+    if ($task) {
+        $trigger = $task.Triggers | Select-Object -First 1
+        $nextRun = (Get-ScheduledTaskInfo -TaskName $SCHED_TASK_NAME -ErrorAction SilentlyContinue).NextRunTime
+        $nextStr = if ($nextRun) { $nextRun.ToString("ddd dd/MM/yyyy HH:mm") } else { "—" }
+        $script:schedStatusLbl.Text      = "✅  Schedule active — Next run: $nextStr"
+        $script:schedStatusLbl.ForeColor = $C.Green
+    } else {
+        $script:schedStatusLbl.Text      = "Schedule: not configured"
+        $script:schedStatusLbl.ForeColor = $C.SubText
+    }
+}
+
+$schedCreateBtn.Add_Click({
+    $schedCreateBtn.Enabled = $false
+    try {
+        $freq    = $script:schedFreqCombo.SelectedItem
+        $timeStr = $script:schedTimeCombo.SelectedItem
+        $atTime  = [datetime]::ParseExact($timeStr, "HH:mm", $null)
+        $trigger = if ($freq -eq "Daily") { New-ScheduledTaskTrigger -Daily -At $atTime }
+                   else { New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At $atTime }
+        $action  = New-ScheduledTaskAction -Execute 'powershell.exe' `
+                       -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$SCRIPT_PATH`" -AutoClean"
+        $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew
+        Unregister-ScheduledTask -TaskName $SCHED_TASK_NAME -Confirm:$false -ErrorAction SilentlyContinue
+        Register-ScheduledTask -TaskName $SCHED_TASK_NAME -Action $action -Trigger $trigger `
+                               -Settings $settings -Description "PC Health Monitor automated cleanup" -Force | Out-Null
+        Update-ScheduleStatus
+        Write-Log -Message "Auto-cleanup scheduled: $freq at $timeStr" -Level INFO
+    } catch {
+        $script:schedStatusLbl.Text      = "❌ Error: $($_.Exception.Message)"
+        $script:schedStatusLbl.ForeColor = $C.Red
+    }
+    $schedCreateBtn.Enabled = $true
+})
+
+$schedRemoveBtn.Add_Click({
+    try {
+        Unregister-ScheduledTask -TaskName $SCHED_TASK_NAME -Confirm:$false -ErrorAction Stop
+        Update-ScheduleStatus
+        Write-Log -Message "Auto-cleanup schedule removed" -Level INFO
+    } catch {
+        $script:schedStatusLbl.Text      = "❌ $($_.Exception.Message)"
+        $script:schedStatusLbl.ForeColor = $C.Red
+    }
+})
+
+# Check existing schedule on tab load (via SelectedIndexChanged)
+$script:toolsTabFirstVisit = $true
+
+Update-ScheduleStatus
+
+$tabs.TabPages.Add($toolsTab)
 
 
 # Security tab removed
