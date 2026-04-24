@@ -1,0 +1,95 @@
+<Page x:Class="PCHealthMonitor.Views.DiskHealth.DiskHealthView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBaseBrush}"
+      Title="Disk Health">
+
+    <Grid Margin="24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Disk Health" Style="{StaticResource TextH1Style}"/>
+                <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Read S.M.A.R.T."
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding ScanCommand}" Width="140"
+                    VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Disk list -->
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding Disks}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="160"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left: disk info + attributes -->
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="{Binding Model}"
+                                               Style="{StaticResource TextH3Style}" Margin="0,0,12,0"/>
+                                    <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                        <Border.Background>
+                                            <SolidColorBrush Color="#30D158" Opacity="0.15"/>
+                                        </Border.Background>
+                                        <TextBlock Text="{Binding Status}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource GreenBrush}"/>
+                                    </Border>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,0,0,12">
+                                    <TextBlock Text="{Binding Interface}" Style="{StaticResource TextCaptionStyle}"/>
+                                    <TextBlock Text="{Binding SizeDisplay}" Style="{StaticResource TextCaptionStyle}"/>
+                                    <TextBlock Text="{Binding SerialNumber}" Style="{StaticResource TextCaptionStyle}"/>
+                                </StackPanel>
+
+                                <DataGrid ItemsSource="{Binding Attributes}"
+                                          Style="{StaticResource DarkDataGridStyle}"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False"
+                                          IsReadOnly="True"
+                                          MaxHeight="220">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="ID"        Binding="{Binding Id}"      Width="50"/>
+                                        <DataGridTextColumn Header="Attribute" Binding="{Binding Name}"    Width="*"/>
+                                        <DataGridTextColumn Header="Value"     Binding="{Binding Display}" Width="120"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+
+                            <!-- Right: temp + health -->
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" Margin="16,0,0,0">
+                                <TextBlock Text="{Binding Temperature, StringFormat={}{0}°C}"
+                                           Style="{StaticResource TextScoreStyle}" FontSize="36"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Temperature" Style="{StaticResource TextCaptionStyle}"
+                                           HorizontalAlignment="Center" Margin="0,2,0,16"/>
+                                <TextBlock Text="{Binding Health, StringFormat={}{0}%}"
+                                           Style="{StaticResource TextMetricStyle}" FontSize="28"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{StaticResource GreenBrush}"/>
+                                <TextBlock Text="Health" Style="{StaticResource TextCaptionStyle}"
+                                           HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</Page>

@@ -1,0 +1,119 @@
+<Page x:Class="PCHealthMonitor.Views.Settings.SettingsView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBaseBrush}"
+      Title="Settings">
+
+    <ScrollViewer Padding="24,20,24,24">
+        <StackPanel MaxWidth="680" HorizontalAlignment="Center">
+
+            <TextBlock Text="Settings" Style="{StaticResource TextH1Style}" Margin="0,0,0,24"/>
+
+            <!-- General -->
+            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="General" Style="{StaticResource TextH3Style}" Margin="0,0,0,16"/>
+
+                    <StackPanel Spacing="14">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
+                                          IsChecked="{Binding StartWithWindows}"/>
+                            <StackPanel>
+                                <TextBlock Text="Start with Windows" Style="{StaticResource TextBodyStyle}"/>
+                                <TextBlock Text="Launch automatically when you log in"
+                                           Style="{StaticResource TextCaptionStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
+                                          IsChecked="{Binding MinimizeToTray}"/>
+                            <StackPanel>
+                                <TextBlock Text="Minimize to system tray" Style="{StaticResource TextBodyStyle}"/>
+                                <TextBlock Text="Keep running in background when window is closed"
+                                           Style="{StaticResource TextCaptionStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
+                                          IsChecked="{Binding ShowNotifications}"/>
+                            <StackPanel>
+                                <TextBlock Text="Show notifications" Style="{StaticResource TextBodyStyle}"/>
+                                <TextBlock Text="Alert you when issues are detected"
+                                           Style="{StaticResource TextCaptionStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Separator Margin="0,16"/>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+                        <Button Content="Reset Defaults" Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ResetCommand}" Width="140"/>
+                        <Button Content="Save Settings"  Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding SaveCommand}"  Width="140"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- License / Activation -->
+            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="License" Style="{StaticResource TextH3Style}" Margin="0,0,12,0"/>
+                        <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                Background="{StaticResource BlueGlowBrush}"
+                                Visibility="{Binding IsActivated, Converter={StaticResource BoolToVisibleConverter}}">
+                            <TextBlock Text="PRO ACTIVE" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource BlueBrush}"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Enter your license key to unlock all Pro features"
+                               Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,16"/>
+
+                    <TextBlock Text="License Key" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,6"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="140"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding LicenseKey, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource DarkTextBoxStyle}"
+                                 PlaceholderText="XXXX-XXXX-XXXX-XXXX"/>
+                        <Button Grid.Column="2"
+                                Content="Activate"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding ActivateCommand}"/>
+                    </Grid>
+
+                    <TextBlock Text="{Binding LicenseStatus}"
+                               Style="{StaticResource TextCaptionStyle}"
+                               Foreground="{StaticResource GreenBrush}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- About -->
+            <Border Style="{StaticResource Card2Style}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{Binding AppName}" Style="{StaticResource TextH3Style}"/>
+                        <TextBlock Text="{Binding Version, StringFormat='Version {0}'}"
+                                   Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,4"/>
+                        <TextBlock Text="{Binding CopyrightTxt}" Style="{StaticResource TextCaptionStyle}"/>
+                    </StackPanel>
+                    <Image Grid.Column="1" Source="/Assets/icon.ico"
+                           Width="48" Height="48" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

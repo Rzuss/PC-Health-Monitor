@@ -1,0 +1,86 @@
+<Page x:Class="PCHealthMonitor.Views.Network.NetworkView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBaseBrush}"
+      Title="Network">
+
+    <Grid Margin="24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Network" Style="{StaticResource TextH1Style}"/>
+                <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Scan"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding ScanCommand}" Width="100"
+                    VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Stats row -->
+        <UniformGrid Grid.Row="2" Rows="1" Columns="3">
+            <Border Style="{StaticResource Card2Style}" Margin="0,0,8,0">
+                <StackPanel>
+                    <TextBlock Text="PUBLIC IP" Style="{StaticResource TextLabelStyle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding PublicIp}" Style="{StaticResource TextMetricStyle}" FontSize="16"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card2Style}" Margin="4,0">
+                <StackPanel>
+                    <TextBlock Text="DOWNLOAD" Style="{StaticResource TextLabelStyle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding DownloadDisplay}"
+                               Style="{StaticResource TextMetricStyle}" FontSize="18"
+                               Foreground="{StaticResource GreenBrush}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card2Style}" Margin="8,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="UPLOAD" Style="{StaticResource TextLabelStyle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding UploadDisplay}"
+                               Style="{StaticResource TextMetricStyle}" FontSize="18"
+                               Foreground="{StaticResource BlueBrush}"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- Active connections table -->
+        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Active Connections"
+                           Style="{StaticResource TextH3Style}" Margin="16,14,0,0"/>
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding Connections}"
+                          Style="{StaticResource DarkDataGridStyle}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          IsReadOnly="True"
+                          Margin="0,8,0,0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Protocol"    Binding="{Binding Protocol}"    Width="70"/>
+                        <DataGridTextColumn Header="Local Port"  Binding="{Binding LocalPort}"   Width="90"/>
+                        <DataGridTextColumn Header="Remote"      Binding="{Binding RemoteAddr}"  Width="160"/>
+                        <DataGridTextColumn Header="Port"        Binding="{Binding RemotePort}"  Width="70"/>
+                        <DataGridTextColumn Header="State"       Binding="{Binding State}"       Width="110"/>
+                        <DataGridTextColumn Header="Process"     Binding="{Binding ProcessName}" Width="*" MinWidth="120"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

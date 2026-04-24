@@ -1,0 +1,107 @@
+<Page x:Class="PCHealthMonitor.Views.Boost.BoostView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBaseBrush}"
+      Title="Boost Mode">
+
+    <ScrollViewer Padding="24,20,24,24">
+        <StackPanel MaxWidth="680" HorizontalAlignment="Center">
+
+            <!-- Header -->
+            <TextBlock Text="Boost Mode" Style="{StaticResource TextH1Style}"/>
+            <TextBlock Text="Elevate process priority and optimize memory for peak performance"
+                       Style="{StaticResource TextCaptionStyle}" Margin="0,4,0,24"/>
+
+            <!-- VIP card -->
+            <Border CornerRadius="16" Padding="28" Margin="0,0,0,20">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#12124A" Offset="0"/>
+                        <GradientStop Color="#1A1040" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border BorderBrush="#6C63FF" BorderThickness="1.5" CornerRadius="16" Padding="28">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="⚡" FontSize="22" Margin="0,0,10,0"/>
+                            <TextBlock Text="VIP BOOST SESSION"
+                                       Style="{StaticResource TextH2Style}"
+                                       Foreground="{StaticResource BlueBrush}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding VipStatus}"
+                                   Style="{StaticResource TextBodyStyle}"
+                                   Foreground="{StaticResource SubTextBrush}"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding TimeRemaining}"
+                                   Style="{StaticResource TextMetricStyle}"
+                                   Foreground="{StaticResource GreenBrush}"
+                                   Margin="0,0,0,16"
+                                   Visibility="{Binding IsVipActive, Converter={StaticResource BoolToVisibleConverter}}"/>
+
+                        <!-- Duration slider -->
+                        <StackPanel Visibility="{Binding IsVipActive, Converter={StaticResource BoolToCollapsedConverter}}"
+                                    Margin="0,0,0,16">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <TextBlock Text="Session duration: "
+                                           Style="{StaticResource TextBodyStyle}"/>
+                                <TextBlock Text="{Binding BoostDurationMin}"
+                                           Style="{StaticResource TextBodyStyle}"
+                                           Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold"/>
+                                <TextBlock Text=" minutes"
+                                           Style="{StaticResource TextBodyStyle}"/>
+                            </StackPanel>
+                            <Slider Value="{Binding BoostDurationMin}"
+                                    Minimum="10" Maximum="120" TickFrequency="10"
+                                    Style="{StaticResource DarkSliderStyle}"/>
+                        </StackPanel>
+
+                        <!-- Activate / Deactivate -->
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Content="Activate VIP Boost"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding ActivateCommand}"
+                                    Width="180"
+                                    Visibility="{Binding IsVipActive, Converter={StaticResource BoolToCollapsedConverter}}"/>
+                            <Button Content="Deactivate"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Command="{Binding DeactivateCommand}"
+                                    Width="130"
+                                    Visibility="{Binding IsVipActive, Converter={StaticResource BoolToVisibleConverter}}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Border>
+
+            <!-- What Boost does — info card -->
+            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="What Boost Mode does"
+                               Style="{StaticResource TextH3Style}" Margin="0,0,0,12"/>
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
+                            <TextBlock Text="Sets foreground process priority to HIGH for active apps"
+                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
+                            <TextBlock Text="Flushes Windows standby memory to free RAM for active tasks"
+                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
+                            <TextBlock Text="Suspends non-critical background services during session"
+                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
+                            <TextBlock Text="Automatically restores normal settings when session ends"
+                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

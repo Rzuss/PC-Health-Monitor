@@ -1,0 +1,349 @@
+<Page x:Class="PCHealthMonitor.Views.Dashboard.DashboardView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:vm="clr-namespace:PCHealthMonitor.ViewModels"
+      Background="{StaticResource BgBaseBrush}"
+      Title="Dashboard">
+
+    <ScrollViewer Padding="24,20,24,24">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>   <!-- Header row -->
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>   <!-- Score + mini gauges -->
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>   <!-- Bottom cards: VIP, Quick Actions, Alerts -->
+            </Grid.RowDefinitions>
+
+            <!-- ─── Header ──────────────────────────────────────────────── -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Dashboard" Style="{StaticResource TextH1Style}"/>
+                    <TextBlock x:Name="LastScanText"
+                               Text="Last scan: never"
+                               Style="{StaticResource TextCaptionStyle}"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="1"
+                        x:Name="ScanBtn"
+                        Content="Scan Now"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Width="120"
+                        VerticalAlignment="Center"
+                        Click="ScanBtn_Click"/>
+            </Grid>
+
+            <!-- ─── Health Score + Mini Gauges row ──────────────────────── -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="280"/>   <!-- Score ring -->
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>     <!-- Mini gauges -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Health Score Arc Card -->
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="220"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="Health Score"
+                                   Style="{StaticResource TextH3Style}"
+                                   Margin="0,0,0,16"/>
+
+                        <!-- Arc gauge canvas -->
+                        <Canvas Grid.Row="1" Width="200" Height="200"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <!-- Background track arc -->
+                            <Path x:Name="ArcTrack"
+                                  Stroke="{StaticResource BgCard3Brush}"
+                                  StrokeThickness="14"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  Fill="Transparent">
+                                <Path.Data>
+                                    <PathGeometry>
+                                        <PathFigure StartPoint="20,160" IsClosed="False">
+                                            <ArcSegment x:Name="TrackArc"
+                                                        Point="180,160"
+                                                        Size="80,80"
+                                                        SweepDirection="Clockwise"
+                                                        IsLargeArc="True"/>
+                                        </PathFigure>
+                                    </PathGeometry>
+                                </Path.Data>
+                            </Path>
+
+                            <!-- Foreground value arc -->
+                            <Path x:Name="ArcValue"
+                                  StrokeThickness="14"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  Fill="Transparent">
+                                <Path.Stroke>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#30D158" Offset="0"/>
+                                        <GradientStop Color="#6C63FF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Path.Stroke>
+                                <Path.Data>
+                                    <PathGeometry>
+                                        <PathFigure x:Name="ArcFigure" StartPoint="20,160" IsClosed="False">
+                                            <ArcSegment x:Name="ValueArc"
+                                                        Point="20.001,160"
+                                                        Size="80,80"
+                                                        SweepDirection="Clockwise"
+                                                        IsLargeArc="False"/>
+                                        </PathFigure>
+                                    </PathGeometry>
+                                </Path.Data>
+                            </Path>
+
+                            <!-- Score number center -->
+                            <StackPanel Canvas.Left="55" Canvas.Top="68" Width="90">
+                                <TextBlock x:Name="ScoreNumber"
+                                           Text="--"
+                                           Style="{StaticResource TextScoreStyle}"
+                                           FontSize="48"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="ScoreGrade"
+                                           Text="Scanning..."
+                                           Style="{StaticResource TextCaptionStyle}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,-4,0,0"/>
+                            </StackPanel>
+                        </Canvas>
+
+                        <!-- Score details -->
+                        <UniformGrid Grid.Row="2" Rows="1" Columns="2" Margin="0,12,0,0">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="IssueCount"
+                                           Text="--"
+                                           Style="{StaticResource TextMetricStyle}"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Issues Found"
+                                           Style="{StaticResource TextCaptionStyle}"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="JunkSize"
+                                           Text="-- MB"
+                                           Style="{StaticResource TextMetricStyle}"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Junk Files"
+                                           Style="{StaticResource TextCaptionStyle}"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </UniformGrid>
+                    </Grid>
+                </Border>
+
+                <!-- Mini Gauges stack -->
+                <StackPanel Grid.Column="2" Spacing="12">
+                    <!-- CPU Gauge Card -->
+                    <Border Style="{StaticResource Card2Style}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="CPU" Style="{StaticResource TextLabelStyle}"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       x:Name="CpuTempLabel"
+                                       Text="-- °C"
+                                       Style="{StaticResource TextCaptionStyle}"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                       x:Name="CpuLoadLabel"
+                                       Text="--%"
+                                       Style="{StaticResource TextH3Style}"/>
+
+                            <ProgressBar Grid.Row="4" Grid.ColumnSpan="2"
+                                         x:Name="CpuBar"
+                                         Style="{StaticResource DarkProgressBarStyle}"
+                                         Value="0" Maximum="100"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- RAM Gauge Card -->
+                    <Border Style="{StaticResource Card2Style}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="MEMORY" Style="{StaticResource TextLabelStyle}"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       x:Name="RamGbLabel"
+                                       Text="-- / -- GB"
+                                       Style="{StaticResource TextCaptionStyle}"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                       x:Name="RamLoadLabel"
+                                       Text="--%"
+                                       Style="{StaticResource TextH3Style}"/>
+
+                            <ProgressBar Grid.Row="4" Grid.ColumnSpan="2"
+                                         x:Name="RamBar"
+                                         Style="{StaticResource DarkProgressBarStyle}"
+                                         Foreground="{StaticResource PurpleBrush}"
+                                         Value="0" Maximum="100"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Disk Gauge Card -->
+                    <Border Style="{StaticResource Card2Style}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="DISK ACTIVITY" Style="{StaticResource TextLabelStyle}"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                       x:Name="DiskLoadLabel"
+                                       Text="--%"
+                                       Style="{StaticResource TextH3Style}"/>
+
+                            <ProgressBar Grid.Row="4" Grid.ColumnSpan="2"
+                                         x:Name="DiskBar"
+                                         Style="{StaticResource DarkProgressBarStyle}"
+                                         Foreground="{StaticResource YellowBrush}"
+                                         Value="0" Maximum="100"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- ─── Bottom Row: VIP Card + Quick Actions + Alerts ──────── -->
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- VIP Card -->
+                <Border Grid.Column="0">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#1A1A2E" Offset="0"/>
+                            <GradientStop Color="#16213E" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Border BorderBrush="#6C63FF" BorderThickness="1" CornerRadius="12" Padding="20">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="⚡" FontSize="18" Margin="0,0,8,0"/>
+                                <TextBlock Text="VIP BOOST MODE"
+                                           Style="{StaticResource TextH3Style}"
+                                           Foreground="{StaticResource BlueBrush}"/>
+                            </StackPanel>
+                            <TextBlock x:Name="VipStatusText"
+                                       Text="No VIP session active"
+                                       Style="{StaticResource TextBodyStyle}"
+                                       Foreground="{StaticResource SubTextBrush}"
+                                       Margin="0,0,0,12"/>
+                            <Button Content="Activate Boost"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="ActivateBoostBtn_Click"/>
+                        </StackPanel>
+                    </Border>
+                </Border>
+
+                <!-- Quick Actions -->
+                <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Quick Actions"
+                                   Style="{StaticResource TextH3Style}"
+                                   Margin="0,0,0,12"/>
+                        <Button Content="Clean Junk Files"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,0,0,8"
+                                Click="QuickClean_Click"/>
+                        <Button Content="Optimize Startup"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,0,0,8"
+                                Click="QuickStartup_Click"/>
+                        <Button Content="Run Disk Health Check"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                HorizontalAlignment="Stretch"
+                                Click="QuickDiskHealth_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- System Alerts -->
+                <Border Grid.Column="4" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="System Alerts"
+                                   Style="{StaticResource TextH3Style}"
+                                   Margin="0,0,0,12"/>
+                        <ItemsControl x:Name="AlertsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource BgCard2Brush}"
+                                            CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Icon}"
+                                                       FontSize="16" Margin="0,0,8,0"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Message}"
+                                                       Style="{StaticResource TextBodySmStyle}"
+                                                       VerticalAlignment="Center"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="NoAlertsText"
+                                   Text="No alerts — system looks good!"
+                                   Style="{StaticResource TextCaptionStyle}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,8"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+        </Grid>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,80 @@
+<Page x:Class="PCHealthMonitor.Views.Storage.StorageView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBaseBrush}"
+      Title="Storage Analyzer">
+
+    <Grid Margin="24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Storage Analyzer" Style="{StaticResource TextH1Style}"/>
+                <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Scan Drives"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding ScanCommand}" Width="120"
+                    VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Drive cards -->
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding Drives}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="12"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource Card2Style}" Width="200">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Name}" Style="{StaticResource TextH3Style}"/>
+                            <TextBlock Text="{Binding DriveType}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,8"/>
+                            <ProgressBar Value="{Binding UsedPct}" Maximum="100" Height="6"
+                                         Style="{StaticResource DarkProgressBarStyle}"
+                                         Margin="0,0,0,8"/>
+                            <TextBlock Text="{Binding UsedDisplay}" Style="{StaticResource TextBodySmStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Large items table -->
+        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Largest Files &amp; Folders"
+                           Style="{StaticResource TextH3Style}" Margin="16,14,0,0"/>
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding LargeItems}"
+                          Style="{StaticResource DarkDataGridStyle}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          IsReadOnly="True"
+                          Margin="0,8,0,0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" MinWidth="200"/>
+                        <DataGridTextColumn Header="Size" Binding="{Binding SizeDisplay}" Width="100"/>
+                        <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="360"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

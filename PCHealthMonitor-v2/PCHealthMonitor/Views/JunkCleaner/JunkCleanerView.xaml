@@ -1,0 +1,75 @@
+<Page x:Class="PCHealthMonitor.Views.JunkCleaner.JunkCleanerView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBaseBrush}"
+      Title="Junk Cleaner">
+
+    <Grid Margin="24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Junk Cleaner" Style="{StaticResource TextH1Style}"/>
+                <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Scan"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Command="{Binding ScanCommand}" Width="90"
+                    VerticalAlignment="Center"/>
+            <Button Grid.Column="3" Content="Clean All"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding CleanCommand}" Width="110"
+                    VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Categories list -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0">
+            <DataGrid ItemsSource="{Binding Categories}"
+                      Style="{StaticResource DarkDataGridStyle}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="True">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="" Binding="{Binding Selected}" Width="44"/>
+                    <DataGridTextColumn Header="Category"   Binding="{Binding Name}"        Width="*" MinWidth="180"/>
+                    <DataGridTextColumn Header="Files"      Binding="{Binding FileCount}"   Width="80"/>
+                    <DataGridTextColumn Header="Size"       Binding="{Binding SizeDisplay}" Width="100"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Footer total -->
+        <Border Grid.Row="4" Style="{StaticResource Card2Style}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Total to clean: " Style="{StaticResource TextBodyStyle}"/>
+                    <TextBlock Text="{Binding TotalDisplay}"
+                               Style="{StaticResource TextBodyStyle}"
+                               Foreground="{StaticResource RedBrush}" FontWeight="SemiBold"/>
+                </StackPanel>
+                <ProgressBar Grid.Column="1" Width="200" Height="6"
+                             Style="{StaticResource DarkProgressBarStyle}"
+                             IsIndeterminate="{Binding IsBusy}"
+                             Foreground="{StaticResource GreenBrush}"
+                             VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>
