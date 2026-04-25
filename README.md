@@ -20,9 +20,9 @@ Phase 1: PowerShell 5.1 + WinForms (production-ready) · Phase 2: C# + WPF + .NE
 
 <div align="center">
 
-[![PC Health Monitor — Deep Space Dashboard](screenshots/PC-Health-Monitor-v2.png)](screenshots/PC-Health-Monitor-v2.png)
+![PC Health Monitor — Dashboard](screenshots/preview.svg)
 
-*Deep Space dark theme — animated health score arc, live CPU/RAM/Disk gauges, VIP Boost Mode, S.M.A.R.T disk health, driver audit, auto-schedule, and more*
+*Dark-themed WPF app — live CPU/RAM/Disk gauges, Junk Cleaner, Boost Mode process picker, System Info, Storage Analyzer, /silent auto-cleanup mode, and more*
 
 </div>
 
