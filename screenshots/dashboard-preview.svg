@@ -1,0 +1,119 @@
+<svg width="100%" viewBox="0 0 680 480" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>PC Health Monitor — App Preview</title>
+<desc>Dark-themed WPF desktop application showing Dashboard with CPU/RAM/Disk gauges, sidebar navigation, and system health stats</desc>
+
+<defs>
+  <clipPath id="appClip">
+    <rect x="20" y="12" width="640" height="456" rx="12"/>
+  </clipPath>
+</defs>
+
+<style>
+  .app-bg { fill: #0f1117; }
+  .titlebar { fill: #161b27; }
+  .sidebar { fill: #161b27; }
+  .card { fill: #1a2035; }
+  .card-sm { fill: #1e2640; }
+  .nav-active { fill: #1e2d52; }
+  .t-primary { fill: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+  .t-secondary { fill: #7c8db0; font-family: 'Segoe UI', sans-serif; }
+  .t-accent { fill: #4a7cf7; font-family: 'Segoe UI', sans-serif; }
+  .t-green { fill: #22c55e; font-family: 'Segoe UI', sans-serif; }
+  .t-yellow { fill: #f59e0b; font-family: 'Segoe UI', sans-serif; }
+  .t-white { fill: #ffffff; font-family: 'Segoe UI', sans-serif; }
+</style>
+
+<rect x="22" y="14" width="640" height="456" rx="12" fill="#000000" opacity="0.45"/>
+
+<g clip-path="url(#appClip)">
+  <rect x="20" y="12" width="640" height="456" class="app-bg"/>
+  <rect x="20" y="12" width="640" height="44" class="titlebar"/>
+  <rect x="20" y="55" width="640" height="1" fill="#252d40"/>
+  <circle cx="40" cy="34" r="8" fill="#4a7cf7"/>
+  <text x="55" y="38" class="t-primary" font-size="13" font-weight="600">PC Health Monitor</text>
+  <rect x="182" y="25" width="32" height="18" rx="4" fill="#4a7cf7"/>
+  <text x="186" y="38" class="t-white" font-size="10" font-weight="700">PRO</text>
+  <text x="380" y="38" class="t-secondary" font-size="12" text-anchor="middle">System is healthy</text>
+  <line x1="590" y1="28" x2="604" y2="28" stroke="#7c8db0" stroke-width="1.5" stroke-linecap="round"/>
+  <rect x="616" y="22" width="12" height="12" stroke="#7c8db0" stroke-width="1.5" fill="none" rx="1"/>
+  <line x1="636" y1="22" x2="646" y2="34" stroke="#7c8db0" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="646" y1="22" x2="636" y2="34" stroke="#7c8db0" stroke-width="1.5" stroke-linecap="round"/>
+
+  <rect x="20" y="56" width="180" height="412" class="sidebar"/>
+  <rect x="199" y="56" width="1" height="412" fill="#252d40"/>
+
+  <rect x="28" y="68" width="164" height="38" rx="7" class="nav-active"/>
+  <text x="60" y="91" class="t-accent" font-size="13" font-weight="500">Dashboard</text>
+  <text x="60" y="127" class="t-secondary" font-size="13">Startup Manager</text>
+  <text x="60" y="167" class="t-secondary" font-size="13">Junk Cleaner</text>
+  <text x="60" y="207" class="t-secondary" font-size="13">Storage Analyzer</text>
+  <text x="60" y="248" class="t-secondary" font-size="13">Boost Mode</text>
+  <text x="60" y="287" class="t-secondary" font-size="13">System Info</text>
+  <text x="60" y="327" class="t-secondary" font-size="13">Tools</text>
+  <text x="60" y="367" class="t-secondary" font-size="13">Network</text>
+  <line x1="36" y1="386" x2="196" y2="386" stroke="#252d40" stroke-width="1"/>
+  <text x="60" y="408" class="t-secondary" font-size="13">Settings</text>
+  <rect x="28" y="420" width="164" height="40" rx="8" fill="#3730a3"/>
+  <text x="42" y="436" class="t-white" font-size="12" font-weight="600">Upgrade to Pro</text>
+  <text x="42" y="450" fill="#bbb3fc" font-family="'Segoe UI',sans-serif" font-size="10">$19.99 one-time</text>
+
+  <text x="220" y="90" class="t-primary" font-size="20" font-weight="700">Dashboard</text>
+  <text x="220" y="108" class="t-secondary" font-size="12">Last scan: 2 minutes ago</text>
+  <rect x="558" y="72" width="88" height="32" rx="8" fill="#4a7cf7"/>
+  <text x="602" y="93" class="t-white" font-size="13" font-weight="500" text-anchor="middle">Scan Now</text>
+
+  <rect x="216" y="122" width="138" height="138" rx="10" class="card" stroke="#252d40" stroke-width="1"/>
+  <circle cx="285" cy="190" r="42" fill="none" stroke="#252d40" stroke-width="8" stroke-dasharray="220 360" stroke-dashoffset="-70" stroke-linecap="round"/>
+  <circle cx="285" cy="190" r="42" fill="none" stroke="#4a7cf7" stroke-width="8" stroke-dasharray="150 360" stroke-dashoffset="-70" stroke-linecap="round"/>
+  <text x="285" y="195" class="t-primary" font-size="18" font-weight="700" text-anchor="middle">68%</text>
+  <text x="285" y="210" class="t-secondary" font-size="10" text-anchor="middle">CPU</text>
+  <text x="285" y="136" class="t-secondary" font-size="11" text-anchor="middle">Processor</text>
+  <text x="285" y="248" class="t-yellow" font-size="10" text-anchor="middle">62°C</text>
+
+  <rect x="364" y="122" width="138" height="138" rx="10" class="card" stroke="#252d40" stroke-width="1"/>
+  <circle cx="433" cy="190" r="42" fill="none" stroke="#252d40" stroke-width="8" stroke-dasharray="220 360" stroke-dashoffset="-70" stroke-linecap="round"/>
+  <circle cx="433" cy="190" r="42" fill="none" stroke="#22c55e" stroke-width="8" stroke-dasharray="103 360" stroke-dashoffset="-70" stroke-linecap="round"/>
+  <text x="433" y="195" class="t-primary" font-size="18" font-weight="700" text-anchor="middle">47%</text>
+  <text x="433" y="210" class="t-secondary" font-size="10" text-anchor="middle">RAM</text>
+  <text x="433" y="136" class="t-secondary" font-size="11" text-anchor="middle">Memory</text>
+  <text x="433" y="248" class="t-secondary" font-size="10" text-anchor="middle">7.5 / 16 GB</text>
+
+  <rect x="512" y="122" width="138" height="138" rx="10" class="card" stroke="#252d40" stroke-width="1"/>
+  <circle cx="581" cy="190" r="42" fill="none" stroke="#252d40" stroke-width="8" stroke-dasharray="220 360" stroke-dashoffset="-70" stroke-linecap="round"/>
+  <circle cx="581" cy="190" r="42" fill="none" stroke="#f59e0b" stroke-width="8" stroke-dasharray="178 360" stroke-dashoffset="-70" stroke-linecap="round"/>
+  <text x="581" y="195" class="t-primary" font-size="18" font-weight="700" text-anchor="middle">81%</text>
+  <text x="581" y="210" class="t-secondary" font-size="10" text-anchor="middle">Disk</text>
+  <text x="581" y="136" class="t-secondary" font-size="11" text-anchor="middle">Storage</text>
+  <text x="581" y="248" class="t-secondary" font-size="10" text-anchor="middle">405 / 500 GB</text>
+
+  <rect x="216" y="272" width="434" height="76" rx="10" class="card" stroke="#252d40" stroke-width="1"/>
+  <circle cx="252" cy="310" r="18" fill="#16a34a" opacity="0.15"/>
+  <circle cx="252" cy="310" r="10" fill="#22c55e"/>
+  <text x="278" y="305" class="t-primary" font-size="14" font-weight="600">System Health: Excellent</text>
+  <text x="278" y="323" class="t-secondary" font-size="12">No threats detected · 312 MB junk found · 3 startup items</text>
+  <rect x="420" y="325" width="214" height="4" rx="2" fill="#252d40"/>
+  <rect x="420" y="325" width="185" height="4" rx="2" fill="#22c55e"/>
+
+  <rect x="216" y="360" width="102" height="70" rx="10" class="card-sm" stroke="#252d40" stroke-width="1"/>
+  <text x="267" y="383" class="t-secondary" font-size="11" text-anchor="middle">Uptime</text>
+  <text x="267" y="405" class="t-primary" font-size="16" font-weight="700" text-anchor="middle">6d 4h</text>
+  <text x="267" y="421" class="t-secondary" font-size="10" text-anchor="middle">since last boot</text>
+
+  <rect x="328" y="360" width="102" height="70" rx="10" class="card-sm" stroke="#252d40" stroke-width="1"/>
+  <text x="379" y="383" class="t-secondary" font-size="11" text-anchor="middle">CPU Temp</text>
+  <text x="379" y="405" class="t-yellow" font-size="16" font-weight="700" text-anchor="middle">62°C</text>
+  <text x="379" y="421" class="t-secondary" font-size="10" text-anchor="middle">CPU package</text>
+
+  <rect x="440" y="360" width="102" height="70" rx="10" class="card-sm" stroke="#252d40" stroke-width="1"/>
+  <text x="491" y="383" class="t-secondary" font-size="11" text-anchor="middle">Network</text>
+  <text x="491" y="405" class="t-green" font-size="16" font-weight="700" text-anchor="middle">12 MB/s</text>
+  <text x="491" y="421" class="t-secondary" font-size="10" text-anchor="middle">combined</text>
+
+  <rect x="552" y="360" width="98" height="70" rx="10" class="card-sm" stroke="#252d40" stroke-width="1"/>
+  <text x="601" y="383" class="t-secondary" font-size="11" text-anchor="middle">Junk Found</text>
+  <text x="601" y="405" class="t-yellow" font-size="16" font-weight="700" text-anchor="middle">312 MB</text>
+  <text x="601" y="421" class="t-secondary" font-size="10" text-anchor="middle">ready to clean</text>
+</g>
+
+<rect x="20" y="12" width="640" height="456" rx="12" fill="none" stroke="#2a3550" stroke-width="1"/>
+</svg>

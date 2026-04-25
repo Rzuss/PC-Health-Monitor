@@ -20,7 +20,7 @@ Phase 1: PowerShell 5.1 + WinForms (production-ready) · Phase 2: C# + WPF + .NE
 
 <div align="center">
 
-![PC Health Monitor — Dashboard](screenshots/preview.svg)
+![PC Health Monitor — Dashboard](screenshots/dashboard-preview.svg)
 
 *Dark-themed WPF app — live CPU/RAM/Disk gauges, Junk Cleaner, Boost Mode process picker, System Info, Storage Analyzer, /silent auto-cleanup mode, and more*
 
