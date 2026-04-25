@@ -2,7 +2,7 @@
 
 > **A modern, dark-themed Windows system optimization suite** — built with WPF (.NET 8), MVVM, and dependency injection. Lightweight, admin-free, and designed for power users who demand clarity and control.
 
-![Preview](Assets/preview.svg)
+![Preview](PCHealthMonitor/Assets/preview.svg)
 
 ---
 
