@@ -12,9 +12,11 @@ using PCHealthMonitor.Views.Tools;
 using PCHealthMonitor.Views.Network;
 using PCHealthMonitor.Views.Settings;
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace PCHealthMonitor;
@@ -194,6 +196,65 @@ public partial class MainWindow : Window
     // ─── Upgrade ─────────────────────────────────────────────────────────
     private void GetProBtn_Click(object sender, RoutedEventArgs e)
     {
-        NavigateTo("Settings"); // Settings view hosts the license activation dialog
+        NavigateTo("Settings");
+    }
+
+    // ─── Edge resize (WM_NCHITTEST) ───────────────────────────────────────
+    // WindowStyle=None + AllowsTransparency=True means Windows won't handle
+    // resize hits automatically. We hook WndProc and return the correct
+    // HT* code so Windows does the native drag-resize.
+
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+
+    private const int WM_NCHITTEST  = 0x0084;
+    private const int HTLEFT        = 10;
+    private const int HTRIGHT       = 11;
+    private const int HTTOP         = 12;
+    private const int HTTOPLEFT     = 13;
+    private const int HTTOPRIGHT    = 14;
+    private const int HTBOTTOM      = 15;
+    private const int HTBOTTOMLEFT  = 16;
+    private const int HTBOTTOMRIGHT = 17;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        var source = (HwndSource)PresentationSource.FromVisual(this);
+        source?.AddHook(WndProc);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg != WM_NCHITTEST || WindowState == WindowState.Maximized)
+            return IntPtr.Zero;
+
+        // Decode screen coordinates from lParam
+        int x = unchecked((short)(lParam.ToInt32() & 0xFFFF));
+        int y = unchecked((short)((lParam.ToInt32() >> 16) & 0xFFFF));
+
+        var local = PointFromScreen(new Point(x, y));
+        double w = ActualWidth;
+        double h = ActualHeight;
+        const double edge = 8; // px hit zone
+
+        bool left   = local.X < edge;
+        bool right  = local.X > w - edge;
+        bool top    = local.Y < edge;
+        bool bottom = local.Y > h - edge;
+
+        if (top    && left)  { handled = true; return (IntPtr)HTTOPLEFT;     }
+        if (top    && right) { handled = true; return (IntPtr)HTTOPRIGHT;    }
+        if (bottom && left)  { handled = true; return (IntPtr)HTBOTTOMLEFT;  }
+        if (bottom && right) { handled = true; return (IntPtr)HTBOTTOMRIGHT; }
+        if (left)            { handled = true; return (IntPtr)HTLEFT;        }
+        if (right)           { handled = true; return (IntPtr)HTRIGHT;       }
+        if (top)             { handled = true; return (IntPtr)HTTOP;         }
+        if (bottom)          { handled = true; return (IntPtr)HTBOTTOM;      }
+
+        return IntPtr.Zero;
     }
 }
