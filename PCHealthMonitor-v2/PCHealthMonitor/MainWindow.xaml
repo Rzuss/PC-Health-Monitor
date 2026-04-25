@@ -138,7 +138,66 @@
                     Background="{StaticResource BgCard2Brush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,0,1,0">
-                <DockPanel>
+                <DockPanel LastChildFill="True">
+                    <!-- Upgrade banner — docked FIRST so ScrollViewer fills remaining space -->
+                    <!-- Upgrade banner — compact -->
+                    <Border DockPanel.Dock="Bottom"
+                            Margin="14,0,14,16"
+                            CornerRadius="10"
+                            Padding="12,9"
+                            VerticalAlignment="Bottom"
+                            x:Name="UpgradeBanner">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#5B54E8" Offset="0"/>
+                                <GradientStop Color="#7C6FF5" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <StackPanel>
+                            <!-- Title row -->
+                            <Grid Margin="0,0,0,7">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="✦" Foreground="#FFD580" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Upgrade to Pro"
+                                               Foreground="White" FontWeight="SemiBold" FontSize="12"
+                                               FontFamily="Segoe UI Variable, Segoe UI"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock Text="$19.99" HorizontalAlignment="Right"
+                                           Foreground="#BDB8FF" FontSize="10"
+                                           FontFamily="Segoe UI Variable, Segoe UI"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                            <!-- Button -->
+                            <Button Content="Get Pro  →"
+                                    Height="26"
+                                    FontSize="11"
+                                    FontWeight="SemiBold"
+                                    FontFamily="Segoe UI Variable, Segoe UI"
+                                    Background="White"
+                                    Foreground="#5B54E8"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Click="GetProBtn_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="6">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#F0EEFF"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Nav items -->
                     <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Hidden">
                         <StackPanel x:Name="NavPanel" Margin="8,12,8,0">
@@ -268,72 +327,6 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- Upgrade banner — compact -->
-                    <Border DockPanel.Dock="Bottom"
-                            Margin="12,0,12,14"
-                            CornerRadius="10"
-                            Padding="12,10"
-                            x:Name="UpgradeBanner">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#5B54E8" Offset="0"/>
-                                <GradientStop Color="#7C6FF5" Offset="1"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="6"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <!-- Title row -->
-                            <StackPanel Grid.Row="0" Orientation="Horizontal">
-                                <TextBlock Text="✦" Foreground="#FFD580" FontSize="11"
-                                           VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock Text="Upgrade to Pro"
-                                           Foreground="White" FontWeight="SemiBold" FontSize="12"
-                                           FontFamily="Segoe UI Variable, Segoe UI"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-
-                            <!-- Subtitle -->
-                            <TextBlock Grid.Row="0" Text="$19.99 one-time"
-                                       Foreground="#BDB8FF" FontSize="10"
-                                       FontFamily="Segoe UI Variable, Segoe UI"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"/>
-
-                            <!-- Button -->
-                            <Button Grid.Row="2"
-                                    Content="Get Pro  →"
-                                    Height="28"
-                                    FontSize="11"
-                                    FontWeight="SemiBold"
-                                    FontFamily="Segoe UI Variable, Segoe UI"
-                                    Background="White"
-                                    Foreground="#5B54E8"
-                                    BorderThickness="0"
-                                    Cursor="Hand"
-                                    Click="GetProBtn_Click">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                CornerRadius="7"
-                                                Padding="0">
-                                            <ContentPresenter HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center"/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#F0EEFF"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                        </Grid>
-                    </Border>
                 </DockPanel>
             </Border>
 
