@@ -9,8 +9,8 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Styles/Colors.xaml"/>
                 <ResourceDictionary Source="Styles/Typography.xaml"/>
-                <ResourceDictionary Source="Styles/Controls.xaml"/>
                 <ResourceDictionary Source="Styles/Animations.xaml"/>
+                <ResourceDictionary Source="Styles/Controls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Global converters -->

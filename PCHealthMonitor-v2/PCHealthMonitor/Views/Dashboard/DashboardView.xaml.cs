@@ -35,7 +35,12 @@ public partial class DashboardView : Page
         _hardware.SnapshotUpdated += OnSnapshot;
 
         Loaded   += (_, _) => OnSnapshot(null, _hardware.Latest);
-        Unloaded += (_, _) => _hardware.SnapshotUpdated -= OnSnapshot;
+        Unloaded += (_, _) =>
+        {
+            _hardware.SnapshotUpdated -= OnSnapshot;
+            _arcTimer?.Stop();   // CRITICAL: stop 60fps timer so it doesn't run on detached page
+            _arcTimer = null;
+        };
     }
 
     // ── Hardware snapshot → UI ────────────────────────────────────────────

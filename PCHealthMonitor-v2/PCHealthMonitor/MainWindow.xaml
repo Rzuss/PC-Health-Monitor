@@ -211,16 +211,16 @@
                                 </StackPanel>
                             </Button>
 
-                            <!-- Disk Health -->
+                            <!-- System Info -->
                             <Button Tag="DiskHealth" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
-                                          Data="M 2 8 A 6 6 0 1 1 14 8 M 8 5 L 8 9 L 10 11"
+                                          Data="M 8 2 L 8 2.5 M 4 4 L 12 4 L 13 13 L 3 13 Z M 6 7 L 10 7 M 6 10 L 9 10"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="1.5"/>
-                                    <TextBlock Text="Disk Health" VerticalAlignment="Center"/>
+                                          StrokeThickness="1.5" Fill="Transparent"/>
+                                    <TextBlock Text="System Info" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
@@ -305,6 +305,7 @@
             <Frame Grid.Row="1" Grid.Column="1"
                    x:Name="MainFrame"
                    NavigationUIVisibility="Hidden"
+                   JournalOwnership="OwnsJournal"
                    Background="Transparent"/>
 
         </Grid>

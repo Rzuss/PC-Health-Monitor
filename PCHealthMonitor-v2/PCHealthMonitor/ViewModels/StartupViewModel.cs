@@ -14,15 +14,17 @@ public sealed class StartupViewModel : BaseViewModel
 
     public StartupViewModel(SchedulerService scheduler)
     {
-        _scheduler    = scheduler;
-        LoadCommand   = new AsyncRelayCommand(LoadAsync);
-        ToggleCommand = new RelayCommand<StartupEntry>(Toggle);
+        _scheduler      = scheduler;
+        LoadCommand     = new AsyncRelayCommand(LoadAsync);
+        ToggleCommand   = new RelayCommand<StartupEntry>(Toggle);
+        DisableCommand  = new RelayCommand<StartupEntry>(DisableEntry);
 
         Entries.CollectionChanged += (_, _) => RefreshCounts();
     }
 
-    public ICommand LoadCommand   { get; }
-    public ICommand ToggleCommand { get; }
+    public ICommand LoadCommand    { get; }
+    public ICommand ToggleCommand  { get; }
+    public ICommand DisableCommand { get; }
 
     public ObservableCollection<StartupEntry> Entries { get; } = new();
 
@@ -65,6 +67,15 @@ public sealed class StartupViewModel : BaseViewModel
         if (entry is null) return;
         entry.IsEnabled = !entry.IsEnabled;
         _scheduler.SetStartupEntry(entry);
+        RefreshCounts();
+    }
+
+    // Removes the entry from Windows startup (sets IsEnabled=false + persists)
+    private void DisableEntry(StartupEntry? entry)
+    {
+        if (entry is null || !entry.IsEnabled) return;
+        entry.IsEnabled = false;
+        _scheduler.SetStartupEntry(entry);   // deletes the registry key
         RefreshCounts();
     }
 }

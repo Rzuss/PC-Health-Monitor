@@ -2,12 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Management;
 using System.Threading;
 using System.Threading.Tasks;
 using DriveInfoVM = PCHealthMonitor.ViewModels.DriveInfo;
 using FolderEntry = PCHealthMonitor.ViewModels.FolderEntry;
-using SmartDisk   = PCHealthMonitor.ViewModels.SmartDisk;
 
 namespace PCHealthMonitor.Services;
 
@@ -181,32 +179,4 @@ public sealed class StorageService
         return size;
     }
 
-    // ── S.M.A.R.T. via WMI ────────────────────────────────────────────────
-    public async Task<List<SmartDisk>> GetSmartDataAsync()
-    {
-        return await Task.Run(() =>
-        {
-            var disks = new List<SmartDisk>();
-            try
-            {
-                using var searcher = new ManagementObjectSearcher(
-                    @"\\.\root\wmi", "SELECT * FROM MSStorageDriver_FailurePredictStatus");
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    using (obj)
-                    {
-                        bool predicted = (bool)(obj["PredictFailure"] ?? false);
-                        disks.Add(new SmartDisk
-                        {
-                            Model  = obj["InstanceName"]?.ToString() ?? "Unknown",
-                            Status = predicted ? "Warning" : "Good",
-                            Health = predicted ? 50 : 100
-                        });
-                    }
-                }
-            }
-            catch { }
-            return disks;
-        });
-    }
 }

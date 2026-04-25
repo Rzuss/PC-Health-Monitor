@@ -1,67 +1,70 @@
 using PCHealthMonitor.Helpers;
 using PCHealthMonitor.Services;
-using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-using System.Windows.Input;
 
 namespace PCHealthMonitor.ViewModels;
 
+/// <summary>
+/// ViewModel for the System Info page (replaces Disk Health).
+/// Loads static hardware/OS data once, then keeps CPU/RAM live via HardwareService.
+/// </summary>
 public sealed class DiskHealthViewModel : BaseViewModel
 {
-    private readonly StorageService _storage;
+    private readonly SystemInfoService _sysInfo;
+    private readonly HardwareService   _hardware;
 
-    public DiskHealthViewModel(StorageService storage)
+    public DiskHealthViewModel(SystemInfoService sysInfo, HardwareService hardware)
     {
-        _storage    = storage;
-        ScanCommand = new AsyncRelayCommand(ScanAsync, () => !IsScanning);
+        _sysInfo  = sysInfo;
+        _hardware = hardware;
     }
 
-    public ICommand ScanCommand { get; }
-
-    public ObservableCollection<SmartDisk> Disks { get; } = new();
-
-    private bool _isScanning;
-    public bool IsScanning { get => _isScanning; set { SetProperty(ref _isScanning, value); AsyncRelayCommand.RaiseCanExecuteChanged(); } }
-
-    private string _statusText = "Click Scan to read S.M.A.R.T. data";
-    public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
-
-    private async Task ScanAsync()
+    // ── Snapshot (single object, all UI binds to it) ─────────────────────
+    private SystemInfoSnapshot? _snapshot;
+    public SystemInfoSnapshot? Snapshot
     {
-        IsScanning = true;
-        StatusText = "Reading S.M.A.R.T. data...";
-        Disks.Clear();
-
-        var disks = await _storage.GetSmartDataAsync();
-        foreach (var d in disks) Disks.Add(d);
-
-        StatusText = Disks.Count > 0
-            ? $"Scanned {Disks.Count} disk(s)"
-            : "No disks found or insufficient permissions";
-
-        IsScanning = false;
+        get => _snapshot;
+        private set => SetProperty(ref _snapshot, value);
     }
-}
 
-public sealed class SmartDisk : BaseViewModel
-{
-    public string Model        { get; init; } = string.Empty;
-    public string SerialNumber { get; init; } = string.Empty;
-    public string Interface    { get; init; } = string.Empty; // SSD / HDD / NVMe
-    public long   SizeBytes    { get; init; }
-    public string SizeDisplay  => $"{SizeBytes / 1_073_741_824.0:0} GB";
-    public int    Temperature  { get; init; }  // °C
-    public int    Health       { get; init; }  // 0–100 %
-    public string Status       { get; init; } = "Unknown"; // Good / Warning / Critical
+    private bool _isLoading = true;
+    public bool IsLoading { get => _isLoading; set => SetProperty(ref _isLoading, value); }
 
-    public ObservableCollection<SmartAttribute> Attributes { get; } = new();
-}
+    // ── Called by View on Loaded ──────────────────────────────────────────
+    public async Task LoadAsync()
+    {
+        if (Snapshot is not null) return;   // already loaded — singleton view
 
-public sealed class SmartAttribute
-{
-    public int    Id      { get; init; }
-    public string Name    { get; init; } = string.Empty;
-    public long   Value   { get; init; }
-    public string Display { get; init; } = string.Empty;
-    public bool   IsAlert { get; init; }
+        IsLoading = true;
+        var snap  = await _sysInfo.GetSnapshotAsync();
+
+        // Inject live metrics from latest hardware snapshot
+        var hw = _hardware.Latest;
+        snap.CpuLoad   = hw.CpuLoad;
+        snap.CpuTempC  = hw.CpuTempC;
+        snap.RamTotalGb = hw.RamTotalGb;
+        snap.RamUsedGb  = hw.RamUsedGb;
+        snap.RamLoadPct = hw.RamLoad;
+
+        Snapshot  = snap;
+        IsLoading = false;
+
+        // Subscribe for live CPU/RAM updates
+        _hardware.SnapshotUpdated += OnHardwareUpdate;
+    }
+
+    public void Unsubscribe() =>
+        _hardware.SnapshotUpdated -= OnHardwareUpdate;
+
+    private void OnHardwareUpdate(object? sender, HardwareSnapshot hw)
+    {
+        if (Snapshot is null) return;
+        Snapshot.CpuLoad    = hw.CpuLoad;
+        Snapshot.CpuTempC   = hw.CpuTempC;
+        Snapshot.RamTotalGb = hw.RamTotalGb;
+        Snapshot.RamUsedGb  = hw.RamUsedGb;
+        Snapshot.RamLoadPct = hw.RamLoad;
+        // Notify UI that live display strings changed
+        OnPropertyChanged(nameof(Snapshot));
+    }
 }

@@ -12,5 +12,8 @@ public partial class DiskHealthView : Page
     {
         InitializeComponent();
         DataContext = vm;
+
+        Loaded   += async (_, _) => await vm.LoadAsync();
+        Unloaded += (_, _)       => vm.Unsubscribe();
     }
 }

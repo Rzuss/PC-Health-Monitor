@@ -110,7 +110,13 @@ public partial class MainWindow : Window
         };
 
         if (target is not null)
+        {
             MainFrame.Navigate(target);
+            // Clear the journal after every navigation so old page instances
+            // are not kept alive in memory with their timers still running.
+            while (MainFrame.CanGoBack)
+                MainFrame.RemoveBackEntry();
+        }
     }
 
     // ─── Pro badge ────────────────────────────────────────────────────────

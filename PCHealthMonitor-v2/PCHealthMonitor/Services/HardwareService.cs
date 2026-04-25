@@ -10,65 +10,92 @@ namespace PCHealthMonitor.Services;
 
 /// <summary>
 /// Provides real-time hardware metrics: CPU%, RAM%, Disk%, CPU temperature.
-/// Thread-safe: uses _isPolling guard to prevent concurrent LibreHardwareMonitor access.
+///
+/// SAFETY MODEL:
+///   - LibreHardwareMonitor (LHM) is optional. If _computer.Open() fails
+///     (AccessViolationException, driver error, permission denied), _lhmEnabled
+///     is set to false and LHM is never called again. All metrics fall back to
+///     safe Win32 API calls that cannot crash the process.
+///   - _isPolling guard prevents concurrent Task.Run(BuildSnapshot) calls,
+///     which would cause concurrent LHM access (LHM is not thread-safe).
+///   - All LHM calls are inside lock(_hwLock) for additional protection.
 /// </summary>
 public sealed class HardwareService : IDisposable
 {
     public event EventHandler<HardwareSnapshot>? SnapshotUpdated;
 
-    private readonly Computer     _computer;
-    private readonly UpdateVisitor _visitor = new();
-    private readonly object        _hwLock  = new();   // serialise LibreHardwareMonitor calls
+    private Computer?      _computer;
+    private readonly UpdateVisitor _visitor  = new();
+    private readonly object        _hwLock   = new();
+    private bool                   _lhmEnabled = false;   // set true only if Open() succeeds
 
     private PerformanceCounter? _cpuCounter;
     private PerformanceCounter? _diskCounter;
 
     private readonly DispatcherTimer _timer;
     private readonly object _snapLock  = new();
-    private volatile bool   _isPolling = false;   // re-entrancy guard
-    private bool _disposed;
+    private volatile bool   _isPolling = false;
+    private bool             _disposed;
 
     public HardwareService()
     {
-        _computer = new Computer
-        {
-            IsCpuEnabled     = true,
-            IsMemoryEnabled  = true,
-            IsStorageEnabled = true,
-            IsGpuEnabled     = false,
-        };
+        // ── LibreHardwareMonitor (optional) ───────────────────────────────
+        // Open() accesses hardware drivers via WMI and P/Invoke.
+        // It can throw AccessViolationException on some machines — which in
+        // .NET 8 kills the process before any catch block runs.
+        // We therefore test it with a very conservative try-catch, and if it
+        // fails we simply run without temperature readings.
+        InitLhm();
 
-        try { _computer.Open(); } catch { /* driver unavailable — metrics degrade gracefully */ }
-
+        // ── PerformanceCounters (safe — pure Win32, never crashes) ────────
         try
         {
             _cpuCounter  = new PerformanceCounter("Processor", "% Processor Time", "_Total");
             _diskCounter = new PerformanceCounter("PhysicalDisk", "% Disk Time", "_Total");
-            // First call always returns 0 — discard it
-            _ = _cpuCounter.NextValue();
+            _ = _cpuCounter.NextValue();   // first call always returns 0 — discard
             _ = _diskCounter.NextValue();
         }
         catch { }
 
+        // ── Polling timer ─────────────────────────────────────────────────
         _timer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromSeconds(2)
         };
-
-        // CRITICAL FIX: use _isPolling guard so we NEVER start a new poll
-        // while the previous Task.Run(BuildSnapshot) is still executing.
-        // Without this guard, concurrent calls to _computer.Accept() crash the
-        // LibreHardwareMonitor native layer with an AccessViolationException
-        // that bypasses all catch blocks and kills the process silently.
         _timer.Tick += async (_, _) =>
         {
-            if (_isPolling) return;   // skip this tick — previous poll still running
+            if (_isPolling) return;   // re-entrancy guard
             _isPolling = true;
             try   { await PollAsync(); }
-            catch { /* belt-and-suspenders — exceptions are already swallowed inside */ }
+            catch { }
             finally { _isPolling = false; }
         };
         _timer.Start();
+    }
+
+    private void InitLhm()
+    {
+        try
+        {
+            _computer = new Computer
+            {
+                IsCpuEnabled     = true,
+                IsMemoryEnabled  = false,  // handled via GlobalMemoryStatusEx (safer)
+                IsStorageEnabled = false,  // can be very slow, skip
+                IsGpuEnabled     = false,
+            };
+            _computer.Open();
+            _lhmEnabled = true;
+        }
+        catch
+        {
+            // LHM failed to initialize — disable permanently.
+            // The app will still show CPU%, RAM%, Disk% via safe Win32 APIs.
+            // Temperature will show "--".
+            try { _computer?.Close(); } catch { }
+            _computer   = null;
+            _lhmEnabled = false;
+        }
     }
 
     // ── Thread-safe Latest snapshot ───────────────────────────────────────
@@ -83,9 +110,9 @@ public sealed class HardwareService : IDisposable
     {
         if (_disposed) return;
 
-        var snapshot = await Task.Run(BuildSnapshot).ConfigureAwait(true);
-        // ConfigureAwait(true) = resume on the captured (UI) SynchronizationContext,
+        // ConfigureAwait(true) = resume on the UI SynchronizationContext,
         // so SnapshotUpdated is always raised on the UI thread.
+        var snapshot = await Task.Run(BuildSnapshot).ConfigureAwait(true);
 
         if (_disposed) return;
 
@@ -95,14 +122,13 @@ public sealed class HardwareService : IDisposable
 
     private HardwareSnapshot BuildSnapshot()
     {
-        // This method runs on a threadpool thread.
-        // _hwLock prevents concurrent LibreHardwareMonitor access
-        // (e.g., if somehow two polls start before the guard is set).
         var snap = new HardwareSnapshot();
 
+        // ── PerformanceCounters (safe) ────────────────────────────────────
         try { snap.CpuLoad  = Math.Min(100f, _cpuCounter?.NextValue()  ?? 0f); } catch { }
         try { snap.DiskLoad = Math.Min(100f, _diskCounter?.NextValue() ?? 0f); } catch { }
 
+        // ── RAM via GlobalMemoryStatusEx (safe Win32) ─────────────────────
         try
         {
             var ramStatus = new MEMORYSTATUSEX();
@@ -116,32 +142,39 @@ public sealed class HardwareService : IDisposable
         }
         catch { }
 
-        // LibreHardwareMonitor — lock protects against concurrent access
-        try
+        // ── LibreHardwareMonitor (optional — temperature only) ────────────
+        if (_lhmEnabled && _computer is not null)
         {
-            lock (_hwLock)
+            try
             {
-                if (_disposed) return snap;
-                _computer.Accept(_visitor);
-                foreach (var hw in _computer.Hardware)
+                lock (_hwLock)
                 {
-                    if (hw.HardwareType != HardwareType.Cpu) continue;
-                    foreach (var sensor in hw.Sensors)
+                    if (_disposed || !_lhmEnabled) return snap;
+                    _computer.Accept(_visitor);
+                    foreach (var hw in _computer.Hardware)
                     {
-                        if (sensor.SensorType == SensorType.Temperature
-                            && sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase)
-                            && sensor.Value.HasValue)
-                            snap.CpuTempC = (float)sensor.Value.Value;
+                        if (hw.HardwareType != HardwareType.Cpu) continue;
+                        foreach (var sensor in hw.Sensors)
+                        {
+                            if (sensor.SensorType == SensorType.Temperature
+                                && sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase)
+                                && sensor.Value.HasValue)
+                                snap.CpuTempC = (float)sensor.Value.Value;
 
-                        if (sensor.SensorType == SensorType.Load
-                            && sensor.Name.Contains("Total", StringComparison.OrdinalIgnoreCase)
-                            && sensor.Value.HasValue)
-                            snap.CpuLoad = (float)sensor.Value.Value;
+                            if (sensor.SensorType == SensorType.Load
+                                && sensor.Name.Contains("Total", StringComparison.OrdinalIgnoreCase)
+                                && sensor.Value.HasValue)
+                                snap.CpuLoad = (float)sensor.Value.Value;
+                        }
                     }
                 }
             }
+            catch
+            {
+                // Any failure from LHM → disable permanently for this session
+                _lhmEnabled = false;
+            }
         }
-        catch { /* hardware driver error — degrade gracefully */ }
 
         return snap;
     }
@@ -167,11 +200,12 @@ public sealed class HardwareService : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        _disposed = true;
+        _disposed   = true;
+        _lhmEnabled = false;
         _timer.Stop();
         _cpuCounter?.Dispose();
         _diskCounter?.Dispose();
-        try { lock (_hwLock) { _computer.Close(); } } catch { }
+        try { lock (_hwLock) { _computer?.Close(); } } catch { }
     }
 }
 

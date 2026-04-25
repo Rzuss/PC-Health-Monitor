@@ -69,7 +69,7 @@
                                         <TextBlock Text="{Binding DriveType}"
                                                    Style="{StaticResource TextCaptionStyle}"
                                                    Margin="0,2,0,8"/>
-                                        <ProgressBar Value="{Binding UsedPct}"
+                                        <ProgressBar Value="{Binding UsedPct, Mode=OneWay}"
                                                      Maximum="100"
                                                      Height="6"
                                                      Style="{StaticResource DarkProgressBarStyle}"

@@ -4,104 +4,289 @@
       Background="{StaticResource BgBaseBrush}"
       Title="Boost Mode">
 
-    <ScrollViewer Padding="24,20,24,24">
-        <StackPanel MaxWidth="680" HorizontalAlignment="Center">
+    <Grid Margin="24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Header -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>  <!-- Active boost card (visible only when boosting) -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>  <!-- Process picker header + settings row -->
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>     <!-- Process list -->
+        </Grid.RowDefinitions>
 
-            <!-- Header -->
-            <TextBlock Text="Boost Mode" Style="{StaticResource TextH1Style}"/>
-            <TextBlock Text="Elevate process priority and optimize memory for peak performance"
-                       Style="{StaticResource TextCaptionStyle}" Margin="0,4,0,24"/>
+        <!-- ── Header ─────────────────────────────────────────────────── -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Boost Mode" Style="{StaticResource TextH1Style}"/>
+                <TextBlock Text="Select a running app and give it top CPU &amp; memory priority"
+                           Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
+            </StackPanel>
 
-            <!-- VIP card -->
-            <Border CornerRadius="16" Padding="28" Margin="0,0,0,20">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                        <GradientStop Color="#12124A" Offset="0"/>
-                        <GradientStop Color="#1A1040" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-                <Border BorderBrush="#6C63FF" BorderThickness="1.5" CornerRadius="16" Padding="28">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                            <TextBlock Text="⚡" FontSize="22" Margin="0,0,10,0"/>
-                            <TextBlock Text="VIP BOOST SESSION"
-                                       Style="{StaticResource TextH2Style}"
-                                       Foreground="{StaticResource BlueBrush}"/>
-                        </StackPanel>
+            <!-- Deactivate button — only visible when boosting -->
+            <Button Grid.Column="1"
+                    Content="⏹  Stop Boost"
+                    Style="{StaticResource DangerButtonStyle}"
+                    Command="{Binding DeactivateCommand}"
+                    Width="130"
+                    VerticalAlignment="Center"
+                    Visibility="{Binding IsVipActive, Converter={StaticResource BoolToVisibleConverter}}"/>
+        </Grid>
+
+        <!-- ── Active Boost Banner ────────────────────────────────────── -->
+        <Border Grid.Row="2"
+                CornerRadius="14"
+                Padding="20,16"
+                Visibility="{Binding IsVipActive, Converter={StaticResource BoolToVisibleConverter}}">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0D2A1A" Offset="0"/>
+                    <GradientStop Color="#0A1F14" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border BorderBrush="{StaticResource GreenBrush}" BorderThickness="1.5" CornerRadius="14" Padding="20,16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon -->
+                    <Border Grid.Column="0"
+                            Width="44" Height="44"
+                            CornerRadius="10"
+                            Background="{StaticResource GreenBrush}"
+                            Margin="0,0,16,0"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="⚡"
+                                   FontSize="22"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Labels -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="BOOST ACTIVE"
+                                   Style="{StaticResource TextCaptionStyle}"
+                                   Foreground="{StaticResource GreenBrush}"
+                                   FontWeight="Bold"/>
+                        <TextBlock Text="{Binding ActiveProcessName}"
+                                   Style="{StaticResource TextH3Style}"
+                                   Margin="0,2,0,0"/>
                         <TextBlock Text="{Binding VipStatus}"
-                                   Style="{StaticResource TextBodyStyle}"
+                                   Style="{StaticResource TextBodySmStyle}"
                                    Foreground="{StaticResource SubTextBrush}"
-                                   Margin="0,0,0,4"/>
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- Countdown -->
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <TextBlock Text="{Binding TimeRemaining}"
                                    Style="{StaticResource TextMetricStyle}"
                                    Foreground="{StaticResource GreenBrush}"
-                                   Margin="0,0,0,16"
-                                   Visibility="{Binding IsVipActive, Converter={StaticResource BoolToVisibleConverter}}"/>
-
-                        <!-- Duration slider -->
-                        <StackPanel Visibility="{Binding IsVipActive, Converter={StaticResource BoolToCollapsedConverter}}"
-                                    Margin="0,0,0,16">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="Session duration: "
-                                           Style="{StaticResource TextBodyStyle}"/>
-                                <TextBlock Text="{Binding BoostDurationMin}"
-                                           Style="{StaticResource TextBodyStyle}"
-                                           Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold"/>
-                                <TextBlock Text=" minutes"
-                                           Style="{StaticResource TextBodyStyle}"/>
-                            </StackPanel>
-                            <Slider Value="{Binding BoostDurationMin}"
-                                    Minimum="10" Maximum="120" TickFrequency="10"
-                                    Style="{StaticResource DarkSliderStyle}"/>
-                        </StackPanel>
-
-                        <!-- Activate / Deactivate -->
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="Activate VIP Boost"
-                                    Style="{StaticResource PrimaryButtonStyle}"
-                                    Command="{Binding ActivateCommand}"
-                                    Width="180"
-                                    Visibility="{Binding IsVipActive, Converter={StaticResource BoolToCollapsedConverter}}"/>
-                            <Button Content="Deactivate"
-                                    Style="{StaticResource DangerButtonStyle}"
-                                    Command="{Binding DeactivateCommand}"
-                                    Width="130"
-                                    Visibility="{Binding IsVipActive, Converter={StaticResource BoolToVisibleConverter}}"/>
-                        </StackPanel>
+                                   FontSize="22"
+                                   HorizontalAlignment="Right"/>
+                        <TextBlock Text="time remaining"
+                                   Style="{StaticResource TextCaptionStyle}"
+                                   HorizontalAlignment="Right"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
-                </Border>
+                </Grid>
             </Border>
+        </Border>
 
-            <!-- What Boost does — info card -->
-            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="What Boost Mode does"
-                               Style="{StaticResource TextH3Style}" Margin="0,0,0,12"/>
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
-                            <TextBlock Text="Sets foreground process priority to HIGH for active apps"
-                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
-                            <TextBlock Text="Flushes Windows standby memory to free RAM for active tasks"
-                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
-                            <TextBlock Text="Suspends non-critical background services during session"
-                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="→  " Foreground="{StaticResource BlueBrush}" FontWeight="Bold"/>
-                            <TextBlock Text="Automatically restores normal settings when session ends"
-                                       Style="{StaticResource TextBodySmStyle}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </StackPanel>
+        <!-- ── Picker header row ──────────────────────────────────────── -->
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Title + status -->
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="Running Applications" Style="{StaticResource TextH3Style}"/>
+                <TextBlock Text="{Binding StatusMessage}"
+                           Style="{StaticResource TextCaptionStyle}"
+                           Margin="0,2,0,0"/>
+            </StackPanel>
+
+            <!-- Duration label + slider (compact) -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Duration:"
+                           Style="{StaticResource TextBodySmStyle}"
+                           Foreground="{StaticResource SubTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <TextBlock Text="{Binding BoostDurationMin}"
+                           Style="{StaticResource TextBodySmStyle}"
+                           Foreground="{StaticResource BlueBrush}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+                <TextBlock Text=" min"
+                           Style="{StaticResource TextBodySmStyle}"
+                           Foreground="{StaticResource SubTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,0"/>
+                <Slider Value="{Binding BoostDurationMin}"
+                        Minimum="5" Maximum="120" TickFrequency="5"
+                        Width="120"
+                        Style="{StaticResource DarkSliderStyle}"
+                        VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Refresh -->
+            <Button Grid.Column="3"
+                    Content="↻  Refresh"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Command="{Binding RefreshCommand}"
+                    Width="100"
+                    Height="34"/>
+
+            <!-- Activate -->
+            <Button Grid.Column="5"
+                    Content="⚡  Activate Boost"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding ActivateCommand}"
+                    Width="150"
+                    Height="34"
+                    Visibility="{Binding IsVipActive, Converter={StaticResource BoolToCollapsedConverter}}"/>
+        </Grid>
+
+        <!-- ── Process list ───────────────────────────────────────────── -->
+        <Border Grid.Row="6" Style="{StaticResource CardStyle}" Padding="0">
+            <Grid>
+                <!-- Empty state -->
+                <StackPanel VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Margin="0,40"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToCollapsedConverter}}">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Processes.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Text="No processes loaded"
+                               Style="{StaticResource TextH3Style}"
+                               HorizontalAlignment="Center"
+                               Foreground="{StaticResource SubTextBrush}"/>
+                    <TextBlock Text="Click ↻ Refresh to scan running applications"
+                               Style="{StaticResource TextBodySmStyle}"
+                               HorizontalAlignment="Center"
+                               Margin="0,6,0,0"/>
                 </StackPanel>
-            </Border>
 
-        </StackPanel>
-    </ScrollViewer>
+                <!-- Process ListBox -->
+                <ListBox ItemsSource="{Binding Processes}"
+                         SelectedItem="{Binding SelectedProcess, Mode=TwoWay}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Row"
+                                                Background="Transparent"
+                                                BorderBrush="{StaticResource BorderBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="16,10"
+                                                Cursor="Hand">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="80"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Avatar -->
+                                                <Border Grid.Column="0"
+                                                        Width="32" Height="32"
+                                                        CornerRadius="8"
+                                                        Background="{StaticResource BgCard3Brush}"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Initial}"
+                                                               FontSize="14" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource BlueBrush}"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"/>
+                                                </Border>
+
+                                                <!-- Name + process name -->
+                                                <StackPanel Grid.Column="1"
+                                                            VerticalAlignment="Center"
+                                                            Margin="12,0,0,0">
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               Style="{StaticResource TextBodyStyle}"
+                                                               FontWeight="Medium"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Style="{StaticResource TextCaptionStyle}"
+                                                               Margin="0,1,0,0"
+                                                               Opacity="0.6"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+
+                                                <!-- Memory -->
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding MemoryDisplay}"
+                                                           Style="{StaticResource TextBodySmStyle}"
+                                                           Foreground="{StaticResource SubTextBrush}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Right"/>
+
+                                                <!-- Selected indicator -->
+                                                <Border x:Name="SelectedDot"
+                                                        Grid.Column="3"
+                                                        Width="8" Height="8"
+                                                        CornerRadius="4"
+                                                        Background="{StaticResource BlueBrush}"
+                                                        Margin="12,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="Hidden"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Row" Property="Background"
+                                                        Value="{StaticResource BgCard3Brush}"/>
+                                                <Setter TargetName="SelectedDot" Property="Visibility"
+                                                        Value="Visible"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Row" Property="Background">
+                                                    <Setter.Value>
+                                                        <SolidColorBrush Color="{StaticResource BgCard3Color}" Opacity="0.5"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Grid>
+        </Border>
+    </Grid>
 </Page>

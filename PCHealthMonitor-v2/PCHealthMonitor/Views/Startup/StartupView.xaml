@@ -10,6 +10,7 @@
             <RowDefinition Height="16"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -35,42 +36,165 @@
             <StackPanel Orientation="Horizontal">
                 <StackPanel Margin="0,0,32,0">
                     <TextBlock Text="{Binding TotalCount}"
-                               Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource BlueBrush}"/>
+                               Style="{StaticResource TextMetricStyle}"
+                               Foreground="{StaticResource BlueBrush}"/>
                     <TextBlock Text="Total entries" Style="{StaticResource TextCaptionStyle}"/>
                 </StackPanel>
                 <StackPanel Margin="0,0,32,0">
                     <TextBlock Text="{Binding EnabledCount}"
-                               Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource GreenBrush}"/>
+                               Style="{StaticResource TextMetricStyle}"
+                               Foreground="{StaticResource GreenBrush}"/>
                     <TextBlock Text="Enabled" Style="{StaticResource TextCaptionStyle}"/>
                 </StackPanel>
                 <StackPanel>
                     <TextBlock Text="{Binding DisabledCount}"
-                               Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource SubTextBrush}"/>
+                               Style="{StaticResource TextMetricStyle}"
+                               Foreground="{StaticResource SubTextBrush}"/>
                     <TextBlock Text="Disabled" Style="{StaticResource TextCaptionStyle}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
 
+        <!-- Column headers -->
+        <Grid Grid.Row="4" Margin="0,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="52"/>       <!-- checkbox -->
+                <ColumnDefinition Width="*"/>        <!-- name -->
+                <ColumnDefinition Width="160"/>      <!-- publisher -->
+                <ColumnDefinition Width="80"/>       <!-- impact -->
+                <ColumnDefinition Width="170"/>      <!-- action button -->
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="On"
+                       Style="{StaticResource TextCaptionStyle}"
+                       Margin="16,0,0,6"/>
+            <TextBlock Grid.Column="1" Text="Program"
+                       Style="{StaticResource TextCaptionStyle}"
+                       Margin="0,0,0,6"/>
+            <TextBlock Grid.Column="2" Text="Publisher"
+                       Style="{StaticResource TextCaptionStyle}"
+                       Margin="0,0,0,6"/>
+            <TextBlock Grid.Column="3" Text="Impact"
+                       Style="{StaticResource TextCaptionStyle}"
+                       Margin="0,0,0,6"/>
+        </Grid>
+
         <!-- Startup list -->
-        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="0">
-            <DataGrid ItemsSource="{Binding Entries}"
-                      Style="{StaticResource DarkDataGridStyle}"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      IsReadOnly="False"
-                      Margin="0">
-                <DataGrid.Columns>
-                    <!-- Checkbox column — always editable -->
-                    <DataGridCheckBoxColumn Header="Enabled"
-                                           Binding="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
-                                           Width="70"
-                                           IsReadOnly="False"/>
-                    <DataGridTextColumn Header="Program"   Binding="{Binding Name}"      Width="*"   MinWidth="160" IsReadOnly="True"/>
-                    <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}"  Width="180" IsReadOnly="True"/>
-                    <DataGridTextColumn Header="Impact"    Binding="{Binding Impact}"     Width="80"  IsReadOnly="True"/>
-                    <DataGridTextColumn Header="Path"      Binding="{Binding Path}"       Width="260" IsReadOnly="True"/>
-                </DataGrid.Columns>
-            </DataGrid>
+        <Border Grid.Row="5" Style="{StaticResource CardStyle}" Padding="0">
+            <ListBox ItemsSource="{Binding Entries}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="RowBorder"
+                                            Background="Transparent"
+                                            BorderBrush="{StaticResource BorderBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="0,2">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="RowBorder" Property="Background"
+                                                    Value="{StaticResource BgCard3Brush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid MinHeight="44">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="52"/>    <!-- checkbox -->
+                                <ColumnDefinition Width="*"/>     <!-- name + path -->
+                                <ColumnDefinition Width="160"/>   <!-- publisher -->
+                                <ColumnDefinition Width="80"/>    <!-- impact -->
+                                <ColumnDefinition Width="170"/>   <!-- action button -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Toggle checkbox -->
+                            <CheckBox Grid.Column="0"
+                                      IsChecked="{Binding IsEnabled, Mode=TwoWay,
+                                                          UpdateSourceTrigger=PropertyChanged}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      Margin="0"/>
+
+                            <!-- Name + path -->
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,12,0">
+                                <TextBlock Text="{Binding Name}"
+                                           Style="{StaticResource TextBodyStyle}"
+                                           FontWeight="Medium"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Path}"
+                                           Style="{StaticResource TextCaptionStyle}"
+                                           Opacity="0.5"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,1,0,0"/>
+                            </StackPanel>
+
+                            <!-- Publisher -->
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Publisher}"
+                                       Style="{StaticResource TextBodySmStyle}"
+                                       Foreground="{StaticResource SubTextBrush}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,12,0"/>
+
+                            <!-- Impact badge -->
+                            <Border Grid.Column="3"
+                                    CornerRadius="4"
+                                    Padding="8,3"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    Background="{StaticResource BgCard3Brush}">
+                                <TextBlock Text="{Binding Impact}"
+                                           Style="{StaticResource TextCaptionStyle}"
+                                           Foreground="{StaticResource YellowBrush}"/>
+                            </Border>
+
+                            <!-- Remove from Startup button -->
+                            <Button Grid.Column="4"
+                                    Content="Remove from Startup"
+                                    Height="34"
+                                    Padding="10,0"
+                                    Margin="8,0,12,0"
+                                    FontSize="11"
+                                    VerticalContentAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{Binding IsEnabled}"
+                                    Command="{Binding DataContext.DisableCommand,
+                                                      RelativeSource={RelativeSource AncestorType=Page}}"
+                                    CommandParameter="{Binding}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Opacity" Value="0.30"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </Border>
     </Grid>
 </Page>
