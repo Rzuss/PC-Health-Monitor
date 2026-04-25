@@ -1,0 +1,2 @@
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\bin\Release\net8.0-windows\win-x64\publish\PCHealthMonitor.pdb
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\bin\Release\net8.0-windows\win-x64\publish\PCHealthMonitor.exe

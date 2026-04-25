@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using PCHealthMonitor.Helpers;
 using PCHealthMonitor.ViewModels;
 using System.Windows.Controls;
 
@@ -11,6 +13,13 @@ public partial class StorageView : Page
     {
         InitializeComponent();
         DataContext = vm;
-        Loaded += async (_, _) => await vm.ScanCommand.ExecuteAsync(null);
+
+        // Auto-load drive list on page load (fast — just enumerates drives, no scan).
+        // Guard: only trigger if drives aren't already loaded (handles back-navigation).
+        Loaded += async (_, _) =>
+        {
+            if (vm.Drives.Count == 0 && vm.LoadDrivesCommand is AsyncRelayCommand cmd)
+                await cmd.ExecuteAsync();
+        };
     }
 }

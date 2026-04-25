@@ -21,46 +21,102 @@
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Text="Storage Analyzer" Style="{StaticResource TextH1Style}"/>
-                <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
+                <TextBlock Text="{Binding StatusText}"
+                           Style="{StaticResource TextCaptionStyle}"
+                           Margin="0,2,0,0"/>
             </StackPanel>
-            <Button Grid.Column="1" Content="Scan Drives"
+            <Button Grid.Column="1"
+                    Content="Find Large Items"
                     Style="{StaticResource PrimaryButtonStyle}"
-                    Command="{Binding ScanCommand}" Width="120"
+                    Command="{Binding ScanCommand}"
+                    Width="150"
                     VerticalAlignment="Center"/>
         </Grid>
 
-        <!-- Drive cards -->
-        <ItemsControl Grid.Row="2" ItemsSource="{Binding Drives}">
-            <ItemsControl.ItemsPanel>
+        <!-- Drive cards — selectable ListBox -->
+        <ListBox Grid.Row="2"
+                 ItemsSource="{Binding Drives}"
+                 SelectedItem="{Binding SelectedDrive, Mode=TwoWay}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                 </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Border Style="{StaticResource Card2Style}" Width="200">
-                        <StackPanel>
-                            <TextBlock Text="{Binding Name}" Style="{StaticResource TextH3Style}"/>
-                            <TextBlock Text="{Binding DriveType}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,8"/>
-                            <ProgressBar Value="{Binding UsedPct}" Maximum="100" Height="6"
-                                         Style="{StaticResource DarkProgressBarStyle}"
-                                         Margin="0,0,0,8"/>
-                            <TextBlock Text="{Binding UsedDisplay}" Style="{StaticResource TextBodySmStyle}"/>
-                        </StackPanel>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0,0,12,0"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="CardBorder"
+                                        Width="210"
+                                        Background="{StaticResource BgCard2Brush}"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="16"
+                                        Cursor="Hand">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}"
+                                                   Style="{StaticResource TextH3Style}"/>
+                                        <TextBlock Text="{Binding DriveType}"
+                                                   Style="{StaticResource TextCaptionStyle}"
+                                                   Margin="0,2,0,8"/>
+                                        <ProgressBar Value="{Binding UsedPct}"
+                                                     Maximum="100"
+                                                     Height="6"
+                                                     Style="{StaticResource DarkProgressBarStyle}"
+                                                     Margin="0,0,0,8"/>
+                                        <TextBlock Text="{Binding UsedDisplay}"
+                                                   Style="{StaticResource TextBodySmStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="CardBorder"
+                                                Property="BorderBrush"
+                                                Value="{StaticResource BlueBrush}"/>
+                                        <Setter TargetName="CardBorder"
+                                                Property="BorderThickness"
+                                                Value="2"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="CardBorder"
+                                                Property="Background"
+                                                Value="{StaticResource BgCard3Brush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+        </ListBox>
 
-        <!-- Large items table -->
+        <!-- Largest Files & Folders table -->
         <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="Largest Files &amp; Folders"
-                           Style="{StaticResource TextH3Style}" Margin="16,14,0,0"/>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="16,14,16,0">
+                    <TextBlock Text="Largest Files &amp; Folders"
+                               Style="{StaticResource TextH3Style}"/>
+                    <TextBlock Text=" — select a drive above and click Find Large Items"
+                               Style="{StaticResource TextCaptionStyle}"
+                               VerticalAlignment="Bottom"
+                               Margin="8,0,0,2"/>
+                </StackPanel>
+
                 <DataGrid Grid.Row="1"
                           ItemsSource="{Binding LargeItems}"
                           Style="{StaticResource DarkDataGridStyle}"
@@ -69,9 +125,19 @@
                           IsReadOnly="True"
                           Margin="0,8,0,0">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" MinWidth="200"/>
-                        <DataGridTextColumn Header="Size" Binding="{Binding SizeDisplay}" Width="100"/>
-                        <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="360"/>
+                        <DataGridTextColumn Header="Name"
+                                            Binding="{Binding Name}"
+                                            Width="*"
+                                            MinWidth="180"/>
+                        <DataGridTextColumn Header="Type"
+                                            Binding="{Binding TypeDisplay}"
+                                            Width="80"/>
+                        <DataGridTextColumn Header="Size"
+                                            Binding="{Binding SizeDisplay}"
+                                            Width="100"/>
+                        <DataGridTextColumn Header="Path"
+                                            Binding="{Binding Path}"
+                                            Width="320"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

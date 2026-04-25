@@ -2,72 +2,114 @@ using PCHealthMonitor.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Management;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PCHealthMonitor.Services;
 
 public sealed class DriverService
 {
-    // Drivers older than this are flagged as "Aging"
-    private static readonly TimeSpan AgingThreshold   = TimeSpan.FromDays(365 * 2);
+    // Drivers older than this are flagged
+    private static readonly TimeSpan AgingThreshold    = TimeSpan.FromDays(365 * 2);
     private static readonly TimeSpan OutdatedThreshold = TimeSpan.FromDays(365 * 4);
 
     public async Task<List<DriverEntry>> GetFlaggedDriversAsync()
     {
-        return await Task.Run(() =>
+        // CRITICAL FIX #1: Win32_PnPSignedDriver is notorious for blocking 30-60 seconds
+        // on some machines. Without a timeout it hangs the background thread indefinitely,
+        // which eventually causes the app to freeze and crash.
+        // We wrap the entire WMI query in Task.Run with a 20-second CancellationToken.
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        try
         {
-            var flagged = new List<DriverEntry>();
+            return await Task.Run(() => QueryFlaggedDrivers(cts.Token), cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return new List<DriverEntry>();   // timed out — return empty, never crash
+        }
+        catch
+        {
+            return new List<DriverEntry>();
+        }
+    }
 
-            using var searcher = new ManagementObjectSearcher(
-                "SELECT * FROM Win32_PnPSignedDriver WHERE DriverDate IS NOT NULL");
+    private static List<DriverEntry> QueryFlaggedDrivers(CancellationToken ct)
+    {
+        var flagged = new List<DriverEntry>();
 
-            foreach (ManagementObject obj in searcher.Get())
+        // CRITICAL FIX #2: ManagementObject implements IDisposable — must be disposed
+        // inside the foreach loop. Previously, every WMI object was leaked, causing
+        // hundreds of COM references to accumulate and eventually OutOfMemoryException.
+        // Each ManagementObject holds native COM memory that only the GC finalizer would
+        // eventually release — but under pressure that could be too late.
+        using var searcher = new ManagementObjectSearcher(
+            "SELECT DeviceName, DriverVersion, DriverDate, DeviceClass " +
+            "FROM Win32_PnPSignedDriver WHERE DriverDate IS NOT NULL");
+
+        // Set a WMI timeout on the options as an extra safety net
+        searcher.Options.Timeout = TimeSpan.FromSeconds(18);
+
+        ManagementObjectCollection? results = null;
+        try { results = searcher.Get(); }
+        catch { return flagged; }
+
+        try
+        {
+            foreach (ManagementObject obj in results)
             {
-                try
+                // CRITICAL FIX: dispose each object immediately after use
+                using (obj)
                 {
-                    var dateStr  = obj["DriverDate"]?.ToString();
-                    var name     = obj["DeviceName"]?.ToString() ?? string.Empty;
-                    var version  = obj["DriverVersion"]?.ToString() ?? string.Empty;
-                    var devClass = obj["DeviceClass"]?.ToString() ?? string.Empty;
-
-                    if (string.IsNullOrWhiteSpace(dateStr) || string.IsNullOrWhiteSpace(name))
-                        continue;
-
-                    // WMI dates: "20210315000000.000000+000"
-                    if (!ManagementDateTimeConverter.ToDateTime(dateStr) is DateTime driverDate)
-                        continue;
-
-                    driverDate = ManagementDateTimeConverter.ToDateTime(dateStr);
-                    var age    = DateTime.Now - driverDate;
-
-                    string status;
-                    if (age >= OutdatedThreshold)
-                        status = "Outdated";
-                    else if (age >= AgingThreshold)
-                        status = "Aging";
-                    else
-                        continue; // driver is recent enough — skip
-
-                    flagged.Add(new DriverEntry
+                    if (ct.IsCancellationRequested) break;
+                    try
                     {
-                        Name        = name,
-                        Version     = version,
-                        Date        = driverDate.ToString("yyyy-MM-dd"),
-                        Status      = status,
-                        DeviceClass = devClass
-                    });
+                        var dateStr  = obj["DriverDate"]?.ToString();
+                        var name     = obj["DeviceName"]?.ToString() ?? string.Empty;
+                        var version  = obj["DriverVersion"]?.ToString() ?? string.Empty;
+                        var devClass = obj["DeviceClass"]?.ToString() ?? string.Empty;
+
+                        if (string.IsNullOrWhiteSpace(dateStr) || string.IsNullOrWhiteSpace(name))
+                            continue;
+
+                        DateTime driverDate;
+                        try { driverDate = ManagementDateTimeConverter.ToDateTime(dateStr); }
+                        catch { continue; }
+
+                        var age = DateTime.Now - driverDate;
+
+                        string status;
+                        if (age >= OutdatedThreshold)
+                            status = "Outdated";
+                        else if (age >= AgingThreshold)
+                            status = "Aging";
+                        else
+                            continue;
+
+                        flagged.Add(new DriverEntry
+                        {
+                            Name        = name,
+                            Version     = version,
+                            Date        = driverDate.ToString("yyyy-MM-dd"),
+                            Status      = status,
+                            DeviceClass = devClass
+                        });
+                    }
+                    catch { }
                 }
-                catch { }
             }
+        }
+        finally
+        {
+            results.Dispose();
+        }
 
-            // Sort: Outdated first, then Aging; alphabetical within group
-            flagged.Sort((a, b) =>
-            {
-                int cmp = string.Compare(b.Status, a.Status, StringComparison.Ordinal); // Outdated > Aging
-                return cmp != 0 ? cmp : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
-            });
-
-            return flagged;
+        flagged.Sort((a, b) =>
+        {
+            int cmp = string.Compare(b.Status, a.Status, StringComparison.Ordinal);
+            return cmp != 0 ? cmp : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         });
+
+        return flagged;
     }
 }

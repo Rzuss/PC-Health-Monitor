@@ -16,8 +16,8 @@ public sealed class ToolsViewModel : BaseViewModel
         _driver    = driver;
         _scheduler = scheduler;
 
-        ScanDriversCommand    = new AsyncRelayCommand(ScanDriversAsync,  () => !IsBusy);
-        SaveScheduleCommand   = new RelayCommand(SaveSchedule);
+        ScanDriversCommand    = new AsyncRelayCommand(ScanDriversAsync,   () => !IsBusy);
+        SaveScheduleCommand   = new AsyncRelayCommand(SaveScheduleAsync);
         DeleteScheduleCommand = new AsyncRelayCommand(DeleteScheduleAsync);
     }
 
@@ -67,9 +67,9 @@ public sealed class ToolsViewModel : BaseViewModel
     private string _scheduleStatus = "No schedule configured";
     public string ScheduleStatus { get => _scheduleStatus; set => SetProperty(ref _scheduleStatus, value); }
 
-    private void SaveSchedule()
+    private async Task SaveScheduleAsync()
     {
-        _scheduler.SaveCleanupSchedule(ScheduleEnabled, ScheduleIntervalDays, ScheduleTime);
+        await _scheduler.SaveCleanupScheduleAsync(ScheduleEnabled, ScheduleIntervalDays, ScheduleTime);
         ScheduleStatus = ScheduleEnabled
             ? $"Scheduled: every {ScheduleIntervalDays} day(s) at {ScheduleTime}"
             : "Schedule disabled";

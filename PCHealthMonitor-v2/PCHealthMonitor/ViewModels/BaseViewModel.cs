@@ -1,47 +1,54 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 
 namespace PCHealthMonitor.ViewModels;
 
 /// <summary>
 /// Base class for all ViewModels.
-/// Implements INotifyPropertyChanged with CallerMemberName support.
+/// Implements INotifyPropertyChanged and provides a UI-thread dispatch helper.
 /// </summary>
 public abstract class BaseViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    /// <summary>
-    /// Raises PropertyChanged for the given property name.
-    /// </summary>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    {
+        // Always marshal PropertyChanged to the UI thread so bindings never crash
+        if (Application.Current?.Dispatcher.CheckAccess() == false)
+            Application.Current.Dispatcher.BeginInvoke(
+                () => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
+        else
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
-    /// <summary>
-    /// Sets a backing field and raises PropertyChanged only if the value changed.
-    /// Returns true if the value was changed.
-    /// </summary>
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-            return false;
-
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
         OnPropertyChanged(propertyName);
         return true;
     }
 
-    /// <summary>
-    /// Sets a backing field, raises PropertyChanged, then invokes an optional callback.
-    /// </summary>
     protected bool SetProperty<T>(ref T field, T value, Action? onChanged,
         [CallerMemberName] string? propertyName = null)
     {
-        if (!SetProperty(ref field, value, propertyName))
-            return false;
-
+        if (!SetProperty(ref field, value, propertyName)) return false;
         onChanged?.Invoke();
         return true;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> on the UI thread.
+    /// Call this before any ObservableCollection.Add() / .Clear() from a background task.
+    /// </summary>
+    protected static void OnUI(Action action)
+    {
+        if (Application.Current?.Dispatcher.CheckAccess() == true)
+            action();
+        else
+            Application.Current?.Dispatcher.BeginInvoke(action);
     }
 }

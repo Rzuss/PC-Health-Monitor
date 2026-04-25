@@ -1,7 +1,9 @@
 using PCHealthMonitor.ViewModels;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PCHealthMonitor.Services;
@@ -23,64 +25,96 @@ public sealed class CleanerService
                                         @"Microsoft\Windows\Explorer")]),
     ];
 
+    // CRITICAL FIX: Added 30-second CancellationToken so that large directories
+    // (Windows SoftwareDistribution with thousands of files, network drives, etc.)
+    // never block the background thread indefinitely. Without this, the scan could
+    // run forever, accumulating Task objects until an OutOfMemoryException occurred.
     public async Task<ScanResult> AnalyzeAsync()
     {
-        return await Task.Run(() =>
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
         {
-            var cats = new List<JunkCategory>();
-            foreach (var (name, paths) in Categories)
+            return await Task.Run(() => ScanAll(cts.Token), cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return new ScanResult();   // timed out — return empty result safely
+        }
+        catch
+        {
+            return new ScanResult();
+        }
+    }
+
+    private static ScanResult ScanAll(CancellationToken ct)
+    {
+        var cats = new List<JunkCategory>();
+        foreach (var (name, paths) in Categories)
+        {
+            if (ct.IsCancellationRequested) break;
+
+            long bytes = 0;
+            int  count = 0;
+            foreach (var p in paths)
             {
-                long bytes = 0;
-                int  count = 0;
-                foreach (var p in paths)
+                if (ct.IsCancellationRequested) break;
+                try
                 {
-                    try
+                    if (!Directory.Exists(p)) continue;
+                    var files = Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories);
+                    foreach (var f in files)
                     {
-                        if (!Directory.Exists(p)) continue;
-                        var files = Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories);
-                        foreach (var f in files)
-                        {
-                            try { var fi = new FileInfo(f); bytes += fi.Length; count++; } catch { }
-                        }
+                        if (ct.IsCancellationRequested) break;
+                        try { var fi = new FileInfo(f); bytes += fi.Length; count++; } catch { }
                     }
-                    catch { }
                 }
-                if (count > 0)
-                    cats.Add(new JunkCategory { Name = name, Bytes = bytes, FileCount = count });
+                catch { }
             }
-            return new ScanResult
-            {
-                Categories = cats,
-                TotalBytes = cats.Sum(c => c.Bytes),
-                FileCount  = cats.Sum(c => c.FileCount)
-            };
-        });
+            if (count > 0)
+                cats.Add(new JunkCategory { Name = name, Bytes = bytes, FileCount = count });
+        }
+        return new ScanResult
+        {
+            Categories = cats,
+            TotalBytes = cats.Sum(c => c.Bytes),
+            FileCount  = cats.Sum(c => c.FileCount)
+        };
     }
 
     public async Task<long> CleanAsync(IEnumerable<JunkCategory> categories)
     {
-        return await Task.Run(() =>
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        try
         {
-            long freed = 0;
-            foreach (var cat in categories.Where(c => c.Selected))
+            return await Task.Run(() => CleanAll(categories, cts.Token), cts.Token);
+        }
+        catch { return 0; }
+    }
+
+    private static long CleanAll(IEnumerable<JunkCategory> categories, CancellationToken ct)
+    {
+        long freed = 0;
+        foreach (var cat in categories.Where(c => c.Selected))
+        {
+            if (ct.IsCancellationRequested) break;
+            var entry = Categories.FirstOrDefault(e => e.Name == cat.Name);
+            if (entry == default) continue;
+            foreach (var p in entry.Paths)
             {
-                var entry = Categories.FirstOrDefault(e => e.Name == cat.Name);
-                if (entry == default) continue;
-                foreach (var p in entry.Paths)
+                if (ct.IsCancellationRequested) break;
+                try
                 {
-                    try
+                    if (!Directory.Exists(p)) continue;
+                    foreach (var f in Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories))
                     {
-                        if (!Directory.Exists(p)) continue;
-                        foreach (var f in Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories))
-                        {
-                            try { var fi = new FileInfo(f); freed += fi.Length; fi.Delete(); } catch { }
-                        }
+                        if (ct.IsCancellationRequested) break;
+                        try { var fi = new FileInfo(f); freed += fi.Length; fi.Delete(); } catch { }
                     }
-                    catch { }
                 }
+                catch { }
             }
-            return freed;
-        });
+        }
+        return freed;
     }
 }
 

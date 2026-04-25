@@ -6,16 +6,18 @@ namespace PCHealthMonitor.Helpers;
 public static class CommandExtensions
 {
     /// <summary>
-    /// Executes an ICommand and, if it returns a Task, awaits it.
-    /// Enables: await vm.ScanCommand.ExecuteAsync(null);
+    /// Awaits an AsyncRelayCommand properly.
+    /// For plain ICommand, fires Execute() and returns immediately.
     /// </summary>
-    public static async Task ExecuteAsync(this ICommand command, object? parameter)
+    public static Task ExecuteAsync(this ICommand command, object? parameter = null)
     {
-        if (command.CanExecute(parameter))
-        {
-            command.Execute(parameter);
-            // Allow async relay commands to complete
-            await Task.Yield();
-        }
+        if (!command.CanExecute(parameter))
+            return Task.CompletedTask;
+
+        if (command is AsyncRelayCommand arc)
+            return arc.ExecuteAsync(parameter);
+
+        command.Execute(parameter);
+        return Task.CompletedTask;
     }
 }

@@ -14,7 +14,6 @@ public sealed class SchedulerService
         return await Task.Run(() =>
         {
             var entries = new List<StartupEntry>();
-            // HKCU Run
             using var key = Microsoft.Win32.Registry.CurrentUser
                 .OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run");
             if (key is not null)
@@ -37,40 +36,52 @@ public sealed class SchedulerService
 
     public void SetStartupEntry(StartupEntry entry)
     {
-        using var key = Microsoft.Win32.Registry.CurrentUser
-            .OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", writable: true);
-        if (key is null) return;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser
+                .OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", writable: true);
+            if (key is null) return;
 
-        if (entry.IsEnabled)
-            key.SetValue(entry.Name, entry.Path);
-        else
-            key.DeleteValue(entry.Name, throwOnMissingValue: false);
+            if (entry.IsEnabled)
+                key.SetValue(entry.Name, entry.Path);
+            else
+                key.DeleteValue(entry.Name, throwOnMissingValue: false);
+        }
+        catch { /* insufficient permissions — silent fail */ }
     }
 
-    public void SaveCleanupSchedule(bool enabled, int days, string time)
+    // ── Schedule via schtasks.exe (async — never blocks the UI thread) ─────
+    public async Task SaveCleanupScheduleAsync(bool enabled, int days, string time)
     {
-        if (!enabled) { DeleteCleanupScheduleAsync().GetAwaiter().GetResult(); return; }
-
-        // Create Windows Task Scheduler task via schtasks.exe
-        var args = $"/Create /F /TN \"{TaskName}\" /TR \"\\\"{Process.GetCurrentProcess().MainModule?.FileName}\\\" /silent\" " +
-                   $"/SC DAILY /MO {days} /ST {time} /RL HIGHEST";
-        Process.Start(new ProcessStartInfo("schtasks.exe", args)
+        if (!enabled)
         {
-            CreateNoWindow  = true,
-            UseShellExecute = false
-        })?.WaitForExit();
+            await DeleteCleanupScheduleAsync();
+            return;
+        }
+
+        var exe  = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
+        var args = $"/Create /F /TN \"{TaskName}\" /TR \"\\\"{exe}\\\" /silent\" " +
+                   $"/SC DAILY /MO {days} /ST {time} /RL HIGHEST";
+
+        await RunProcessAsync("schtasks.exe", args);
     }
 
     public async Task DeleteCleanupScheduleAsync()
+        => await RunProcessAsync("schtasks.exe", $"/Delete /F /TN \"{TaskName}\"");
+
+    private static Task RunProcessAsync(string exe, string args)
     {
-        await Task.Run(() =>
+        return Task.Run(() =>
         {
-            var args = $"/Delete /F /TN \"{TaskName}\"";
-            Process.Start(new ProcessStartInfo("schtasks.exe", args)
+            try
             {
-                CreateNoWindow  = true,
-                UseShellExecute = false
-            })?.WaitForExit();
+                Process.Start(new ProcessStartInfo(exe, args)
+                {
+                    CreateNoWindow  = true,
+                    UseShellExecute = false
+                })?.WaitForExit(10_000); // 10s timeout — never block indefinitely
+            }
+            catch { }
         });
     }
 }

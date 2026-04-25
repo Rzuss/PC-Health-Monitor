@@ -33,19 +33,19 @@
         <!-- Stats bar -->
         <Border Grid.Row="2" Style="{StaticResource Card2Style}">
             <StackPanel Orientation="Horizontal">
-                <StackPanel>
-                    <TextBlock x:Name="TotalLbl" Text="{Binding Entries.Count}"
+                <StackPanel Margin="0,0,32,0">
+                    <TextBlock Text="{Binding TotalCount}"
                                Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource BlueBrush}"/>
                     <TextBlock Text="Total entries" Style="{StaticResource TextCaptionStyle}"/>
                 </StackPanel>
-                <StackPanel>
-                    <TextBlock Text="--" Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource GreenBrush}"
-                               x:Name="EnabledLbl"/>
+                <StackPanel Margin="0,0,32,0">
+                    <TextBlock Text="{Binding EnabledCount}"
+                               Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource GreenBrush}"/>
                     <TextBlock Text="Enabled" Style="{StaticResource TextCaptionStyle}"/>
                 </StackPanel>
                 <StackPanel>
-                    <TextBlock Text="--" Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource SubTextBrush}"
-                               x:Name="DisabledLbl"/>
+                    <TextBlock Text="{Binding DisabledCount}"
+                               Style="{StaticResource TextMetricStyle}" Foreground="{StaticResource SubTextBrush}"/>
                     <TextBlock Text="Disabled" Style="{StaticResource TextCaptionStyle}"/>
                 </StackPanel>
             </StackPanel>
@@ -57,14 +57,18 @@
                       Style="{StaticResource DarkDataGridStyle}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
-                      IsReadOnly="True"
+                      IsReadOnly="False"
                       Margin="0">
                 <DataGrid.Columns>
-                    <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70"/>
-                    <DataGridTextColumn Header="Program"   Binding="{Binding Name}"      Width="*" MinWidth="160"/>
-                    <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}"  Width="180"/>
-                    <DataGridTextColumn Header="Impact"    Binding="{Binding Impact}"     Width="80"/>
-                    <DataGridTextColumn Header="Path"      Binding="{Binding Path}"       Width="260"/>
+                    <!-- Checkbox column — always editable -->
+                    <DataGridCheckBoxColumn Header="Enabled"
+                                           Binding="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
+                                           Width="70"
+                                           IsReadOnly="False"/>
+                    <DataGridTextColumn Header="Program"   Binding="{Binding Name}"      Width="*"   MinWidth="160" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}"  Width="180" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Impact"    Binding="{Binding Impact}"     Width="80"  IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Path"      Binding="{Binding Path}"       Width="260" IsReadOnly="True"/>
                 </DataGrid.Columns>
             </DataGrid>
         </Border>

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using PCHealthMonitor.Services;
 using PCHealthMonitor.ViewModels;
 using System;
@@ -40,6 +41,15 @@ public partial class DashboardView : Page
     // ── Hardware snapshot → UI ────────────────────────────────────────────
     private void OnSnapshot(object? sender, HardwareSnapshot snap)
     {
+        // Always marshal to the UI thread.
+        // SnapshotUpdated should already be raised on the UI thread (DispatcherTimer),
+        // but this guard protects against any future re-entrancy or threading change.
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnSnapshot(sender, snap));
+            return;
+        }
+
         // CPU
         CpuLoadLabel.Text = $"{snap.CpuLoad:0}%";
         CpuTempLabel.Text = snap.CpuTempC > 0 ? $"{snap.CpuTempC:0} °C" : "-- °C";

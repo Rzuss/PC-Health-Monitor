@@ -15,33 +15,22 @@ public sealed class DashboardViewModel : BaseViewModel
     {
         _hardware = hardware;
         _cleaner  = cleaner;
-
         RunQuickScanCommand = new AsyncRelayCommand(RunQuickScanAsync);
     }
 
-    // ── Commands ──────────────────────────────────────────────────────────
     public ICommand RunQuickScanCommand { get; }
 
-    // ── Properties ───────────────────────────────────────────────────────
     private bool _isScanning;
-    public bool IsScanning
-    {
-        get => _isScanning;
-        set => SetProperty(ref _isScanning, value);
-    }
+    public bool IsScanning { get => _isScanning; set => SetProperty(ref _isScanning, value); }
 
     private int _issueCount;
-    public int IssueCount
-    {
-        get => _issueCount;
-        set => SetProperty(ref _issueCount, value);
-    }
+    public int IssueCount { get => _issueCount; set => SetProperty(ref _issueCount, value); }
 
     private long _junkBytes;
     public long JunkBytes
     {
         get => _junkBytes;
-        set => SetProperty(ref _junkBytes, value);
+        set { SetProperty(ref _junkBytes, value); OnPropertyChanged(nameof(JunkDisplay)); }
     }
 
     public string JunkDisplay => JunkBytes switch
@@ -54,29 +43,27 @@ public sealed class DashboardViewModel : BaseViewModel
 
     public ObservableCollection<AlertItem> Alerts { get; } = new();
 
-    // ── Quick scan ────────────────────────────────────────────────────────
+    // ── Quick scan — all collection updates happen on UI thread via OnUI() ──
     private async Task RunQuickScanAsync()
     {
         if (IsScanning) return;
         IsScanning = true;
-        Alerts.Clear();
+        OnUI(Alerts.Clear);
 
         try
         {
-            // Junk analysis
             var result = await _cleaner.AnalyzeAsync();
-            JunkBytes   = result.TotalBytes;
-            IssueCount  = result.FileCount;
-            OnPropertyChanged(nameof(JunkDisplay));
+            JunkBytes  = result.TotalBytes;
+            IssueCount = result.FileCount;
 
-            // Hardware-based alerts
             var snap = _hardware.Latest;
+
             if (snap.CpuTempC > 80)
-                Alerts.Add(new AlertItem("🌡️", $"CPU temperature is high: {snap.CpuTempC:0}°C"));
+                OnUI(() => Alerts.Add(new AlertItem("🌡️", $"CPU temperature is high: {snap.CpuTempC:0}°C")));
             if (snap.RamLoad > 85)
-                Alerts.Add(new AlertItem("⚠️", $"Memory usage is high: {snap.RamLoad}%"));
+                OnUI(() => Alerts.Add(new AlertItem("⚠️", $"Memory usage is high: {snap.RamLoad}%")));
             if (result.TotalBytes > 500_000_000)
-                Alerts.Add(new AlertItem("🗑️", $"{JunkDisplay} of junk files found"));
+                OnUI(() => Alerts.Add(new AlertItem("🗑️", $"{JunkDisplay} of junk files found")));
         }
         finally
         {

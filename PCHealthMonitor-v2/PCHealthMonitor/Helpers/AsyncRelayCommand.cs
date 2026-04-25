@@ -5,9 +5,8 @@ using System.Windows.Input;
 namespace PCHealthMonitor.Helpers;
 
 /// <summary>
-/// Asynchronous ICommand implementation.
+/// Asynchronous ICommand — exposes ExecuteAsync for awaitable call-sites.
 /// Prevents re-entrant execution while a task is running.
-/// Propagates exceptions via the standard WPF UnhandledException path.
 /// </summary>
 public sealed class AsyncRelayCommand : ICommand
 {
@@ -36,10 +35,16 @@ public sealed class AsyncRelayCommand : ICommand
     public bool CanExecute(object? parameter)
         => !_isExecuting && (_canExecute?.Invoke(parameter) ?? true);
 
+    /// <summary>Fire-and-forget execution (required by ICommand interface).</summary>
     public async void Execute(object? parameter)
     {
-        if (!CanExecute(parameter)) return;
+        await ExecuteAsync(parameter);
+    }
 
+    /// <summary>Awaitable execution — use this from code-behind Loaded handlers.</summary>
+    public async Task ExecuteAsync(object? parameter = null)
+    {
+        if (!CanExecute(parameter)) return;
         try
         {
             _isExecuting = true;
@@ -53,7 +58,5 @@ public sealed class AsyncRelayCommand : ICommand
         }
     }
 
-    /// <summary>Forces WPF to re-query CanExecute.</summary>
-    public static void RaiseCanExecuteChanged()
-        => CommandManager.InvalidateRequerySuggested();
+    public static void RaiseCanExecuteChanged() => CommandManager.InvalidateRequerySuggested();
 }

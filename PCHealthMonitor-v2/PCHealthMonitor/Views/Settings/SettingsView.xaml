@@ -14,8 +14,8 @@
                 <StackPanel>
                     <TextBlock Text="General" Style="{StaticResource TextH3Style}" Margin="0,0,0,16"/>
 
-                    <StackPanel <!-- Spacing not supported in WPF -->>
-                        <StackPanel Orientation="Horizontal" <!-- Spacing not supported in WPF -->>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding StartWithWindows}"/>
                             <StackPanel>
@@ -25,7 +25,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" <!-- Spacing not supported in WPF -->>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding MinimizeToTray}"/>
                             <StackPanel>
@@ -35,7 +35,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" <!-- Spacing not supported in WPF -->>
+                        <StackPanel Orientation="Horizontal">
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding ShowNotifications}"/>
                             <StackPanel>
@@ -48,9 +48,9 @@
 
                     <Separator Margin="0,16"/>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" <!-- Spacing not supported in WPF -->>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Content="Reset Defaults" Style="{StaticResource SecondaryButtonStyle}"
-                                Command="{Binding ResetCommand}" Width="140"/>
+                                Command="{Binding ResetCommand}" Width="140" Margin="0,0,12,0"/>
                         <Button Content="Save Settings"  Style="{StaticResource PrimaryButtonStyle}"
                                 Command="{Binding SaveCommand}"  Width="140"/>
                     </StackPanel>
@@ -82,7 +82,7 @@
                         <TextBox Grid.Column="0"
                                  Text="{Binding LicenseKey, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource DarkTextBoxStyle}"
-                                 PlaceholderText="XXXX-XXXX-XXXX-XXXX"/>
+                                 Tag="XXXX-XXXX-XXXX-XXXX"/>
                         <Button Grid.Column="2"
                                 Content="Activate"
                                 Style="{StaticResource PrimaryButtonStyle}"

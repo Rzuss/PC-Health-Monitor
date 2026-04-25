@@ -317,7 +317,7 @@
                         <TextBlock Text="System Alerts"
                                    Style="{StaticResource TextH3Style}"
                                    Margin="0,0,0,12"/>
-                        <ItemsControl x:Name="AlertsList">
+                        <ItemsControl ItemsSource="{Binding Alerts}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="{StaticResource BgCard2Brush}"
@@ -335,11 +335,21 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock x:Name="NoAlertsText"
-                                   Text="No alerts — system looks good!"
-                                   Style="{StaticResource TextCaptionStyle}"
+                        <!-- Shown only when Alerts list is empty -->
+                        <TextBlock Text="Run a scan to check system health"
                                    HorizontalAlignment="Center"
-                                   Margin="0,8"/>
+                                   Margin="0,8">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource TextCaptionStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Alerts.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </Border>
             </Grid>

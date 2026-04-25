@@ -1,4 +1,5 @@
 using Hardcodet.Wpf.TaskbarNotification;
+using Microsoft.Extensions.DependencyInjection;
 using PCHealthMonitor.Services;
 using PCHealthMonitor.ViewModels;
 using PCHealthMonitor.Views.Dashboard;
@@ -24,7 +25,6 @@ public partial class MainWindow : Window
     private readonly LicenseService  _license;
     private readonly HardwareService _hardware;
     private TaskbarIcon?             _trayIcon;
-    private Button?                  _activeNavBtn;
     private bool                     _isMaximized;
 
     // ─── Constructor ──────────────────────────────────────────────────────
@@ -56,13 +56,18 @@ public partial class MainWindow : Window
     // ─── Hardware snapshot → title bar status ─────────────────────────────
     private void OnSnapshotUpdated(object? sender, HardwareSnapshot snap)
     {
-        StatusText.Text = snap.HealthScore switch
+        var text = snap.HealthScore switch
         {
             >= 80 => $"System is healthy  ·  CPU {snap.CpuLoad:0}%  RAM {snap.RamLoad}%",
             >= 60 => $"System is good  ·  CPU {snap.CpuLoad:0}%  RAM {snap.RamLoad}%",
             >= 40 => $"System needs attention  ·  CPU {snap.CpuLoad:0}%",
             _     => $"Performance is degraded  ·  CPU {snap.CpuLoad:0}%"
         };
+
+        if (Dispatcher.CheckAccess())
+            StatusText.Text = text;
+        else
+            Dispatcher.BeginInvoke(() => StatusText.Text = text);
     }
 
     // ─── Navigation ───────────────────────────────────────────────────────
@@ -92,15 +97,15 @@ public partial class MainWindow : Window
         // Navigate frame to the appropriate Page
         Page? target = page switch
         {
-            "Dashboard"   => App.Services.GetService<DashboardView>()   ?? new DashboardView(),
-            "Startup"     => App.Services.GetService<StartupView>()     ?? new StartupView(),
-            "JunkCleaner" => App.Services.GetService<JunkCleanerView>() ?? new JunkCleanerView(),
-            "Storage"     => App.Services.GetService<StorageView>()     ?? new StorageView(),
-            "Boost"       => App.Services.GetService<BoostView>()       ?? new BoostView(),
-            "DiskHealth"  => App.Services.GetService<DiskHealthView>()  ?? new DiskHealthView(),
-            "Tools"       => App.Services.GetService<ToolsView>()       ?? new ToolsView(),
-            "Network"     => App.Services.GetService<NetworkView>()     ?? new NetworkView(),
-            "Settings"    => App.Services.GetService<SettingsView>()    ?? new SettingsView(),
+            "Dashboard"   => App.Services.GetRequiredService<DashboardView>()   ?? new DashboardView(),
+            "Startup"     => App.Services.GetRequiredService<StartupView>()     ?? new StartupView(),
+            "JunkCleaner" => App.Services.GetRequiredService<JunkCleanerView>() ?? new JunkCleanerView(),
+            "Storage"     => App.Services.GetRequiredService<StorageView>()     ?? new StorageView(),
+            "Boost"       => App.Services.GetRequiredService<BoostView>()       ?? new BoostView(),
+            "DiskHealth"  => App.Services.GetRequiredService<DiskHealthView>()  ?? new DiskHealthView(),
+            "Tools"       => App.Services.GetRequiredService<ToolsView>()       ?? new ToolsView(),
+            "Network"     => App.Services.GetRequiredService<NetworkView>()     ?? new NetworkView(),
+            "Settings"    => App.Services.GetRequiredService<SettingsView>()    ?? new SettingsView(),
             _             => null
         };
 

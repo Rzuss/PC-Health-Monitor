@@ -14,23 +14,27 @@ public sealed class BoostService
         if (_isActive) return;
         await Task.Run(() =>
         {
-            // Elevate foreground processes to High priority
-            try
+            // Elevate foreground GUI processes to High priority
+            foreach (var proc in Process.GetProcesses())
             {
-                foreach (var proc in Process.GetProcesses())
+                using (proc)
                 {
                     try
                     {
-                        if (proc.MainWindowHandle != IntPtr.Zero) // foreground / GUI process
+                        if (proc.MainWindowHandle != IntPtr.Zero)
                             proc.PriorityClass = ProcessPriorityClass.High;
                     }
                     catch { }
                 }
             }
-            catch { }
 
-            // Flush standby memory via EmptyWorkingSet on own process (safe)
-            try { EmptyWorkingSet(Process.GetCurrentProcess().Handle); } catch { }
+            // Flush own working set (safe, no admin needed)
+            try
+            {
+                using var self = Process.GetCurrentProcess();
+                EmptyWorkingSet(self.Handle);
+            }
+            catch { }
 
             _isActive = true;
         });
@@ -39,9 +43,10 @@ public sealed class BoostService
     public void Deactivate()
     {
         if (!_isActive) return;
-        try
+
+        foreach (var proc in Process.GetProcesses())
         {
-            foreach (var proc in Process.GetProcesses())
+            using (proc)
             {
                 try
                 {
@@ -51,7 +56,7 @@ public sealed class BoostService
                 catch { }
             }
         }
-        catch { }
+
         _isActive = false;
     }
 

@@ -1,0 +1,20 @@
+﻿PCHealthMonitor
+2.0.0.0
+
+winexe
+C#
+.cs
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\obj\Release\net8.0-windows\win-x64\
+PCHealthMonitor
+none
+false
+TRACE;RELEASE;NET;NET8_0;NETCOREAPP
+C:\Users\rotem\OneDrive\Desktop\clean bot\PCHealthMonitor-v2\PCHealthMonitor\App.xaml
+14803472290
+
+381263135690
+240-1603389149
+MainWindow.xaml;Styles\Animations.xaml;Styles\Colors.xaml;Styles\Controls.xaml;Styles\Typography.xaml;Views\Boost\BoostView.xaml;Views\Dashboard\DashboardView.xaml;Views\DiskHealth\DiskHealthView.xaml;Views\JunkCleaner\JunkCleanerView.xaml;Views\Network\NetworkView.xaml;Views\Settings\SettingsView.xaml;Views\Startup\StartupView.xaml;Views\Storage\StorageView.xaml;Views\Tools\ToolsView.xaml;
+
+False
+
