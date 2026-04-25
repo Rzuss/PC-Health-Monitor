@@ -61,6 +61,9 @@ public partial class App : Application
 
         base.OnStartup(e);
 
+        // ── Integrity check (passive, logged) ────────────────────────────────
+        _ = IntegrityService.Check();   // fire-and-forget; result written to integrity.log
+
         // ── Build DI host ────────────────────────────────────────────────────
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices(ConfigureServices)
