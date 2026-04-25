@@ -340,6 +340,28 @@
                    JournalOwnership="OwnsJournal"
                    Background="Transparent"/>
 
+            <!-- ─── Toast Overlay ────────────────────────────────────── -->
+            <!-- Spans full content area (row 1 only, above sidebar too).
+                 IsHitTestVisible=False on the host so toasts never block
+                 clicks; individual toast cards enable hit-testing for
+                 the dismiss button. -->
+            <Grid Grid.Row="1" Grid.ColumnSpan="2"
+                  IsHitTestVisible="False"
+                  Panel.ZIndex="999">
+                <ItemsControl x:Name="ToastPanel"
+                              VerticalAlignment="Bottom"
+                              HorizontalAlignment="Right"
+                              Margin="0,0,24,24"
+                              IsHitTestVisible="True"
+                              Width="320">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Vertical"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </Grid>
+
         </Grid>
     </Border>
 </Window>

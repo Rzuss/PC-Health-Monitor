@@ -156,6 +156,7 @@ public partial class App : Application
         services.AddSingleton<LicenseService>();
         services.AddSingleton<SettingsService>();
         services.AddSingleton<SystemInfoService>();
+        services.AddSingleton<ToastService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

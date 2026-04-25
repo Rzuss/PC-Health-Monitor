@@ -13,11 +13,13 @@ using PCHealthMonitor.Views.Network;
 using PCHealthMonitor.Views.Settings;
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace PCHealthMonitor;
 
@@ -27,12 +29,14 @@ public partial class MainWindow : Window
     private readonly LicenseService  _license;
     private readonly HardwareService _hardware;
     private readonly SettingsService _settingsService;
+    private readonly ToastService    _toast;
     private TaskbarIcon?             _trayIcon;
     private bool                     _isMaximized;
 
     // ─── Constructor ──────────────────────────────────────────────────────
     public MainWindow(MainViewModel vm, LicenseService license,
-                      HardwareService hardware, SettingsService settingsService)
+                      HardwareService hardware, SettingsService settingsService,
+                      ToastService toast)
     {
         InitializeComponent();
 
@@ -40,6 +44,7 @@ public partial class MainWindow : Window
         _license         = license;
         _hardware        = hardware;
         _settingsService = settingsService;
+        _toast           = toast;
         DataContext = vm;
 
         // Initialize tray icon
@@ -47,6 +52,10 @@ public partial class MainWindow : Window
 
         // Wire hardware updates to status bar
         _hardware.SnapshotUpdated += OnSnapshotUpdated;
+
+        // Subscribe to toast events (fired from any thread → marshal to UI)
+        _toast.ToastRequested += (_, msg) =>
+            Dispatcher.InvokeAsync(() => ShowToast(msg));
 
         // Restore window geometry, then navigate on load
         Loaded += (_, _) =>
@@ -243,6 +252,182 @@ public partial class MainWindow : Window
     private void GetProBtn_Click(object sender, RoutedEventArgs e)
     {
         NavigateTo("Settings");
+    }
+
+    // ─── Keyboard shortcuts ───────────────────────────────────────────────
+    // Ctrl+1–8: switch tabs | Ctrl+R: navigate to Dashboard (re-scan)
+    // Esc: hide to tray
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        bool ctrl = Keyboard.Modifiers == ModifierKeys.Control;
+
+        if (ctrl)
+        {
+            var page = e.Key switch
+            {
+                Key.D1 or Key.NumPad1 => "Dashboard",
+                Key.D2 or Key.NumPad2 => "Startup",
+                Key.D3 or Key.NumPad3 => "JunkCleaner",
+                Key.D4 or Key.NumPad4 => "Storage",
+                Key.D5 or Key.NumPad5 => "Boost",
+                Key.D6 or Key.NumPad6 => "DiskHealth",
+                Key.D7 or Key.NumPad7 => "Tools",
+                Key.D8 or Key.NumPad8 => "Network",
+                Key.D9 or Key.NumPad9 => "Settings",
+                Key.R                  => "Dashboard",
+                _                      => null
+            };
+
+            if (page is not null)
+            {
+                NavigateTo(page);
+                e.Handled = true;
+            }
+        }
+        else if (e.Key == Key.Escape)
+        {
+            // Minimize to tray on Escape
+            SaveWindowGeometry();
+            Hide();
+            e.Handled = true;
+        }
+    }
+
+    // ─── Toast notification system ────────────────────────────────────────
+    // Called on the UI thread via Dispatcher.InvokeAsync.
+    // Creates a toast card, adds it to the ToastPanel, animates it in,
+    // waits for the duration, then animates it out and removes it.
+    private async void ShowToast(ToastMessage msg)
+    {
+        // ── Color scheme by type ──────────────────────────────────────────
+        var (accentHex, iconText) = msg.Type switch
+        {
+            ToastType.Success => ("#22C55E", "✓"),
+            ToastType.Warning => ("#F59E0B", "⚠"),
+            ToastType.Error   => ("#EF4444", "✕"),
+            _                 => ("#3B82F6", "ℹ"),
+        };
+        var accentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(accentHex));
+
+        // ── Build toast card ──────────────────────────────────────────────
+        var card = new Border
+        {
+            Background    = (Brush)FindResource("BgCard2Brush"),
+            CornerRadius  = new CornerRadius(10),
+            Margin        = new Thickness(0, 6, 0, 0),
+            Padding       = new Thickness(14, 11, 14, 11),
+            BorderBrush   = accentBrush,
+            BorderThickness = new Thickness(0, 0, 0, 0),
+            Opacity       = 0,
+            RenderTransform = new TranslateTransform(40, 0),
+        };
+        card.Effect = new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = Colors.Black, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.5
+        };
+
+        // Left accent bar + content
+        var innerGrid = new Grid();
+        innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) });
+        innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        // Left color strip
+        var strip = new Border
+        {
+            Background   = accentBrush,
+            CornerRadius = new CornerRadius(3),
+            Width = 4,
+            Margin = new Thickness(0, 0, 12, 0)
+        };
+        Grid.SetColumn(strip, 0);
+
+        // Icon
+        var icon = new TextBlock
+        {
+            Text               = iconText,
+            Foreground         = accentBrush,
+            FontSize           = 16,
+            FontWeight         = FontWeights.Bold,
+            VerticalAlignment  = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        Grid.SetColumn(icon, 1);
+
+        // Message text
+        var text = new TextBlock
+        {
+            Text               = msg.Text,
+            Foreground         = (Brush)FindResource("TextBrush"),
+            FontSize           = 13,
+            TextWrapping       = TextWrapping.Wrap,
+            VerticalAlignment  = VerticalAlignment.Center,
+            Margin             = new Thickness(0, 0, 8, 0),
+        };
+        Grid.SetColumn(text, 2);
+
+        // Dismiss button
+        var dismiss = new Button
+        {
+            Content         = "✕",
+            Foreground      = (Brush)FindResource("SubTextBrush"),
+            Background      = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            FontSize        = 11,
+            Cursor          = Cursors.Hand,
+            VerticalAlignment   = VerticalAlignment.Center,
+            Padding         = new Thickness(4),
+        };
+        Grid.SetColumn(dismiss, 3);
+
+        innerGrid.Children.Add(strip);
+        innerGrid.Children.Add(icon);
+        innerGrid.Children.Add(text);
+        innerGrid.Children.Add(dismiss);
+        card.Child = innerGrid;
+
+        ToastPanel.Items.Add(card);
+
+        // Track whether the user dismissed early
+        bool dismissed = false;
+        dismiss.Click += (_, _) => { dismissed = true; };
+
+        // ── Animate in — slide from right + fade ──────────────────────────
+        var translate = (TranslateTransform)card.RenderTransform;
+
+        var slideIn = new DoubleAnimation(40, 0,
+            new Duration(TimeSpan.FromMilliseconds(250)))
+        {
+            EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut }
+        };
+        var fadeIn = new DoubleAnimation(0, 1,
+            new Duration(TimeSpan.FromMilliseconds(200)));
+
+        translate.BeginAnimation(TranslateTransform.XProperty, slideIn);
+        card.BeginAnimation(OpacityProperty, fadeIn);
+
+        // ── Wait for duration (or early dismiss) ──────────────────────────
+        var elapsed = 0;
+        const int pollMs = 50;
+        while (elapsed < msg.DurationMs && !dismissed)
+        {
+            await Task.Delay(pollMs);
+            elapsed += pollMs;
+        }
+
+        // ── Animate out — fade ────────────────────────────────────────────
+        var fadeOut = new DoubleAnimation(1, 0,
+            new Duration(TimeSpan.FromMilliseconds(180)));
+
+        var tcs = new TaskCompletionSource<bool>();
+        fadeOut.Completed += (_, _) => tcs.TrySetResult(true);
+        card.BeginAnimation(OpacityProperty, fadeOut);
+
+        await tcs.Task;
+        ToastPanel.Items.Remove(card);
     }
 
     // ─── Edge resize (WM_NCHITTEST) ───────────────────────────────────────
