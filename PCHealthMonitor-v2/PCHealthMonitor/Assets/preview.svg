@@ -116,6 +116,4 @@
 </g>
 
 <rect x="20" y="12" width="640" height="456" rx="12" fill="none" stroke="#2a3550" stroke-width="1"/>
-<rect x="476" y="0" width="204" height="22" rx="6" fill="#1e2640"/>
-<text x="578" y="15" fill="#7c8db0" font-family="'Segoe UI',sans-serif" font-size="11" text-anchor="middle">WPF · .NET 8 · MVVM · DI · LibreHardwareMonitor</text>
 </svg>
