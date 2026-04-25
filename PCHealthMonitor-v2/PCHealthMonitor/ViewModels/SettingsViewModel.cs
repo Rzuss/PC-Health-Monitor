@@ -1,5 +1,6 @@
 using PCHealthMonitor.Helpers;
 using PCHealthMonitor.Services;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -56,10 +57,11 @@ public sealed class SettingsViewModel : BaseViewModel
     private string _licenseStatus = string.Empty;
     public string LicenseStatus { get => _licenseStatus; set => SetProperty(ref _licenseStatus, value); }
 
-    // ── App info ──────────────────────────────────────────────────────────
-    public string Version     => "2.0.0";
-    public string AppName     => "PC Health Monitor";
-    public string CopyrightTxt => "© 2025 Rotem. All rights reserved.";
+    // ── App info (read from assembly metadata — always in sync with .csproj) ─
+    public string Version      => Assembly.GetExecutingAssembly()
+                                          .GetName().Version?.ToString(3) ?? "2.0.0";
+    public string AppName      => "PC Health Monitor";
+    public string CopyrightTxt => "© 2026 Rotem Zussman. All rights reserved.";
 
     // ── Commands ──────────────────────────────────────────────────────────
     private void Save()

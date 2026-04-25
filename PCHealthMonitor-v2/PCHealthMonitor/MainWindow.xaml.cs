@@ -26,17 +26,20 @@ public partial class MainWindow : Window
     private readonly MainViewModel    _vm;
     private readonly LicenseService  _license;
     private readonly HardwareService _hardware;
+    private readonly SettingsService _settingsService;
     private TaskbarIcon?             _trayIcon;
     private bool                     _isMaximized;
 
     // ─── Constructor ──────────────────────────────────────────────────────
-    public MainWindow(MainViewModel vm, LicenseService license, HardwareService hardware)
+    public MainWindow(MainViewModel vm, LicenseService license,
+                      HardwareService hardware, SettingsService settingsService)
     {
         InitializeComponent();
 
-        _vm       = vm;
-        _license  = license;
-        _hardware = hardware;
+        _vm              = vm;
+        _license         = license;
+        _hardware        = hardware;
+        _settingsService = settingsService;
         DataContext = vm;
 
         // Initialize tray icon
@@ -45,14 +48,17 @@ public partial class MainWindow : Window
         // Wire hardware updates to status bar
         _hardware.SnapshotUpdated += OnSnapshotUpdated;
 
-        // Navigate to Dashboard on load
+        // Restore window geometry, then navigate on load
         Loaded += (_, _) =>
         {
+            RestoreWindowGeometry();
             NavigateTo("Dashboard");
             UpdateProBadge();
         };
 
-        Closed += (_, _) => _trayIcon?.Dispose();
+        // Save geometry whenever the window is actually closing
+        Closing += (_, _) => SaveWindowGeometry();
+        Closed  += (_, _) => _trayIcon?.Dispose();
     }
 
     // ─── Hardware snapshot → title bar status ─────────────────────────────
@@ -161,7 +167,8 @@ public partial class MainWindow : Window
 
     private void CloseBtn_Click(object sender, RoutedEventArgs e)
     {
-        // Minimize to tray instead of closing
+        // Save geometry before hiding so tray-only sessions persist size/pos
+        SaveWindowGeometry();
         Hide();
     }
 
@@ -191,6 +198,45 @@ public partial class MainWindow : Window
     {
         _trayIcon?.Dispose();
         Application.Current.Shutdown();
+    }
+
+    // ─── Window geometry persistence ──────────────────────────────────────
+    private void RestoreWindowGeometry()
+    {
+        try
+        {
+            var s = _settingsService.Load();
+            if (s.WindowLeft >= 0 && s.WindowTop >= 0)
+            {
+                // Clamp to ensure window is on a visible screen
+                var wa = SystemParameters.WorkArea;
+                Left   = Math.Max(0, Math.Min(s.WindowLeft, wa.Right  - 200));
+                Top    = Math.Max(0, Math.Min(s.WindowTop,  wa.Bottom - 100));
+            }
+            if (s.WindowWidth  >= MinWidth)  Width  = s.WindowWidth;
+            if (s.WindowHeight >= MinHeight) Height = s.WindowHeight;
+        }
+        catch { /* leave defaults */ }
+    }
+
+    private void SaveWindowGeometry()
+    {
+        try
+        {
+            if (WindowState == WindowState.Minimized) return; // don't save minimized state
+
+            var s = _settingsService.Load();
+            if (WindowState == WindowState.Normal)
+            {
+                s.WindowLeft   = Left;
+                s.WindowTop    = Top;
+                s.WindowWidth  = Width;
+                s.WindowHeight = Height;
+            }
+            // If maximized, keep the last Normal geometry so restore looks right
+            _settingsService.Save(s);
+        }
+        catch { }
     }
 
     // ─── Upgrade ─────────────────────────────────────────────────────────

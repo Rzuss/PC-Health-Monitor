@@ -39,8 +39,16 @@ public sealed class SettingsService
 
 public sealed class AppSettings
 {
+    // ── User preferences ──────────────────────────────────────────────────
     public bool StartWithWindows  { get; set; } = false;
     public bool MinimizeToTray    { get; set; } = true;
     public bool ShowNotifications { get; set; } = true;
     public int  ScanIntervalHours { get; set; } = 24;
+
+    // ── Window geometry (persisted between sessions) ───────────────────────
+    // -1 = not set; window will use its XAML defaults (CenterScreen, 1200×780)
+    public double WindowLeft   { get; set; } = -1;
+    public double WindowTop    { get; set; } = -1;
+    public double WindowWidth  { get; set; } = 1200;
+    public double WindowHeight { get; set; } = 780;
 }
