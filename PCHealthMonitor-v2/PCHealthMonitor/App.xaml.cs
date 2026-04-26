@@ -84,6 +84,9 @@ public partial class App : Application
             return;
         }
 
+        // ── Background license refresh (silent, non-blocking) ────────────────
+        _ = Services.GetRequiredService<LicenseService>().RefreshAsync();
+
         // ── Normal startup ───────────────────────────────────────────────────
         var mainWindow = Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
@@ -154,6 +157,7 @@ public partial class App : Application
         services.AddSingleton<BatteryService>();
         services.AddSingleton<ReportService>();
         services.AddSingleton<LicenseService>();
+        services.AddSingleton<ProFeatureService>();
         services.AddSingleton<SettingsService>();
         services.AddSingleton<SystemInfoService>();
         services.AddSingleton<ToastService>();

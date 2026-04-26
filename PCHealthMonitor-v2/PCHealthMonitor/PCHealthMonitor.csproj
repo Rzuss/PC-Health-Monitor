@@ -42,6 +42,9 @@
     <!-- JSON (settings, license, reports) -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
 
+    <!-- DPAPI — encrypt license cache with Windows user account key -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+
     <!-- Async helpers -->
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
   </ItemGroup>

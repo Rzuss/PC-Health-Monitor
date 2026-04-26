@@ -81,9 +81,9 @@ public sealed class SettingsViewModel : BaseViewModel
         IsBusy = true;
         LicenseStatus = "Validating license...";
 
-        bool ok = await _license.ActivateAsync(LicenseKey.Trim());
+        var (ok, msg) = await _license.ActivateAsync(LicenseKey.Trim());
         IsActivated   = ok;
-        LicenseStatus = ok ? "Pro activated — thank you!" : "Invalid license key. Please try again.";
+        LicenseStatus = msg;
         IsBusy = false;
     }
 

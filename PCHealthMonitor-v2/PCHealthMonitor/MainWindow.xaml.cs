@@ -53,6 +53,14 @@ public partial class MainWindow : Window
         // Wire hardware updates to status bar
         _hardware.SnapshotUpdated += OnSnapshotUpdated;
 
+        // Refresh Pro badge whenever activation state changes
+        _license.ProStatusChanged += (_, isPro) =>
+            Dispatcher.InvokeAsync(() =>
+            {
+                UpdateProBadge();
+                _vm.NotifyProStatusChanged();
+            });
+
         // Subscribe to toast events (fired from any thread → marshal to UI)
         _toast.ToastRequested += (_, msg) =>
             Dispatcher.InvokeAsync(() => ShowToast(msg));
