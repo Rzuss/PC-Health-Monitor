@@ -1,6 +1,6 @@
 name: Release — PC Health Monitor (WPF)
 
-# Triggers on version tags (git tag v2.0.1 && git push origin v2.0.1)
+# Triggers ONLY on version tags (v2.0.1, v2.1.0, etc.)
 # or manually from GitHub Actions UI.
 on:
   push:
@@ -25,6 +25,9 @@ jobs:
     name: Build · Package · Release
     runs-on: windows-latest
 
+    # Guard: on tag-push, only run if this is actually a version tag
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
       - name: Checkout
@@ -43,6 +46,11 @@ jobs:
             $tag = "${{ github.ref_name }}"
             $ver = $tag.TrimStart('v')
             $pre = $ver -match '-'
+          }
+          # Validate version looks like semver
+          if ($ver -notmatch '^\d+\.\d+') {
+            Write-Error "Invalid version: '$ver' — must be semver like 2.0.1"
+            exit 1
           }
           "VER=$ver" | Out-File $env:GITHUB_OUTPUT -Append
           "TAG=$tag" | Out-File $env:GITHUB_OUTPUT -Append
@@ -89,28 +97,29 @@ jobs:
         run: |
           $ver = "${{ steps.ver.outputs.VER }}"
 
-          # Read and patch the .iss (version + publish dir must point to our output)
+          # Patch version + publish dir in the .iss file
           $iss = Get-Content PCHealthMonitor-v2/installer.iss -Raw
           $iss = $iss -replace '#define AppVersion\s+"[^"]+"',  "#define AppVersion   `"$ver`""
           $iss = $iss -replace '#define PublishDir\s+"[^"]+"',  "#define PublishDir   `"..\publish-output`""
           Set-Content PCHealthMonitor-v2/installer.iss $iss -Encoding UTF8
+          Write-Host "Patched installer.iss — AppVersion=$ver  PublishDir=..\publish-output"
 
-          # Create output folder
+          # Ensure output folder exists
           New-Item -ItemType Directory -Force -Path PCHealthMonitor-v2/dist | Out-Null
 
-          # Build
-          iscc PCHealthMonitor-v2/installer.iss
-          if ($LASTEXITCODE -ne 0) { throw "iscc failed with exit code $LASTEXITCODE" }
+          # Build installer
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" PCHealthMonitor-v2/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
 
-          # The .iss OutputBaseFilename uses {#AppVersion} — rename to canonical name
-          $built = Get-ChildItem "PCHealthMonitor-v2/dist/*.exe" | Select-Object -First 1
-          if (-not $built) { throw "Installer exe not found in PCHealthMonitor-v2/dist/" }
-
-          $target = "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
-          if ($built.FullName -ne (Resolve-Path $target -ErrorAction SilentlyContinue)) {
-            Rename-Item $built.FullName $target -ErrorAction SilentlyContinue
+          # Confirm output file exists
+          $installer = "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
+          if (-not (Test-Path $installer)) {
+            # Inno may name it differently — list what's there
+            $found = Get-ChildItem "PCHealthMonitor-v2/dist/" -Filter "*.exe" | Select-Object -ExpandProperty FullName
+            Write-Host "Files in dist: $found"
+            # Rename to canonical name
+            if ($found) { Rename-Item $found[0] (Resolve-Path "PCHealthMonitor-v2/dist/").Path + "PCHealthMonitor-Setup-$ver.exe" }
           }
-
           $final = Get-Item "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
           Write-Host "Installer ready: $($final.Name)  ($([math]::Round($final.Length/1MB,1)) MB)"
 
@@ -149,7 +158,7 @@ jobs:
 ### What's New in v$ver
 - Real-time dashboard with animated CPU / RAM / Disk gauges
 - Toast notification system (Success / Warning / Error / Info)
-- Keyboard shortcuts: Ctrl+1–9 to switch tabs, Ctrl+R to scan, Esc to tray
+- Keyboard shortcuts: Ctrl+1-9 to switch tabs, Ctrl+R to scan, Esc to tray
 - Window size & position remembered between sessions
 - Integrity audit log on every launch
 
@@ -167,11 +176,11 @@ Get-FileHash "PCHealthMonitor-Setup-$ver.exe" -Algorithm SHA256
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name:               ${{ steps.ver.outputs.TAG }}
-          name:                   "PC Health Monitor v${{ steps.ver.outputs.VER }}"
-          body_path:              RELEASE_NOTES.md
-          draft:                  false
-          prerelease:             ${{ steps.ver.outputs.PRE }}
+          tag_name:                ${{ steps.ver.outputs.TAG }}
+          name:                    "PC Health Monitor v${{ steps.ver.outputs.VER }}"
+          body_path:               RELEASE_NOTES.md
+          draft:                   false
+          prerelease:              ${{ steps.ver.outputs.PRE }}
           fail_on_unmatched_files: true
           files: |
             PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-${{ steps.ver.outputs.VER }}.exe
