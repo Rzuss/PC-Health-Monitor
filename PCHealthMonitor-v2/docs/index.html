@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="PC Health Monitor — Real-time system optimization for Windows. Monitor CPU, RAM, disk, clean junk files, boost performance. 100% offline, no admin required."/>
+  <meta property="og:title" content="PC Health Monitor"/>
+  <meta property="og:description" content="Real-time system optimization for Windows. 100% offline, no telemetry."/>
+  <meta property="og:image" content="https://raw.githubusercontent.com/Rzuss/PC-Health-Monitor/main/screenshots/dashboard-preview.svg"/>
+  <meta property="og:type" content="website"/>
+  <title>PC Health Monitor — Real-time System Optimization for Windows</title>
+
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #07070D;
+      color: #E8E8F0;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Design tokens ─────────────────────────────────────────────────── */
+    :root {
+      --bg-base:    #07070D;
+      --bg-card:    #0F0F18;
+      --bg-card2:   #14141F;
+      --border:     rgba(255,255,255,0.07);
+      --border-hi:  rgba(255,255,255,0.13);
+      --blue:       #4F6EF7;
+      --blue-glow:  rgba(79,110,247,0.18);
+      --blue-dark:  #3B54D4;
+      --green:      #22C55E;
+      --amber:      #F59E0B;
+      --red:        #EF4444;
+      --purple:     #8B5CF6;
+      --text:       #E8E8F0;
+      --subtext:    #7878A0;
+      --caption:    #5A5A7A;
+      --radius-sm:  8px;
+      --radius-md:  12px;
+      --radius-lg:  16px;
+      --radius-xl:  24px;
+    }
+
+    /* ── Utility ───────────────────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 100px;
+      font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    }
+    .badge-blue   { background: var(--blue-glow); color: var(--blue); border: 1px solid rgba(79,110,247,.3); }
+    .badge-green  { background: rgba(34,197,94,.12); color: var(--green); border: 1px solid rgba(34,197,94,.25); }
+    .badge-amber  { background: rgba(245,158,11,.12); color: var(--amber); border: 1px solid rgba(245,158,11,.25); }
+    .badge-purple { background: rgba(139,92,246,.12); color: var(--purple); border: 1px solid rgba(139,92,246,.25); }
+
+    /* ── Navbar ────────────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(7,7,13,.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 60px; gap: 20px;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 15px; font-weight: 700; color: var(--text);
+      text-decoration: none;
+    }
+    .nav-logo svg { flex-shrink: 0; }
+    .nav-links {
+      display: flex; align-items: center; gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--subtext); text-decoration: none; font-size: 14px;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .btn-nav {
+      padding: 8px 18px; border-radius: var(--radius-sm);
+      background: var(--blue); color: #fff; font-size: 14px; font-weight: 600;
+      text-decoration: none; border: none; cursor: pointer;
+      transition: background .2s, transform .15s;
+    }
+    .btn-nav:hover { background: var(--blue-dark); transform: translateY(-1px); }
+
+    /* ── Buttons ───────────────────────────────────────────────────────── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 9px;
+      padding: 14px 28px; border-radius: var(--radius-md);
+      background: var(--blue); color: #fff; font-size: 15px; font-weight: 700;
+      text-decoration: none; border: none; cursor: pointer;
+      box-shadow: 0 0 32px rgba(79,110,247,.35);
+      transition: background .2s, transform .15s, box-shadow .2s;
+    }
+    .btn-primary:hover {
+      background: var(--blue-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 0 48px rgba(79,110,247,.5);
+    }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 24px; border-radius: var(--radius-md);
+      background: transparent; color: var(--text); font-size: 15px; font-weight: 600;
+      text-decoration: none; border: 1px solid var(--border-hi); cursor: pointer;
+      transition: background .2s, border-color .2s, transform .15s;
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.22);
+      transform: translateY(-2px);
+    }
+
+    /* ── Hero ──────────────────────────────────────────────────────────── */
+    .hero {
+      position: relative; overflow: hidden;
+      padding: 100px 0 80px;
+      text-align: center;
+    }
+    /* Radial glow behind headline */
+    .hero::before {
+      content: '';
+      position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 500px;
+      background: radial-gradient(ellipse, rgba(79,110,247,.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 800; letter-spacing: -.02em; line-height: 1.1;
+      margin-bottom: 20px;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, #6B8EFF 0%, #A78BFA 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      max-width: 580px; margin: 0 auto 36px;
+      font-size: 18px; color: var(--subtext); line-height: 1.65;
+    }
+    .hero-cta {
+      display: flex; align-items: center; justify-content: center;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 20px;
+    }
+    .hero-meta {
+      font-size: 13px; color: var(--caption);
+      display: flex; align-items: center; justify-content: center; gap: 16px;
+    }
+    .hero-meta span { display: flex; align-items: center; gap: 5px; }
+
+    /* App preview */
+    .hero-preview {
+      margin-top: 64px; position: relative;
+    }
+    .hero-preview::before {
+      content: '';
+      position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%);
+      width: 80%; height: 80px;
+      background: radial-gradient(ellipse, rgba(79,110,247,.3) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-preview img, .hero-preview svg {
+      width: 100%; max-width: 860px;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-hi);
+      box-shadow: 0 40px 120px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.04);
+    }
+
+    /* ── Stats bar ─────────────────────────────────────────────────────── */
+    .stats-bar {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+      margin: 80px 0;
+    }
+    .stats-inner {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; flex-wrap: wrap;
+    }
+    .stat-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 32px;
+      border-right: 1px solid var(--border);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-item svg { color: var(--blue); flex-shrink: 0; }
+    .stat-label { font-size: 14px; font-weight: 600; color: var(--text); }
+    .stat-sub   { font-size: 12px; color: var(--subtext); }
+
+    /* ── Section ───────────────────────────────────────────────────────── */
+    section { padding: 80px 0; }
+    .section-eyebrow { margin-bottom: 12px; }
+    .section-title {
+      font-size: clamp(26px, 4vw, 40px); font-weight: 800;
+      letter-spacing: -.02em; margin-bottom: 14px;
+    }
+    .section-sub {
+      font-size: 16px; color: var(--subtext); max-width: 520px; line-height: 1.65;
+    }
+    .section-header { margin-bottom: 52px; }
+    .section-header.center { text-align: center; }
+    .section-header.center .section-sub { margin: 0 auto; }
+
+    /* ── Feature grid ──────────────────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 26px;
+      transition: border-color .2s, transform .2s, box-shadow .2s;
+    }
+    .feature-card:hover {
+      border-color: var(--border-hi);
+      transform: translateY(-3px);
+      box-shadow: 0 16px 48px rgba(0,0,0,.4);
+    }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px; font-size: 22px;
+    }
+    .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p  { font-size: 14px; color: var(--subtext); line-height: 1.6; }
+
+    /* ── How it works ──────────────────────────────────────────────────── */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0;
+    }
+    .step-item {
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; padding: 32px 24px; position: relative;
+    }
+    .step-item:not(:last-child)::after {
+      content: '';
+      position: absolute; top: 48px; right: 0;
+      width: 1px; height: 40%;
+      background: linear-gradient(to bottom, var(--border), transparent);
+    }
+    .step-number {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--blue-glow); border: 1px solid rgba(79,110,247,.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 800; color: var(--blue);
+      margin-bottom: 18px;
+    }
+    .step-item h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .step-item p  { font-size: 14px; color: var(--subtext); line-height: 1.6; }
+
+    /* ── Privacy / Security ────────────────────────────────────────────── */
+    .privacy-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+    .privacy-table { width: 100%; border-collapse: collapse; }
+    .privacy-table tr + tr td { border-top: 1px solid var(--border); }
+    .privacy-table td {
+      padding: 12px 0; font-size: 14px; vertical-align: middle;
+    }
+    .privacy-table td:first-child { color: var(--subtext); }
+    .privacy-table td:last-child   { text-align: right; font-weight: 600; }
+    .check  { color: var(--green); }
+    .cross  { color: var(--red); }
+
+    /* ── Download CTA ──────────────────────────────────────────────────── */
+    .download-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 64px 48px;
+      text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .download-section::before {
+      content: '';
+      position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+      width: 500px; height: 300px;
+      background: radial-gradient(ellipse, rgba(79,110,247,.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .download-section h2 {
+      font-size: clamp(24px, 4vw, 38px); font-weight: 800;
+      letter-spacing: -.02em; margin-bottom: 14px;
+    }
+    .download-section p { font-size: 16px; color: var(--subtext); margin-bottom: 36px; }
+    .download-meta {
+      margin-top: 20px;
+      display: flex; align-items: center; justify-content: center; gap: 24px;
+      flex-wrap: wrap; font-size: 13px; color: var(--caption);
+    }
+    .download-meta span { display: flex; align-items: center; gap: 6px; }
+    .sha-block {
+      margin-top: 28px;
+      background: var(--bg-base); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 14px 20px;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 12px; color: var(--subtext);
+      display: inline-block; max-width: 100%; word-break: break-all;
+    }
+    .sha-block strong { color: var(--caption); font-weight: 500; }
+
+    /* ── Changelog ─────────────────────────────────────────────────────── */
+    .changelog-list { display: flex; flex-direction: column; gap: 20px; }
+    .changelog-item {
+      display: grid; grid-template-columns: 160px 1fr;
+      gap: 24px; padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .changelog-item:last-child { border-bottom: none; }
+    .changelog-version { font-size: 14px; }
+    .changelog-ver-num { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+    .changelog-date    { color: var(--caption); font-size: 13px; }
+    .changelog-items   { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .changelog-items li { font-size: 14px; color: var(--subtext); display: flex; gap: 10px; }
+    .changelog-items li::before { content: '—'; color: var(--caption); flex-shrink: 0; }
+
+    /* ── Footer ────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 0; margin-top: 80px;
+    }
+    .footer-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+    }
+    .footer-left { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--caption); }
+    .footer-links { display: flex; align-items: center; gap: 24px; }
+    .footer-links a { font-size: 14px; color: var(--subtext); text-decoration: none; transition: color .2s; }
+    .footer-links a:hover { color: var(--text); }
+
+    /* ── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .stats-inner { flex-direction: column; }
+      .stat-item { border-right: none; border-bottom: 1px solid var(--border); width: 100%; justify-content: center; }
+      .stat-item:last-child { border-bottom: none; }
+      .privacy-card { grid-template-columns: 1fr; padding: 32px 24px; }
+      .download-section { padding: 40px 24px; }
+      .changelog-item { grid-template-columns: 1fr; gap: 8px; }
+      .step-item:not(:last-child)::after { display: none; }
+      .footer-inner { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     NAVBAR
+══════════════════════════════════════════════════════════════════════ -->
+<nav>
+  <div class="container">
+    <div class="nav-inner">
+      <a class="nav-logo" href="#">
+        <!-- App icon (inline SVG) -->
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="7" fill="#1A1A2E"/>
+          <circle cx="14" cy="14" r="8" stroke="#4F6EF7" stroke-width="2" fill="none"/>
+          <circle cx="14" cy="14" r="4" fill="#4F6EF7" opacity=".4"/>
+          <circle cx="14" cy="14" r="2" fill="#4F6EF7"/>
+          <path d="M14 6 L14 4 M14 24 L14 22 M6 14 L4 14 M24 14 L22 14"
+                stroke="#4F6EF7" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+        </svg>
+        PC Health Monitor
+        <span class="badge badge-blue" style="font-size:10px;padding:2px 8px;">v2.0</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How it Works</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#changelog">Changelog</a></li>
+        <li><a href="https://github.com/Rzuss/PC-Health-Monitor" target="_blank">GitHub ↗</a></li>
+      </ul>
+
+      <a class="btn-nav" href="https://github.com/Rzuss/PC-Health-Monitor/releases/latest" target="_blank">
+        Download Free
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-eyebrow">
+      <span class="badge badge-green">
+        <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+        Free &amp; Open Source
+      </span>
+      <span class="badge badge-blue">v2.0 — WPF Edition</span>
+    </div>
+
+    <h1>
+      Your PC,<br/>
+      <span>Always at Peak Health</span>
+    </h1>
+
+    <p class="hero-sub">
+      Real-time monitoring, intelligent junk cleaning, and performance optimization —
+      all running 100% offline on your machine. No cloud, no telemetry, no admin rights required.
+    </p>
+
+    <div class="hero-cta">
+      <a class="btn-primary" href="https://github.com/Rzuss/PC-Health-Monitor/releases/latest" target="_blank">
+        <!-- Download icon -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download for Windows
+      </a>
+      <a class="btn-secondary" href="https://github.com/Rzuss/PC-Health-Monitor" target="_blank">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        View on GitHub
+      </a>
+    </div>
+
+    <div class="hero-meta">
+      <span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Windows 10 / 11
+      </span>
+      <span>·</span>
+      <span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        No Admin Rights
+      </span>
+      <span>·</span>
+      <span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        ~80 MB · Self-contained
+      </span>
+      <span>·</span>
+      <span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        MIT License
+      </span>
+    </div>
+
+    <!-- App preview image -->
+    <div class="hero-preview">
+      <img
+        src="https://raw.githubusercontent.com/Rzuss/PC-Health-Monitor/main/screenshots/dashboard-preview.svg"
+        alt="PC Health Monitor — Dashboard showing CPU, RAM, and Disk gauges with health score"
+        loading="lazy"
+      />
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     STATS BAR
+══════════════════════════════════════════════════════════════════════ -->
+<div class="stats-bar">
+  <div class="container">
+    <div class="stats-inner">
+
+      <div class="stat-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <div>
+          <div class="stat-label">100% Offline</div>
+          <div class="stat-sub">No internet connection ever</div>
+        </div>
+      </div>
+
+      <div class="stat-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div>
+          <div class="stat-label">No Admin Required</div>
+          <div class="stat-sub">Installs to %LocalAppData%</div>
+        </div>
+      </div>
+
+      <div class="stat-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <div>
+          <div class="stat-label">Live Monitoring</div>
+          <div class="stat-sub">Updates every second</div>
+        </div>
+      </div>
+
+      <div class="stat-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <div>
+          <div class="stat-label">Open Source</div>
+          <div class="stat-sub">MIT License · Full source on GitHub</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     FEATURES
+══════════════════════════════════════════════════════════════════════ -->
+<section id="features">
+  <div class="container">
+    <div class="section-header center">
+      <div class="section-eyebrow"><span class="badge badge-blue">Features</span></div>
+      <h2 class="section-title">Everything your PC needs,<br/>nothing it doesn't</h2>
+      <p class="section-sub">Nine specialized tabs, each laser-focused on a single aspect of your system's health.</p>
+    </div>
+
+    <div class="features-grid">
+
+      <!-- Dashboard -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(79,110,247,.12);">📊</div>
+        <h3>Real-Time Dashboard</h3>
+        <p>Arc gauges for CPU, RAM, and Disk with a live Health Score. Sparkline CPU history chart updates every second using LibreHardwareMonitor.</p>
+      </div>
+
+      <!-- Startup Manager -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(245,158,11,.12);">⚡</div>
+        <h3>Startup Manager</h3>
+        <p>See every program that launches at Windows startup. Toggle or permanently remove entries — changes go to HKCU only, no system-wide edits.</p>
+      </div>
+
+      <!-- Junk Cleaner -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(34,197,94,.12);">🧹</div>
+        <h3>Intelligent Junk Cleaner</h3>
+        <p>Scans Temp, Prefetch, browser caches, Windows Update leftovers, and more. Shows exact sizes before you clean — no surprises.</p>
+      </div>
+
+      <!-- Storage Analyzer -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(139,92,246,.12);">💾</div>
+        <h3>Storage Analyzer</h3>
+        <p>Visual breakdown of every drive. Identifies largest folders at a glance so you know exactly where your disk space went.</p>
+      </div>
+
+      <!-- Boost Mode -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(239,68,68,.12);">🚀</div>
+        <h3>Boost Mode</h3>
+        <p>Elevate priority of any running process for gaming or rendering workloads. One click to boost, one click to restore — fully reversible.</p>
+      </div>
+
+      <!-- System Info -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(79,110,247,.12);">🖥️</div>
+        <h3>System Information</h3>
+        <p>Detailed hardware inventory: CPU model &amp; cores, RAM slots and speed, GPU, motherboard, BIOS version, and OS build — all from WMI read-only.</p>
+      </div>
+
+      <!-- Tools -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(245,158,11,.12);">🔧</div>
+        <h3>Driver &amp; Auto-Schedule</h3>
+        <p>Audit installed drivers and schedule automatic silent cleanups via Windows Task Scheduler — runs at 2 AM with a tray notification when done.</p>
+      </div>
+
+      <!-- Network -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(34,197,94,.12);">🌐</div>
+        <h3>Network Monitor</h3>
+        <p>Live adapter stats, active connections, ping latency, and DNS info. Identifies which processes are consuming bandwidth right now.</p>
+      </div>
+
+      <!-- Settings -->
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(139,92,246,.12);">⚙️</div>
+        <h3>Smart Settings</h3>
+        <p>Window size and position remembered between sessions. Toggle startup, tray behavior, and notification preferences — saved to a local JSON file.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     HOW IT WORKS
+══════════════════════════════════════════════════════════════════════ -->
+<section id="how-it-works" style="background:var(--bg-card); border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+  <div class="container">
+    <div class="section-header center">
+      <div class="section-eyebrow"><span class="badge badge-purple">How it Works</span></div>
+      <h2 class="section-title">Up and running in 3 steps</h2>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-item">
+        <div class="step-number">1</div>
+        <h3>Download the Installer</h3>
+        <p>One self-contained .exe file (~80 MB). No .NET runtime installation needed — everything is bundled inside.</p>
+      </div>
+      <div class="step-item">
+        <div class="step-number">2</div>
+        <h3>Install Without Admin</h3>
+        <p>The installer places the app in your personal %LocalAppData% folder. No UAC prompt, no system changes.</p>
+      </div>
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <h3>Monitor &amp; Optimize</h3>
+        <p>Launch from the Desktop shortcut. The dashboard starts live monitoring immediately — no configuration required.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     PRIVACY & SECURITY
+══════════════════════════════════════════════════════════════════════ -->
+<section id="privacy">
+  <div class="container">
+    <div class="privacy-card">
+      <div>
+        <div class="section-eyebrow"><span class="badge badge-green">Privacy &amp; Security</span></div>
+        <h2 class="section-title" style="font-size:clamp(22px,3vw,32px);margin-top:12px;">
+          Zero network traffic.<br/>Ever.
+        </h2>
+        <p style="font-size:15px;color:var(--subtext);line-height:1.65;margin-top:12px;">
+          PC Health Monitor is a fully offline application. It reads your hardware, writes to your local Temp folders, and nothing else. Your system data never leaves your machine — not even for crash reports or analytics.
+        </p>
+        <div style="margin-top:24px;padding:16px 20px;background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-md);font-size:13px;color:var(--subtext);">
+          🔒 Verify the download SHA-256 hash on the <a href="https://github.com/Rzuss/PC-Health-Monitor/releases" target="_blank" style="color:var(--blue);">Releases page</a> to confirm you have the official binary.
+        </div>
+      </div>
+
+      <table class="privacy-table">
+        <tr>
+          <td>Reads local hardware info (CPU, RAM, Disk)</td>
+          <td><span class="check">✓ Yes</span> — by design</td>
+        </tr>
+        <tr>
+          <td>Writes to Temp / junk folders (cleanup)</td>
+          <td><span class="check">✓ Yes</span> — user-initiated only</td>
+        </tr>
+        <tr>
+          <td>Modifies Startup registry (HKCU only)</td>
+          <td><span class="check">✓ Yes</span> — only when you click Remove</td>
+        </tr>
+        <tr>
+          <td>Sends data to any external server</td>
+          <td><span class="cross">✕ Never</span></td>
+        </tr>
+        <tr>
+          <td>Collects telemetry or analytics</td>
+          <td><span class="cross">✕ Never</span></td>
+        </tr>
+        <tr>
+          <td>Requires internet connection</td>
+          <td><span class="cross">✕ Never</span></td>
+        </tr>
+        <tr>
+          <td>Stores passwords or credentials</td>
+          <td><span class="cross">✕ Never</span></td>
+        </tr>
+        <tr>
+          <td>Requires administrator privileges</td>
+          <td><span class="cross">✕ Never</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     DOWNLOAD CTA
+══════════════════════════════════════════════════════════════════════ -->
+<section id="download">
+  <div class="container">
+    <div class="download-section">
+      <span class="badge badge-blue" style="margin-bottom:20px;font-size:13px;">Latest Release — v2.0.0</span>
+      <h2>Ready to take control of your PC?</h2>
+      <p>Free forever. One file. No strings attached.</p>
+      <a class="btn-primary" href="https://github.com/Rzuss/PC-Health-Monitor/releases/latest" target="_blank" style="font-size:17px;padding:16px 36px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download PCHealthMonitor-Setup-2.0.0.exe
+      </a>
+      <div class="download-meta">
+        <span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+          Windows 10 / 11 · x64
+        </span>
+        <span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          ~80 MB · Self-contained · No .NET install needed
+        </span>
+        <span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          No admin · Installs to %LocalAppData%
+        </span>
+      </div>
+      <div class="sha-block">
+        <strong>SHA-256 · </strong>
+        Verify with: <code>Get-FileHash "PCHealthMonitor-Setup-2.0.0.exe" -Algorithm SHA256</code>
+        &nbsp;·&nbsp; Hash published on the <a href="https://github.com/Rzuss/PC-Health-Monitor/releases" target="_blank" style="color:var(--blue);">Releases page</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     CHANGELOG
+══════════════════════════════════════════════════════════════════════ -->
+<section id="changelog">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow"><span class="badge badge-amber">Changelog</span></div>
+      <h2 class="section-title">What's new</h2>
+    </div>
+
+    <div class="changelog-list">
+
+      <div class="changelog-item">
+        <div class="changelog-version">
+          <div class="changelog-ver-num">v2.0.0 <span class="badge badge-blue" style="font-size:10px;vertical-align:middle;">Latest</span></div>
+          <div class="changelog-date">April 2026</div>
+        </div>
+        <ul class="changelog-items">
+          <li>Full rewrite in C# WPF (.NET 8) — native dark UI with hardware acceleration</li>
+          <li>Live arc gauges for CPU / RAM / Disk with animated Health Score</li>
+          <li>Toast notification system — Success, Warning, Error, Info with auto-dismiss</li>
+          <li>Window size &amp; position remembered between sessions</li>
+          <li>Keyboard shortcuts: Ctrl+1–9 to switch tabs, Ctrl+R to scan, Esc to tray</li>
+          <li>Integrity audit log on every launch — detects tampering patterns</li>
+          <li>Silent auto-cleanup mode via Task Scheduler (/silent flag)</li>
+          <li>Self-contained installer — no .NET runtime required</li>
+        </ul>
+      </div>
+
+      <div class="changelog-item">
+        <div class="changelog-version">
+          <div class="changelog-ver-num">v1.x (PowerShell)</div>
+          <div class="changelog-date">2024 – 2025</div>
+        </div>
+        <ul class="changelog-items">
+          <li>Original PowerShell + WinForms prototype</li>
+          <li>PC Advisor AI chat with hardware-aware responses</li>
+          <li>Behavioral Baseline Engine with Z-score anomaly detection</li>
+          <li>Offline threat intelligence (IOC database)</li>
+          <li>Plugin architecture with .psm1 drop-in tabs</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="7" fill="#1A1A2E"/>
+          <circle cx="14" cy="14" r="8" stroke="#4F6EF7" stroke-width="2" fill="none"/>
+          <circle cx="14" cy="14" r="2" fill="#4F6EF7"/>
+        </svg>
+        <span>© 2026 Rotem Zussman · MIT License · PC Health Monitor</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/Rzuss/PC-Health-Monitor" target="_blank">GitHub</a>
+        <a href="https://github.com/Rzuss/PC-Health-Monitor/releases" target="_blank">Releases</a>
+        <a href="https://github.com/Rzuss/PC-Health-Monitor/blob/main/PCHealthMonitor-v2/SECURITY.md" target="_blank">Security</a>
+        <a href="https://github.com/Rzuss/PC-Health-Monitor/blob/main/PCHealthMonitor-v2/LICENSE" target="_blank">License</a>
+        <a href="https://github.com/Rzuss/PC-Health-Monitor/issues" target="_blank">Report a Bug</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
