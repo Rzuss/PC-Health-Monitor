@@ -2,43 +2,63 @@ using Microsoft.Extensions.DependencyInjection;
 using PCHealthMonitor.Services;
 using PCHealthMonitor.ViewModels;
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Threading;
 
 namespace PCHealthMonitor.Views.Dashboard;
 
 public partial class DashboardView : Page
 {
-    private readonly DashboardViewModel _vm;
-    private readonly HardwareService    _hardware;
+    private readonly DashboardViewModel    _vm;
+    private readonly HardwareService       _hardware;
+    private readonly MetricsHistoryService _history;
+    private readonly ProFeatureService     _pro;
+
     private int _displayedScore = -1;
+    private int _snapshotTick   = 0;          // used to throttle chart redraws
+    private int _selectedHours  = 1;          // active time range
 
     // Arc geometry constants
     private const double CX = 100, CY = 100, R = 80;
-    private const double ArcStartAngle = 220;  // degrees — bottom-left
-    private const double ArcSweepDeg   = 280;  // total arc sweep
+    private const double ArcStartAngle = 220;
+    private const double ArcSweepDeg   = 280;
 
     public DashboardView() : this(
         App.Services.GetRequiredService<DashboardViewModel>(),
-        App.Services.GetRequiredService<HardwareService>()) { }
+        App.Services.GetRequiredService<HardwareService>(),
+        App.Services.GetRequiredService<MetricsHistoryService>(),
+        App.Services.GetRequiredService<ProFeatureService>()) { }
 
-    public DashboardView(DashboardViewModel vm, HardwareService hardware)
+    public DashboardView(
+        DashboardViewModel    vm,
+        HardwareService       hardware,
+        MetricsHistoryService history,
+        ProFeatureService     pro)
     {
         InitializeComponent();
         _vm       = vm;
         _hardware = hardware;
+        _history  = history;
+        _pro      = pro;
         DataContext = vm;
 
         _hardware.SnapshotUpdated += OnSnapshot;
 
-        Loaded   += (_, _) => OnSnapshot(null, _hardware.Latest);
+        Loaded += (_, _) =>
+        {
+            // Show or hide the History card based on Pro status
+            HistoryCard.Visibility = _pro.IsPro ? Visibility.Visible : Visibility.Collapsed;
+            HighlightTimeRangeButton(_selectedHours);
+            OnSnapshot(null, _hardware.Latest);
+        };
+
         Unloaded += (_, _) =>
         {
             _hardware.SnapshotUpdated -= OnSnapshot;
-            _arcTimer?.Stop();   // CRITICAL: stop 60fps timer so it doesn't run on detached page
+            _arcTimer?.Stop();
             _arcTimer = null;
         };
     }
@@ -46,9 +66,6 @@ public partial class DashboardView : Page
     // ── Hardware snapshot → UI ────────────────────────────────────────────
     private void OnSnapshot(object? sender, HardwareSnapshot snap)
     {
-        // Always marshal to the UI thread.
-        // SnapshotUpdated should already be raised on the UI thread (DispatcherTimer),
-        // but this guard protects against any future re-entrancy or threading change.
         if (!Dispatcher.CheckAccess())
         {
             Dispatcher.BeginInvoke(() => OnSnapshot(sender, snap));
@@ -88,6 +105,14 @@ public partial class DashboardView : Page
                 _     => (Brush)FindResource("RedBrush")
             };
         }
+
+        // Pro: redraw charts every ~30 seconds (15 ticks × 2s poll interval)
+        if (_pro.IsPro)
+        {
+            _snapshotTick++;
+            if (_snapshotTick % 15 == 1)  // 1 = immediate on first load
+                DrawCharts();
+        }
     }
 
     // ── Arc animation ─────────────────────────────────────────────────────
@@ -103,12 +128,11 @@ public partial class DashboardView : Page
 
         _arcTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(16)  // ~60 fps
+            Interval = TimeSpan.FromMilliseconds(16)
         };
         _arcTimer.Tick += (_, _) =>
         {
             var progress = Math.Min(1.0, (DateTime.Now - startTime).TotalMilliseconds / duration.TotalMilliseconds);
-            // Ease-out cubic: 1 – (1–t)³
             var eased = 1 - Math.Pow(1 - progress, 3);
             var cur   = (int)(from + (score - from) * eased);
             ScoreNumber.Text = cur.ToString();
@@ -117,19 +141,18 @@ public partial class DashboardView : Page
         };
         _arcTimer.Start();
 
-        // Immediately set final values (visible if animation ticks lag)
         ScoreNumber.Text = score.ToString();
         UpdateArcGeometry(score);
     }
 
     private void UpdateArcGeometry(int score)
     {
-        double pct       = Math.Clamp(score / 100.0, 0, 1);
-        double sweepDeg  = ArcSweepDeg * pct;
-        double endAngle  = ArcStartAngle + sweepDeg;
+        double pct      = Math.Clamp(score / 100.0, 0, 1);
+        double sweepDeg = ArcSweepDeg * pct;
+        double endAngle = ArcStartAngle + sweepDeg;
 
         var endPoint = AngleToPoint(endAngle, CX, CY, R);
-        ValueArc.Point     = endPoint;
+        ValueArc.Point    = endPoint;
         ValueArc.IsLargeArc = sweepDeg > 180;
     }
 
@@ -139,7 +162,7 @@ public partial class DashboardView : Page
         return new Point(cx + r * Math.Cos(rad), cy + r * Math.Sin(rad));
     }
 
-    // ── ProgressBar smooth animation ─────────────────────────────────────
+    // ── ProgressBar smooth animation ──────────────────────────────────────
     private static void AnimateBar(System.Windows.Controls.ProgressBar bar, double target)
     {
         var anim = new DoubleAnimation(target,
@@ -150,6 +173,101 @@ public partial class DashboardView : Page
         bar.BeginAnimation(System.Windows.Controls.ProgressBar.ValueProperty, anim);
     }
 
+    // ── Historical chart drawing ──────────────────────────────────────────
+    private void DrawCharts()
+    {
+        var pts  = _history.GetHistory(_selectedHours);
+        var W    = ChartCanvas.ActualWidth;
+        var H    = ChartCanvas.ActualHeight;
+
+        if (W < 10 || H < 10) return;
+
+        // Update grid lines
+        SetGridLine(GridLine75, 0, W, H * 0.25);
+        SetGridLine(GridLine50, 0, W, H * 0.50);
+        SetGridLine(GridLine25, 0, W, H * 0.75);
+
+        // Y-axis labels
+        Canvas.SetTop(Label75, H * 0.25 - 9);
+        Canvas.SetTop(Label50, H * 0.50 - 9);
+        Canvas.SetTop(Label25, H * 0.75 - 9);
+
+        if (pts.Count < 2)
+        {
+            CpuLine.Points.Clear();
+            RamLine.Points.Clear();
+            DiskLine.Points.Clear();
+            NoDataLabel.Visibility = Visibility.Visible;
+            Canvas.SetLeft(NoDataLabel, (W - 240) / 2);
+            return;
+        }
+
+        NoDataLabel.Visibility = Visibility.Collapsed;
+
+        CpuLine.Points  = BuildPoints(pts, p => p.CpuLoad,          W, H);
+        RamLine.Points  = BuildPoints(pts, p => (float)p.RamLoad,   W, H);
+        DiskLine.Points = BuildPoints(pts, p => p.DiskLoad,          W, H);
+    }
+
+    private static void SetGridLine(System.Windows.Shapes.Line line, double x1, double x2, double y)
+    {
+        line.X1 = x1; line.X2 = x2;
+        line.Y1 = y;  line.Y2 = y;
+    }
+
+    private static PointCollection BuildPoints(
+        IReadOnlyList<MetricPoint> data,
+        Func<MetricPoint, float>   getValue,
+        double W, double H)
+    {
+        var pc = new PointCollection(data.Count);
+        for (int i = 0; i < data.Count; i++)
+        {
+            double x = (double)i / (data.Count - 1) * W;
+            double y = H - (getValue(data[i]) / 100.0 * H);
+            pc.Add(new Point(x, Math.Clamp(y, 0, H)));
+        }
+        return pc;
+    }
+
+    // Called when the chart border is resized
+    private void ChartCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_pro.IsPro) DrawCharts();
+    }
+
+    // ── Time range selector ───────────────────────────────────────────────
+    private void TimeRangeBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (!int.TryParse(btn.Tag?.ToString(), out int hours)) return;
+
+        _selectedHours = hours;
+        HighlightTimeRangeButton(hours);
+        DrawCharts();
+    }
+
+    private void HighlightTimeRangeButton(int hours)
+    {
+        // Reset all
+        foreach (var btn in new[] { Btn1H, Btn24H, Btn7D, Btn30D })
+        {
+            btn.Opacity    = 0.6;
+            btn.FontWeight = FontWeights.Normal;
+        }
+
+        // Highlight active
+        var active = hours switch
+        {
+            1   => Btn1H,
+            24  => Btn24H,
+            168 => Btn7D,
+            _   => Btn30D
+        };
+        active.Opacity    = 1.0;
+        active.FontWeight = FontWeights.SemiBold;
+    }
+
     // ── Button handlers ───────────────────────────────────────────────────
     private void ScanBtn_Click(object sender, RoutedEventArgs e)
     {
@@ -158,10 +276,9 @@ public partial class DashboardView : Page
     }
 
     private void ActivateBoostBtn_Click(object sender, RoutedEventArgs e) => NavigateMain("Boost");
-
-    private void QuickClean_Click(object sender, RoutedEventArgs e)      => NavigateMain("JunkCleaner");
-    private void QuickStartup_Click(object sender, RoutedEventArgs e)    => NavigateMain("Startup");
-    private void QuickDiskHealth_Click(object sender, RoutedEventArgs e) => NavigateMain("DiskHealth");
+    private void QuickClean_Click(object sender, RoutedEventArgs e)       => NavigateMain("JunkCleaner");
+    private void QuickStartup_Click(object sender, RoutedEventArgs e)     => NavigateMain("Startup");
+    private void QuickDiskHealth_Click(object sender, RoutedEventArgs e)  => NavigateMain("DiskHealth");
 
     private void NavigateMain(string page)
     {

@@ -13,6 +13,8 @@
                 <RowDefinition Height="Auto"/>   <!-- Score + mini gauges -->
                 <RowDefinition Height="20"/>
                 <RowDefinition Height="Auto"/>   <!-- Bottom cards: VIP, Quick Actions, Alerts -->
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>   <!-- PRO: Performance History charts -->
             </Grid.RowDefinitions>
 
             <!-- ─── Header ──────────────────────────────────────────────── -->
@@ -353,6 +355,114 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- ─── PRO: Performance History ───────────────────────────── -->
+            <Border Grid.Row="6" Style="{StaticResource CardStyle}"
+                    x:Name="HistoryCard">
+                <StackPanel>
+
+                    <!-- Title + PRO badge + time range buttons -->
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Performance History"
+                                       Style="{StaticResource TextH3Style}"
+                                       Margin="0,0,10,0"/>
+                            <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                    Background="{StaticResource BlueGlowBrush}">
+                                <TextBlock Text="PRO" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource BlueBrush}"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Time range selector -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="Btn1H"  Content="1H"  Width="40" Margin="0,0,4,0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="TimeRangeBtn_Click" Tag="1"/>
+                            <Button x:Name="Btn24H" Content="24H" Width="44" Margin="0,0,4,0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="TimeRangeBtn_Click" Tag="24"/>
+                            <Button x:Name="Btn7D"  Content="7D"  Width="40" Margin="0,0,4,0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="TimeRangeBtn_Click" Tag="168"/>
+                            <Button x:Name="Btn30D" Content="30D" Width="44"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="TimeRangeBtn_Click" Tag="720"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Legend -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource BlueBrush}"   Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="CPU" Style="{StaticResource TextCaptionStyle}" Margin="0,0,16,0"/>
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource PurpleBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="RAM" Style="{StaticResource TextCaptionStyle}" Margin="0,0,16,0"/>
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource YellowBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Disk" Style="{StaticResource TextCaptionStyle}"/>
+                    </StackPanel>
+
+                    <!-- Chart canvas -->
+                    <Border CornerRadius="8" Background="{StaticResource BgCard2Brush}"
+                            Height="130" ClipToBounds="True"
+                            SizeChanged="ChartCanvas_SizeChanged">
+                        <Canvas x:Name="ChartCanvas">
+
+                            <!-- Grid lines (horizontal at 25%, 50%, 75%) -->
+                            <Line x:Name="GridLine75" Stroke="{StaticResource BorderBrush}"
+                                  StrokeThickness="1" StrokeDashArray="3,4" Opacity="0.5"/>
+                            <Line x:Name="GridLine50" Stroke="{StaticResource BorderBrush}"
+                                  StrokeThickness="1" StrokeDashArray="3,4" Opacity="0.5"/>
+                            <Line x:Name="GridLine25" Stroke="{StaticResource BorderBrush}"
+                                  StrokeThickness="1" StrokeDashArray="3,4" Opacity="0.5"/>
+
+                            <!-- Y-axis labels -->
+                            <TextBlock x:Name="LabelTop"    Canvas.Left="4" Canvas.Top="2"
+                                       Text="100%" Style="{StaticResource TextCaptionStyle}"
+                                       FontSize="9" Opacity="0.5"/>
+                            <TextBlock x:Name="Label75"     Canvas.Left="4"
+                                       Text="75%"  Style="{StaticResource TextCaptionStyle}"
+                                       FontSize="9" Opacity="0.5"/>
+                            <TextBlock x:Name="Label50"     Canvas.Left="4"
+                                       Text="50%"  Style="{StaticResource TextCaptionStyle}"
+                                       FontSize="9" Opacity="0.5"/>
+                            <TextBlock x:Name="Label25"     Canvas.Left="4"
+                                       Text="25%"  Style="{StaticResource TextCaptionStyle}"
+                                       FontSize="9" Opacity="0.5"/>
+
+                            <!-- Chart polylines -->
+                            <Polyline x:Name="CpuLine"
+                                      Stroke="{StaticResource BlueBrush}"
+                                      StrokeThickness="1.5"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                            <Polyline x:Name="RamLine"
+                                      Stroke="{StaticResource PurpleBrush}"
+                                      StrokeThickness="1.5"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                            <Polyline x:Name="DiskLine"
+                                      Stroke="{StaticResource YellowBrush}"
+                                      StrokeThickness="1.5"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+
+                            <!-- "Not enough data yet" placeholder -->
+                            <TextBlock x:Name="NoDataLabel"
+                                       Text="Collecting data… check back in a minute."
+                                       Style="{StaticResource TextCaptionStyle}"
+                                       Foreground="{StaticResource SubTextBrush}"
+                                       Canvas.Left="0" Canvas.Top="50"
+                                       TextAlignment="Center"/>
+                        </Canvas>
+                    </Border>
+
+                </StackPanel>
+            </Border>
 
         </Grid>
     </ScrollViewer>
