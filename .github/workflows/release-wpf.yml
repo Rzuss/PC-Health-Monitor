@@ -21,6 +21,8 @@ jobs:
   release:
     name: Build · Package · Release
     runs-on: windows-latest
+    # Hard guard — only run when explicitly triggered via UI or API
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
