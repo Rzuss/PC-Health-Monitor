@@ -1,279 +1,191 @@
 name: Release — PC Health Monitor (WPF)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Triggers:
-#   • Push a version tag:  git tag v2.0.0 && git push origin v2.0.0
-#   • Manual run from GitHub Actions UI (workflow_dispatch)
-# ─────────────────────────────────────────────────────────────────────────────
+# Triggers on version tags (git tag v2.0.1 && git push origin v2.0.1)
+# or manually from GitHub Actions UI.
 on:
   push:
     tags:
-      - 'v[0-9]*'          # v2.0.0, v2.1.0-beta, etc.
+      - 'v[0-9]*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g. 2.0.0)'
+        description: 'Version number (e.g. 2.0.1)'
         required: true
-        default: '2.0.0'
+        default: '2.0.1'
       prerelease:
         description: 'Mark as pre-release?'
         type: boolean
         default: false
 
 permissions:
-  contents: write    # Required to create GitHub Releases and upload assets
-
-env:
-  DOTNET_VERSION:  '8.0.x'
-  PROJECT_PATH:    'PCHealthMonitor-v2/PCHealthMonitor/PCHealthMonitor.csproj'
-  INSTALLER_ISS:   'PCHealthMonitor-v2/installer.iss'
-  PUBLISH_DIR:     'PCHealthMonitor-v2/PCHealthMonitor/bin/Release/net8.0-windows/win-x64/publish'
+  contents: write
 
 jobs:
   release:
-    name: Build · Sign · Package · Release
+    name: Build · Package · Release
     runs-on: windows-latest
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       # ── 2. Resolve version ───────────────────────────────────────────────────
-      - name: Resolve version string
+      - name: Resolve version
         id: ver
         shell: pwsh
         run: |
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $ver = "${{ github.event.inputs.version }}"
             $tag = "v$ver"
+            $pre = "${{ github.event.inputs.prerelease }}" -eq "true"
           } else {
             $tag = "${{ github.ref_name }}"
             $ver = $tag.TrimStart('v')
+            $pre = $ver -match '-'
           }
-          $isPreRelease = $ver -match '-'
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $isPreRelease = [System.Convert]::ToBoolean("${{ github.event.inputs.prerelease }}")
-          }
-          "VER=$ver"         | Out-File $env:GITHUB_OUTPUT -Append
-          "TAG=$tag"         | Out-File $env:GITHUB_OUTPUT -Append
-          "PRE=$isPreRelease"| Out-File $env:GITHUB_OUTPUT -Append
-          Write-Host "Version: $ver  |  Tag: $tag  |  Pre-release: $isPreRelease"
+          "VER=$ver" | Out-File $env:GITHUB_OUTPUT -Append
+          "TAG=$tag" | Out-File $env:GITHUB_OUTPUT -Append
+          "PRE=$pre"  | Out-File $env:GITHUB_OUTPUT -Append
+          Write-Host "Version=$ver  Tag=$tag  Pre=$pre"
 
       # ── 3. Setup .NET 8 ──────────────────────────────────────────────────────
-      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-version: '8.0.x'
 
-      # ── 4. Patch version in .csproj ──────────────────────────────────────────
-      - name: Patch version in .csproj
+      # ── 4. Restore ───────────────────────────────────────────────────────────
+      - name: Restore
+        run: dotnet restore PCHealthMonitor-v2/PCHealthMonitor/PCHealthMonitor.csproj
+
+      # ── 5. Publish (self-contained, single-file, win-x64) ───────────────────
+      - name: Publish
         shell: pwsh
         run: |
-          $ver  = "${{ steps.ver.outputs.VER }}"
-          $path = "${{ env.PROJECT_PATH }}"
-          $xml  = [xml](Get-Content $path)
-          $pg   = $xml.Project.PropertyGroup | Where-Object { $_.Version }
-          if ($pg) {
-            $pg.Version         = $ver
-            $pg.FileVersion     = "$ver.0"
-            $pg.AssemblyVersion = "$ver.0"
-          }
-          $xml.Save((Resolve-Path $path))
-          Write-Host "Patched .csproj to version $ver"
-
-      # ── 5. Restore dependencies ──────────────────────────────────────────────
-      - name: Restore NuGet packages
-        shell: pwsh
-        run: dotnet restore ${{ env.PROJECT_PATH }}
-
-      # ── 6. Publish (self-contained, single-file, win-x64) ───────────────────
-      - name: dotnet publish
-        shell: pwsh
-        run: |
-          dotnet publish ${{ env.PROJECT_PATH }} `
+          $ver = "${{ steps.ver.outputs.VER }}"
+          dotnet publish PCHealthMonitor-v2/PCHealthMonitor/PCHealthMonitor.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:PublishReadyToRun=true `
-            -p:Version=${{ steps.ver.outputs.VER }} `
-            -o ${{ env.PUBLISH_DIR }}
-          $exe = Get-Item "${{ env.PUBLISH_DIR }}\PCHealthMonitor.exe"
-          Write-Host "Published: $($exe.Name)  ($([math]::Round($exe.Length/1MB,2)) MB)"
+            -p:Version=$ver `
+            -o publish-output
+          $exe = Get-Item "publish-output\PCHealthMonitor.exe"
+          Write-Host "Published: $($exe.Name)  ($([math]::Round($exe.Length/1MB,1)) MB)"
 
-      # ── 7. Code signing (optional — skipped if secret not set) ───────────────
-      # To enable: add CODE_SIGNING_PFX (base64-encoded .pfx) and
-      # CODE_SIGNING_PASSWORD secrets in your repo Settings → Secrets.
-      - name: Sign executable (optional)
-        if: ${{ env.CODE_SIGNING_PFX != '' }}
-        env:
-          CODE_SIGNING_PFX:      ${{ secrets.CODE_SIGNING_PFX }}
-          CODE_SIGNING_PASSWORD: ${{ secrets.CODE_SIGNING_PASSWORD }}
-        shell: pwsh
-        run: |
-          # Decode PFX from base64 secret
-          $pfxPath = "$env:RUNNER_TEMP\codesign.pfx"
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODE_SIGNING_PFX))
-
-          # Locate signtool.exe (ships with Windows SDK on windows-latest)
-          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" `
-                        -Recurse -Filter signtool.exe |
-                        Sort-Object FullName -Descending | Select-Object -First 1).FullName
-
-          & $signtool sign `
-            /f $pfxPath `
-            /p $env:CODE_SIGNING_PASSWORD `
-            /tr http://timestamp.digicert.com `
-            /td sha256 `
-            /fd sha256 `
-            "${{ env.PUBLISH_DIR }}\PCHealthMonitor.exe"
-
-          Remove-Item $pfxPath -Force
-          Write-Host "Executable signed successfully"
-
-      # ── 8. Install Inno Setup 6 ──────────────────────────────────────────────
-      - name: Install Inno Setup 6
+      # ── 6. Install Inno Setup ────────────────────────────────────────────────
+      - name: Install Inno Setup
         shell: pwsh
         run: |
           choco install innosetup --yes --no-progress
-          $iscc = "C:\Program Files (x86)\Inno Setup 6"
-          "$iscc" | Out-File $env:GITHUB_PATH -Append
-          Write-Host "Inno Setup ready at $iscc"
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File $env:GITHUB_PATH -Append
 
-      # ── 9. Patch version in installer.iss ────────────────────────────────────
-      - name: Patch version in installer.iss
+      # ── 7. Build installer ───────────────────────────────────────────────────
+      - name: Build installer
         shell: pwsh
         run: |
           $ver = "${{ steps.ver.outputs.VER }}"
-          $iss = Get-Content ${{ env.INSTALLER_ISS }} -Raw
-          $iss = $iss -replace '#define AppVersion\s+"[^"]+"', "#define AppVersion     `"$ver`""
-          Set-Content ${{ env.INSTALLER_ISS }} $iss -Encoding UTF8
-          Write-Host "Patched installer.iss AppVersion → $ver"
 
-      # ── 10. Create dist/ folder ───────────────────────────────────────────────
-      - name: Create dist directory
-        shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path PCHealthMonitor-v2/dist | Out-Null
+          # Read and patch the .iss (version + publish dir must point to our output)
+          $iss = Get-Content PCHealthMonitor-v2/installer.iss -Raw
+          $iss = $iss -replace '#define AppVersion\s+"[^"]+"',  "#define AppVersion   `"$ver`""
+          $iss = $iss -replace '#define PublishDir\s+"[^"]+"',  "#define PublishDir   `"..\publish-output`""
+          Set-Content PCHealthMonitor-v2/installer.iss $iss -Encoding UTF8
 
-      # ── 11. Build installer ───────────────────────────────────────────────────
-      - name: Build installer with Inno Setup
-        shell: pwsh
-        working-directory: PCHealthMonitor-v2
-        run: |
-          iscc installer.iss
-          $ver = "${{ steps.ver.outputs.VER }}"
-          $exe = Get-Item "dist\PCHealthMonitor-Setup-$ver.exe"
-          Write-Host "Installer: $($exe.Name)  ($([math]::Round($exe.Length/1MB,2)) MB)"
+          # Create output folder
+          New-Item -ItemType Directory -Force -Path PCHealthMonitor-v2/dist | Out-Null
 
-      # ── 12. Sign installer (optional) ─────────────────────────────────────────
-      - name: Sign installer (optional)
-        if: ${{ env.CODE_SIGNING_PFX != '' }}
-        env:
-          CODE_SIGNING_PFX:      ${{ secrets.CODE_SIGNING_PFX }}
-          CODE_SIGNING_PASSWORD: ${{ secrets.CODE_SIGNING_PASSWORD }}
-        shell: pwsh
-        run: |
-          $ver     = "${{ steps.ver.outputs.VER }}"
-          $pfxPath = "$env:RUNNER_TEMP\codesign.pfx"
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODE_SIGNING_PFX))
+          # Build
+          iscc PCHealthMonitor-v2/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc failed with exit code $LASTEXITCODE" }
 
-          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" `
-                        -Recurse -Filter signtool.exe |
-                        Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          # The .iss OutputBaseFilename uses {#AppVersion} — rename to canonical name
+          $built = Get-ChildItem "PCHealthMonitor-v2/dist/*.exe" | Select-Object -First 1
+          if (-not $built) { throw "Installer exe not found in PCHealthMonitor-v2/dist/" }
 
-          & $signtool sign `
-            /f $pfxPath `
-            /p $env:CODE_SIGNING_PASSWORD `
-            /tr http://timestamp.digicert.com `
-            /td sha256 `
-            /fd sha256 `
-            "PCHealthMonitor-v2\dist\PCHealthMonitor-Setup-$ver.exe"
+          $target = "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
+          if ($built.FullName -ne (Resolve-Path $target -ErrorAction SilentlyContinue)) {
+            Rename-Item $built.FullName $target -ErrorAction SilentlyContinue
+          }
 
-          Remove-Item $pfxPath -Force
-          Write-Host "Installer signed successfully"
+          $final = Get-Item "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
+          Write-Host "Installer ready: $($final.Name)  ($([math]::Round($final.Length/1MB,1)) MB)"
 
-      # ── 13. Compute SHA-256 checksum ─────────────────────────────────────────
-      - name: Compute SHA-256 checksum
-        id: checksum
+      # ── 8. Compute SHA-256 ───────────────────────────────────────────────────
+      - name: Compute SHA-256
+        id: sha
         shell: pwsh
         run: |
           $ver  = "${{ steps.ver.outputs.VER }}"
-          $file = "PCHealthMonitor-v2\dist\PCHealthMonitor-Setup-$ver.exe"
+          $file = "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
           $hash = (Get-FileHash $file -Algorithm SHA256).Hash
           "HASH=$hash" | Out-File $env:GITHUB_OUTPUT -Append
           Write-Host "SHA-256: $hash"
 
-      # ── 14. Generate release notes ────────────────────────────────────────────
+      # ── 9. Generate release notes ────────────────────────────────────────────
       - name: Generate release notes
         shell: pwsh
         run: |
           $ver  = "${{ steps.ver.outputs.VER }}"
-          $hash = "${{ steps.checksum.outputs.HASH }}"
+          $hash = "${{ steps.sha.outputs.HASH }}"
+          @"
+## PC Health Monitor v$ver
 
-          $notes = @"
-          ## PC Health Monitor v$ver
+### Download & Install
+1. Click **PCHealthMonitor-Setup-$ver.exe** below
+2. Run the installer — setup wizard will guide you through installation
+3. **No administrator rights required** — installs to your personal AppData folder
+4. Launch from the Desktop shortcut or Start Menu
 
-          ### Download & Install
-          1. Download **PCHealthMonitor-Setup-$ver.exe** below
-          2. Run the installer — **no administrator rights required**
-          3. Launch from the Desktop shortcut or Start Menu
-          4. (Optional) Enable **Start with Windows** in Settings
+### System Requirements
+- Windows 10 (1903+) or Windows 11
+- x64 architecture
+- ~80 MB disk space
+- No internet connection needed — fully offline
 
-          ### System Requirements
-          | | |
-          |---|---|
-          | OS | Windows 10 (1903+) or Windows 11 |
-          | Architecture | x64 |
-          | RAM | 100 MB |
-          | Disk | 150 MB |
-          | Admin rights | Not required |
+### What's New in v$ver
+- Real-time dashboard with animated CPU / RAM / Disk gauges
+- Toast notification system (Success / Warning / Error / Info)
+- Keyboard shortcuts: Ctrl+1–9 to switch tabs, Ctrl+R to scan, Esc to tray
+- Window size & position remembered between sessions
+- Integrity audit log on every launch
 
-          ### What's New in v$ver
-          - Window size & position remembered between sessions
-          - Toast notification system (Success / Warning / Error / Info)
-          - Keyboard shortcuts: Ctrl+1–9 to switch tabs, Ctrl+R to scan, Esc to tray
-          - Version now reads from assembly metadata (always in sync)
-          - Integrity audit log on every launch
+### Verify Binary Integrity
+``````powershell
+Get-FileHash "PCHealthMonitor-Setup-$ver.exe" -Algorithm SHA256
+# Expected SHA-256: $hash
+``````
 
-          ### Verify Binary Integrity
-          ``````powershell
-          Get-FileHash "PCHealthMonitor-Setup-$ver.exe" -Algorithm SHA256
-          # Expected: $hash
-          ``````
+---
+*100% Offline · No Telemetry · No Admin Required · MIT License*
+"@ | Out-File RELEASE_NOTES.md -Encoding UTF8
 
-          ---
-          *Fully offline · No telemetry · MIT License · [Source code](https://github.com/Rzuss/PC-Health-Monitor)*
-          "@
-
-          $notes | Out-File "RELEASE_NOTES.md" -Encoding UTF8
-
-      # ── 15. Create GitHub Release ─────────────────────────────────────────────
+      # ── 10. Create GitHub Release with installer asset ────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name:   ${{ steps.ver.outputs.TAG }}
-          name:       "PC Health Monitor v${{ steps.ver.outputs.VER }}"
-          body_path:  RELEASE_NOTES.md
-          draft:      false
-          prerelease: ${{ steps.ver.outputs.PRE }}
-          files:      PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-${{ steps.ver.outputs.VER }}.exe
+          tag_name:               ${{ steps.ver.outputs.TAG }}
+          name:                   "PC Health Monitor v${{ steps.ver.outputs.VER }}"
+          body_path:              RELEASE_NOTES.md
+          draft:                  false
+          prerelease:             ${{ steps.ver.outputs.PRE }}
+          fail_on_unmatched_files: true
+          files: |
+            PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-${{ steps.ver.outputs.VER }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 16. Job summary ───────────────────────────────────────────────────────
-      - name: Job summary
+      # ── 11. Summary ───────────────────────────────────────────────────────────
+      - name: Summary
         shell: pwsh
         run: |
           $ver  = "${{ steps.ver.outputs.VER }}"
-          $hash = "${{ steps.checksum.outputs.HASH }}"
-          $exe  = Get-Item "PCHealthMonitor-v2\dist\PCHealthMonitor-Setup-$ver.exe"
-          Write-Host ""
-          Write-Host "✅  Release published: PC Health Monitor v$ver"
-          Write-Host "    Installer : PCHealthMonitor-Setup-$ver.exe"
-          Write-Host "    Size      : $([math]::Round($exe.Length/1MB,2)) MB"
-          Write-Host "    SHA-256   : $hash"
-          Write-Host "    URL       : https://github.com/Rzuss/PC-Health-Monitor/releases/tag/v$ver"
+          $hash = "${{ steps.sha.outputs.HASH }}"
+          $exe  = Get-Item "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
+          Write-Host "SUCCESS: PC Health Monitor v$ver released"
+          Write-Host "File   : $($exe.Name)"
+          Write-Host "Size   : $([math]::Round($exe.Length/1MB,1)) MB"
+          Write-Host "SHA256 : $hash"
