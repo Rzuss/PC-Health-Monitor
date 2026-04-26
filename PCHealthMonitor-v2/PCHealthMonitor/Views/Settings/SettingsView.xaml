@@ -60,6 +60,8 @@
             <!-- License / Activation -->
             <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
                 <StackPanel>
+
+                    <!-- Title row -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <TextBlock Text="License" Style="{StaticResource TextH3Style}" Margin="0,0,12,0"/>
                         <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
@@ -69,30 +71,101 @@
                                        Foreground="{StaticResource BlueBrush}"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="Enter your license key to unlock all Pro features"
-                               Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,16"/>
 
-                    <TextBlock Text="License Key" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,6"/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="140"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0"
-                                 Text="{Binding LicenseKey, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource DarkTextBoxStyle}"
-                                 Tag="XXXX-XXXX-XXXX-XXXX"/>
-                        <Button Grid.Column="2"
-                                Content="Activate"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Command="{Binding ActivateCommand}"/>
-                    </Grid>
+                    <!-- Active Pro summary (shown when activated) -->
+                    <Border CornerRadius="8" Padding="14,12"
+                            Background="{StaticResource BlueGlowBrush}"
+                            Margin="0,8,0,16"
+                            Visibility="{Binding IsActivated, Converter={StaticResource BoolToVisibleConverter}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="PC Health Monitor Pro" FontWeight="SemiBold"
+                                           Foreground="{StaticResource BlueBrush}" FontSize="13"/>
+                                <TextBlock Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0">
+                                    <Run Text="All features unlocked · Historical Charts, Scheduled Cleanup, Export, Alerts"/>
+                                </TextBlock>
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="Deactivate"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding DeactivateCommand}"
+                                    Width="110" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
 
+                    <!-- Key entry panel (shown when NOT activated) -->
+                    <StackPanel Visibility="{Binding IsActivated, Converter={StaticResource BoolToCollapsedConverter}}">
+                        <TextBlock Margin="0,2,0,12"
+                                   Style="{StaticResource TextCaptionStyle}">
+                            <Run Text="Enter your license key to unlock Historical Charts, Scheduled Cleanup, PDF/CSV Export &amp; Custom Alerts.  "/>
+                            <Hyperlink NavigateUri="https://rzuss.gumroad.com"
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource BlueBrush}">
+                                Get a key →
+                            </Hyperlink>
+                        </TextBlock>
+
+                        <TextBlock Text="License Key" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,6"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding LicenseKey, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     Tag="XXXX-XXXX-XXXX-XXXX">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding ActivateCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Activating…"
+                                               Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibleConverter}}"/>
+                                    <TextBlock Text="Activate"
+                                               Visibility="{Binding IsBusy, Converter={StaticResource BoolToCollapsedConverter}}"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Status message (error = red, success/info = green) -->
                     <TextBlock Text="{Binding LicenseStatus}"
-                               Style="{StaticResource TextCaptionStyle}"
-                               Foreground="{StaticResource GreenBrush}"
-                               Margin="0,8,0,0"/>
+                               Margin="0,10,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource TextCaptionStyle}">
+                                <Style.Triggers>
+                                    <!-- Hide when empty -->
+                                    <DataTrigger Binding="{Binding LicenseStatus}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <!-- Error → red -->
+                                    <DataTrigger Binding="{Binding LicenseStatusIsError}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource RedBrush}"/>
+                                    </DataTrigger>
+                                    <!-- Success/info → green -->
+                                    <DataTrigger Binding="{Binding LicenseStatusIsError}" Value="False">
+                                        <Setter Property="Foreground" Value="{StaticResource GreenBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
                 </StackPanel>
             </Border>
 

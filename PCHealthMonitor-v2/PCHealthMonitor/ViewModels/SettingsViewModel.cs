@@ -16,16 +16,18 @@ public sealed class SettingsViewModel : BaseViewModel
         _settings = settings;
         _license  = license;
 
-        SaveCommand    = new RelayCommand(Save);
-        ActivateCommand = new AsyncRelayCommand(ActivateAsync, () => !IsBusy && !string.IsNullOrWhiteSpace(LicenseKey));
-        ResetCommand   = new RelayCommand(Reset);
+        SaveCommand       = new RelayCommand(Save);
+        ActivateCommand   = new AsyncRelayCommand(ActivateAsync, () => !IsBusy && !string.IsNullOrWhiteSpace(LicenseKey));
+        DeactivateCommand = new RelayCommand(Deactivate, () => IsActivated);
+        ResetCommand      = new RelayCommand(Reset);
 
         LoadFromSettings();
     }
 
-    public ICommand SaveCommand     { get; }
-    public ICommand ActivateCommand { get; }
-    public ICommand ResetCommand    { get; }
+    public ICommand SaveCommand       { get; }
+    public ICommand ActivateCommand   { get; }
+    public ICommand DeactivateCommand { get; }
+    public ICommand ResetCommand      { get; }
 
     // ── General settings ──────────────────────────────────────────────────
     private bool _startWithWindows;
@@ -55,7 +57,23 @@ public sealed class SettingsViewModel : BaseViewModel
     }
 
     private string _licenseStatus = string.Empty;
-    public string LicenseStatus { get => _licenseStatus; set => SetProperty(ref _licenseStatus, value); }
+    public string LicenseStatus
+    {
+        get => _licenseStatus;
+        set
+        {
+            SetProperty(ref _licenseStatus, value);
+            // Treat status as error if it does NOT start with a success phrase
+            LicenseStatusIsError = !string.IsNullOrEmpty(value)
+                && !value.StartsWith("Activated",      StringComparison.OrdinalIgnoreCase)
+                && !value.StartsWith("Settings saved", StringComparison.OrdinalIgnoreCase)
+                && !value.StartsWith("Settings rest",  StringComparison.OrdinalIgnoreCase)
+                && !value.StartsWith("Validating",     StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private bool _licenseStatusIsError;
+    public bool LicenseStatusIsError { get => _licenseStatusIsError; set => SetProperty(ref _licenseStatusIsError, value); }
 
     // ── App info (read from assembly metadata — always in sync with .csproj) ─
     public string Version      => Assembly.GetExecutingAssembly()
@@ -85,6 +103,14 @@ public sealed class SettingsViewModel : BaseViewModel
         IsActivated   = ok;
         LicenseStatus = msg;
         IsBusy = false;
+    }
+
+    private void Deactivate()
+    {
+        _license.Deactivate();
+        IsActivated   = false;
+        LicenseKey    = string.Empty;
+        LicenseStatus = "License removed. You are now on the Free plan.";
     }
 
     private void Reset()
