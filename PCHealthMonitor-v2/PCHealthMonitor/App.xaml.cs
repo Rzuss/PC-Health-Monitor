@@ -87,6 +87,16 @@ public partial class App : Application
         // ── Background license refresh (silent, non-blocking) ────────────────
         _ = Services.GetRequiredService<LicenseService>().RefreshAsync();
 
+        // ── Wire history + alert services to hardware polling ─────────────────
+        var hardware = Services.GetRequiredService<HardwareService>();
+        var history  = Services.GetRequiredService<MetricsHistoryService>();
+        var alerts   = Services.GetRequiredService<AlertService>();
+        hardware.SnapshotUpdated += (_, snap) =>
+        {
+            history.Record(snap);
+            alerts.Evaluate(snap);
+        };
+
         // ── Normal startup ───────────────────────────────────────────────────
         var mainWindow = Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
@@ -161,6 +171,8 @@ public partial class App : Application
         services.AddSingleton<SettingsService>();
         services.AddSingleton<SystemInfoService>();
         services.AddSingleton<ToastService>();
+        services.AddSingleton<MetricsHistoryService>();
+        services.AddSingleton<AlertService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

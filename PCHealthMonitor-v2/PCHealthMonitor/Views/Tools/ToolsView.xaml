@@ -12,6 +12,8 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="24"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="24"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Header -->
@@ -115,6 +117,37 @@
                     </Grid>
                 </StackPanel>
             </Border>
+            <!-- ── Pro: Export Report ────────────────────────────────── -->
+            <Border Grid.Row="6" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="Export Report" Style="{StaticResource TextH3Style}" Margin="0,0,12,0"/>
+                        <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                Background="{StaticResource BlueGlowBrush}">
+                            <TextBlock Text="PRO" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource BlueBrush}"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Export a full system health report with 24-hour history data."
+                               Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,16"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="Export CSV"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ExportCsvCommand}"
+                                Width="130" Margin="0,0,12,0"/>
+                        <Button Content="Export HTML / PDF"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding ExportHtmlCommand}"
+                                Width="160"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding ExportStatus}"
+                               Style="{StaticResource TextCaptionStyle}"
+                               Foreground="{StaticResource GreenBrush}"/>
+                </StackPanel>
+            </Border>
+
         </Grid>
     </ScrollViewer>
 </Page>

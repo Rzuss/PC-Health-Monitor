@@ -29,6 +29,9 @@ public sealed class SettingsViewModel : BaseViewModel
     public ICommand DeactivateCommand { get; }
     public ICommand ResetCommand      { get; }
 
+    // ── Pro visibility ────────────────────────────────────────────────────
+    public bool IsPro => _license.IsActivated;
+
     // ── General settings ──────────────────────────────────────────────────
     private bool _startWithWindows;
     public bool StartWithWindows { get => _startWithWindows; set => SetProperty(ref _startWithWindows, value); }
@@ -41,6 +44,14 @@ public sealed class SettingsViewModel : BaseViewModel
 
     private int _scanIntervalHours = 24;
     public int ScanIntervalHours { get => _scanIntervalHours; set => SetProperty(ref _scanIntervalHours, value); }
+
+    // ── Pro: Custom alert thresholds ──────────────────────────────────────
+    // 0 = disabled. Set to 1-100 to enable.
+    private int _cpuAlertThreshold;
+    public int CpuAlertThreshold { get => _cpuAlertThreshold; set => SetProperty(ref _cpuAlertThreshold, value); }
+
+    private int _ramAlertThreshold;
+    public int RamAlertThreshold { get => _ramAlertThreshold; set => SetProperty(ref _ramAlertThreshold, value); }
 
     // ── License ───────────────────────────────────────────────────────────
     private bool _isActivated;
@@ -84,12 +95,20 @@ public sealed class SettingsViewModel : BaseViewModel
     // ── Commands ──────────────────────────────────────────────────────────
     private void Save()
     {
+        var existing = _settings.Load();
         _settings.Save(new AppSettings
         {
-            StartWithWindows  = StartWithWindows,
-            MinimizeToTray    = MinimizeToTray,
-            ShowNotifications = ShowNotifications,
-            ScanIntervalHours = ScanIntervalHours
+            StartWithWindows   = StartWithWindows,
+            MinimizeToTray     = MinimizeToTray,
+            ShowNotifications  = ShowNotifications,
+            ScanIntervalHours  = ScanIntervalHours,
+            CpuAlertThreshold  = CpuAlertThreshold,
+            RamAlertThreshold  = RamAlertThreshold,
+            // preserve geometry
+            WindowLeft  = existing.WindowLeft,
+            WindowTop   = existing.WindowTop,
+            WindowWidth = existing.WindowWidth,
+            WindowHeight= existing.WindowHeight,
         });
         LicenseStatus = "Settings saved.";
     }
@@ -123,10 +142,12 @@ public sealed class SettingsViewModel : BaseViewModel
     private void LoadFromSettings()
     {
         var s = _settings.Load();
-        StartWithWindows  = s.StartWithWindows;
-        MinimizeToTray    = s.MinimizeToTray;
-        ShowNotifications = s.ShowNotifications;
-        ScanIntervalHours = s.ScanIntervalHours;
-        IsActivated       = _license.IsActivated;
+        StartWithWindows   = s.StartWithWindows;
+        MinimizeToTray     = s.MinimizeToTray;
+        ShowNotifications  = s.ShowNotifications;
+        ScanIntervalHours  = s.ScanIntervalHours;
+        CpuAlertThreshold  = s.CpuAlertThreshold;
+        RamAlertThreshold  = s.RamAlertThreshold;
+        IsActivated        = _license.IsActivated;
     }
 }

@@ -45,6 +45,10 @@ public sealed class AppSettings
     public bool ShowNotifications { get; set; } = true;
     public int  ScanIntervalHours { get; set; } = 24;
 
+    // ── Pro: Custom alert thresholds (0 = disabled) ───────────────────────
+    public int CpuAlertThreshold { get; set; } = 0;
+    public int RamAlertThreshold { get; set; } = 0;
+
     // ── Window geometry (persisted between sessions) ───────────────────────
     // -1 = not set; window will use its XAML defaults (CenterScreen, 1200×780)
     public double WindowLeft   { get; set; } = -1;

@@ -57,6 +57,51 @@
                 </StackPanel>
             </Border>
 
+            <!-- Pro: Custom Alerts (visible only when Pro is active) -->
+            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16"
+                    Visibility="{Binding IsPro, Converter={StaticResource BoolToVisibleConverter}}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="Custom Alerts" Style="{StaticResource TextH3Style}" Margin="0,0,12,0"/>
+                        <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                Background="{StaticResource BlueGlowBrush}">
+                            <TextBlock Text="PRO" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource BlueBrush}"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Get a toast notification when CPU or RAM exceeds your threshold. Set to 0 to disable."
+                               Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,16"/>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- CPU threshold -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="CPU Alert Threshold (%)" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,6"/>
+                            <TextBox Style="{StaticResource DarkTextBoxStyle}"
+                                     Text="{Binding CpuAlertThreshold, UpdateSourceTrigger=PropertyChanged}"
+                                     Tag="0 = off, e.g. 90"/>
+                        </StackPanel>
+
+                        <!-- RAM threshold -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="RAM Alert Threshold (%)" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,6"/>
+                            <TextBox Style="{StaticResource DarkTextBoxStyle}"
+                                     Text="{Binding RamAlertThreshold, UpdateSourceTrigger=PropertyChanged}"
+                                     Tag="0 = off, e.g. 85"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource TextCaptionStyle}" Foreground="{StaticResource SubTextBrush}">
+                        <Run Text="Alerts are throttled to one per 5 minutes per metric. Save Settings to apply."/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
             <!-- License / Activation -->
             <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
                 <StackPanel>
