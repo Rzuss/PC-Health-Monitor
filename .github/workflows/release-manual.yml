@@ -1,0 +1,129 @@
+name: Release WPF Installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 2.0.1)'
+        required: true
+        default: '2.0.1'
+      prerelease:
+        description: 'Pre-release?'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: ver
+        shell: pwsh
+        run: |
+          $ver = "${{ github.event.inputs.version }}"
+          $tag = "v$ver"
+          $pre = "${{ github.event.inputs.prerelease }}" -eq "true"
+          "VER=$ver" | Out-File $env:GITHUB_OUTPUT -Append
+          "TAG=$tag" | Out-File $env:GITHUB_OUTPUT -Append
+          "PRE=$pre"  | Out-File $env:GITHUB_OUTPUT -Append
+          Write-Host "Version=$ver  Tag=$tag  Pre=$pre"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore PCHealthMonitor-v2/PCHealthMonitor/PCHealthMonitor.csproj
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.VER }}"
+          dotnet publish PCHealthMonitor-v2/PCHealthMonitor/PCHealthMonitor.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:Version=$ver `
+            -o publish-output
+          Write-Host "Published OK"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File $env:GITHUB_PATH -Append
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.VER }}"
+          $iss = Get-Content PCHealthMonitor-v2/installer.iss -Raw
+          $iss = $iss -replace '#define AppVersion\s+"[^"]+"', "#define AppVersion `"$ver`""
+          $iss = $iss -replace '#define PublishDir\s+"[^"]+"',  "#define PublishDir `..\publish-output`""
+          Set-Content PCHealthMonitor-v2/installer.iss $iss -Encoding UTF8
+          New-Item -ItemType Directory -Force -Path PCHealthMonitor-v2/dist | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" PCHealthMonitor-v2/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          $exe = Get-ChildItem "PCHealthMonitor-v2/dist/*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "Installer exe not found in dist/" }
+          $target = "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
+          if ($exe.FullName -ne (Resolve-Path $target -ErrorAction SilentlyContinue).Path) {
+            Rename-Item $exe.FullName $target
+          }
+          Write-Host "Installer: $((Get-Item $target).Name)"
+
+      - name: SHA-256
+        id: sha
+        shell: pwsh
+        run: |
+          $ver  = "${{ steps.ver.outputs.VER }}"
+          $hash = (Get-FileHash "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe" -Algorithm SHA256).Hash
+          "HASH=$hash" | Out-File $env:GITHUB_OUTPUT -Append
+          Write-Host "SHA-256: $hash"
+
+      - name: Release notes
+        shell: pwsh
+        run: |
+          $ver  = "${{ steps.ver.outputs.VER }}"
+          $hash = "${{ steps.sha.outputs.HASH }}"
+          $notes = "## PC Health Monitor v$ver`n`n" +
+                   "### Install`n" +
+                   "1. Download **PCHealthMonitor-Setup-$ver.exe** below`n" +
+                   "2. Run the installer (no admin required)`n" +
+                   "3. Launch from Desktop or Start Menu`n`n" +
+                   "### Requirements`n" +
+                   "- Windows 10/11 x64`n" +
+                   "- ~80 MB disk space`n`n" +
+                   "### SHA-256`n" +
+                   '```' + "`nGet-FileHash 'PCHealthMonitor-Setup-$ver.exe' -Algorithm SHA256`n# $hash`n" + '```' + "`n`n" +
+                   "*100% Offline - No Telemetry - No Admin Required - MIT License*"
+          $notes | Out-File RELEASE_NOTES.md -Encoding UTF8
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:                ${{ steps.ver.outputs.TAG }}
+          name:                    "PC Health Monitor v${{ steps.ver.outputs.VER }}"
+          body_path:               RELEASE_NOTES.md
+          draft:                   false
+          prerelease:              ${{ steps.ver.outputs.PRE }}
+          fail_on_unmatched_files: true
+          files: PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-${{ steps.ver.outputs.VER }}.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Done
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.VER }}"
+          $exe = Get-Item "PCHealthMonitor-v2/dist/PCHealthMonitor-Setup-$ver.exe"
+          Write-Host "Released: $($exe.Name) ($([math]::Round($exe.Length/1MB,1)) MB)"
