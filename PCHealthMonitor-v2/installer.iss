@@ -55,8 +55,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 ; ── Tasks ─────────────────────────────────────────────────────────────────────
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checked
-Name: "startuptask"; Description: "Start with &Windows (silent background cleanup)"; GroupDescription: "Startup:"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a &desktop shortcut"
+Name: "startuptask"; Description: "Start with &Windows (silent background cleanup)"; Flags: unchecked
 
 ; ── Files ─────────────────────────────────────────────────────────────────────
 [Files]

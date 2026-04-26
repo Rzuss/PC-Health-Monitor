@@ -53,8 +53,9 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:Version=$ver `
-            -o publish-output
-          Write-Host "Published OK"
+            -o PCHealthMonitor-v2/pub
+          $exe = Get-Item "PCHealthMonitor-v2\pub\PCHealthMonitor.exe"
+          Write-Host "Published: $($exe.Name) ($([math]::Round($exe.Length/1MB,1)) MB)"
 
       - name: Install Inno Setup
         shell: pwsh
@@ -68,7 +69,7 @@ jobs:
           $ver = "${{ steps.ver.outputs.VER }}"
           $iss = Get-Content PCHealthMonitor-v2/installer.iss -Raw
           $iss = $iss -replace '#define AppVersion\s+"[^"]+"', "#define AppVersion `"$ver`""
-          $iss = $iss -replace '#define PublishDir\s+"[^"]+"', '#define PublishDir "..\publish-output"'
+          $iss = $iss -replace '#define PublishDir\s+"[^"]+"', '#define PublishDir "pub"'
           Set-Content PCHealthMonitor-v2/installer.iss $iss -Encoding UTF8
           New-Item -ItemType Directory -Force -Path PCHealthMonitor-v2/dist | Out-Null
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" PCHealthMonitor-v2/installer.iss
