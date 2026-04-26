@@ -1,0 +1,228 @@
+<Window x:Class="PCHealthMonitor.Views.Upgrade.ProUpgradeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Upgrade to Pro — PC Health Monitor"
+        Width="680" Height="560"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        SnapsToDevicePixels="True">
+
+    <Border Background="{StaticResource BgBaseBrush}"
+            CornerRadius="14"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            ClipToBounds="True">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="60" ShadowDepth="0" Opacity="0.85"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- header -->
+                <RowDefinition Height="*"/>     <!-- comparison panels -->
+                <RowDefinition Height="Auto"/>  <!-- footer buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- ── Header ───────────────────────────────────────────────── -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource BgCard2Brush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="28,18">
+                <Grid>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Unlock PC Health Monitor Pro"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontFamily="Segoe UI Variable, Segoe UI"
+                                   FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="One-time purchase · No subscriptions · Lifetime updates"
+                                   Foreground="{StaticResource SubTextBrush}"
+                                   FontFamily="Segoe UI Variable, Segoe UI"
+                                   FontSize="12" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <!-- Close button -->
+                    <Button HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Width="28" Height="28"
+                            Content="✕"
+                            FontSize="13"
+                            Foreground="{StaticResource SubTextBrush}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            Click="CloseBtn_Click">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource BgCard3Brush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- ── Comparison panels ─────────────────────────────────────── -->
+            <Grid Grid.Row="1" Margin="24,20,24,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- FREE panel -->
+                <Border Grid.Column="0"
+                        Background="{StaticResource BgCard2Brush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20,18">
+                    <StackPanel>
+                        <!-- Plan name -->
+                        <TextBlock Text="Free"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontFamily="Segoe UI Variable, Segoe UI"
+                                   FontSize="16" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                        <TextBlock Text="$0 · Forever free"
+                                   Foreground="{StaticResource SubTextBrush}"
+                                   FontFamily="Segoe UI Variable, Segoe UI"
+                                   FontSize="12" Margin="0,0,0,16"/>
+
+                        <!-- Features -->
+                        <StackPanel x:Name="FreeFeatures"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- PRO panel -->
+                <Border Grid.Column="2"
+                        CornerRadius="12"
+                        Padding="20,18"
+                        BorderThickness="1.5">
+                    <Border.BorderBrush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#7C6FF5" Offset="0"/>
+                            <GradientStop Color="#5B54E8" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.BorderBrush>
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#1A1830" Offset="0"/>
+                            <GradientStop Color="#161428" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <StackPanel>
+                        <!-- Plan name + badge -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <TextBlock Text="Pro"
+                                       Foreground="White"
+                                       FontFamily="Segoe UI Variable, Segoe UI"
+                                       FontSize="16" FontWeight="SemiBold"/>
+                            <Border Background="#5B54E8" CornerRadius="4" Padding="7,2"
+                                    Margin="8,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="BEST VALUE" Foreground="White"
+                                           FontSize="9" FontWeight="Bold"
+                                           FontFamily="Segoe UI Variable, Segoe UI"/>
+                            </Border>
+                        </StackPanel>
+                        <!-- Price -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16" VerticalAlignment="Bottom">
+                            <TextBlock Text="$9.99"
+                                       Foreground="White"
+                                       FontFamily="Segoe UI Variable, Segoe UI"
+                                       FontSize="26" FontWeight="Bold"
+                                       VerticalAlignment="Bottom"/>
+                            <TextBlock Text=" one-time"
+                                       Foreground="#BDB8FF"
+                                       FontFamily="Segoe UI Variable, Segoe UI"
+                                       FontSize="12"
+                                       VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                        </StackPanel>
+
+                        <!-- Features -->
+                        <StackPanel x:Name="ProFeatures"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ── Footer buttons ────────────────────────────────────────── -->
+            <Border Grid.Row="2"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="24,14">
+                <Grid>
+                    <Button x:Name="GetProBtn"
+                            HorizontalAlignment="Right"
+                            Width="200" Height="40"
+                            FontSize="14" FontWeight="SemiBold"
+                            FontFamily="Segoe UI Variable, Segoe UI"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            Click="GetProBtn_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border CornerRadius="8">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#5B54E8" Offset="0"/>
+                                            <GradientStop Color="#7C6FF5" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Border.Opacity" Value="0.88"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="Get Pro — $9.99  →"
+                                   Foreground="White"
+                                   FontFamily="Segoe UI Variable, Segoe UI"
+                                   FontSize="14" FontWeight="SemiBold"/>
+                    </Button>
+
+                    <Button HorizontalAlignment="Left"
+                            Content="I already have a license key →"
+                            FontSize="12"
+                            FontFamily="Segoe UI Variable, Segoe UI"
+                            Foreground="{StaticResource BlueBrush}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            VerticalAlignment="Center"
+                            Click="AlreadyHaveKeyBtn_Click">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <TextBlock Text="{TemplateBinding Content}"
+                                                       Foreground="{TemplateBinding Foreground}"
+                                                       FontSize="{TemplateBinding FontSize}"
+                                                       FontFamily="{TemplateBinding FontFamily}"
+                                                       TextDecorations="Underline"/>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

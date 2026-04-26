@@ -11,6 +11,7 @@ using PCHealthMonitor.Views.DiskHealth;
 using PCHealthMonitor.Views.Tools;
 using PCHealthMonitor.Views.Network;
 using PCHealthMonitor.Views.Settings;
+using PCHealthMonitor.Views.Upgrade;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -259,7 +260,9 @@ public partial class MainWindow : Window
     // ─── Upgrade ─────────────────────────────────────────────────────────
     private void GetProBtn_Click(object sender, RoutedEventArgs e)
     {
-        NavigateTo("Settings");
+        var dlg = new ProUpgradeWindow { Owner = this };
+        dlg.NavigateToLicense += (_, _) => NavigateTo("Settings");
+        dlg.ShowDialog();
     }
 
     // ─── Keyboard shortcuts ───────────────────────────────────────────────

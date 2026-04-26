@@ -298,7 +298,7 @@
                                                FontFamily="Segoe UI Variable, Segoe UI"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBlock Text="$19.99" HorizontalAlignment="Right"
+                                <TextBlock Text="$9.99" HorizontalAlignment="Right"
                                            Foreground="#BDB8FF" FontSize="11"
                                            FontFamily="Segoe UI Variable, Segoe UI"
                                            VerticalAlignment="Center"/>
