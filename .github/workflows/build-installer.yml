@@ -1,10 +1,8 @@
-name: Build Installer
+name: Build Installer (Legacy — Disabled)
 
-# Triggers on version tags: v3.0, v3.1.0, etc.
+# This workflow is for the legacy PowerShell version and is disabled.
+# The WPF release is handled by release-wpf.yml
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
