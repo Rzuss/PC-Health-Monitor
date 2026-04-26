@@ -18,7 +18,7 @@ public static class IntegrityService
     {
         var report = new IntegrityReport();
 
-        report.AssemblyLocation   = Assembly.GetExecutingAssembly().Location;
+        report.AssemblyLocation   = Environment.ProcessPath ?? AppContext.BaseDirectory;
         report.IsRunningFromTemp  = IsFromTempPath(report.AssemblyLocation);
         report.HasSuspiciousName  = HasSuspiciousAssemblyName();
         report.NetworkInterfaces  = GetActiveInterfaces();
