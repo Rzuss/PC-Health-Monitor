@@ -50,20 +50,21 @@ public sealed class StorageService
     //   1. Scan the user's home folder (fast, relevant)
     //   2. Scan top-level drive dirs, SKIPPING system folders
     //   3. Hard limit: 10 seconds total, max 500 dirs/files per level
-    public async Task<List<FolderEntry>> GetLargeItemsAsync(string rootPath, int topN = 50)
+    public async Task<StorageScanResult> GetLargeItemsAsync(string rootPath, int topN = 50)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         try
         {
-            return await Task.Run(() => SmartScan(rootPath, topN, cts.Token), cts.Token);
+            var items = await Task.Run(() => SmartScan(rootPath, topN, cts.Token), cts.Token);
+            return new StorageScanResult { Items = items, TimedOut = false };
         }
         catch (OperationCanceledException)
         {
-            return new List<FolderEntry>();   // timed out — empty is safe
+            return new StorageScanResult { Items = new List<FolderEntry>(), TimedOut = true };
         }
         catch
         {
-            return new List<FolderEntry>();
+            return new StorageScanResult { Items = new List<FolderEntry>(), TimedOut = false };
         }
     }
 
@@ -179,4 +180,10 @@ public sealed class StorageService
         return size;
     }
 
+}
+
+public sealed class StorageScanResult
+{
+    public List<FolderEntry> Items    { get; init; } = new();
+    public bool              TimedOut { get; init; }
 }

@@ -17,13 +17,11 @@ public sealed class NetworkService
     {
         var result = new NetworkScanResult();
 
-        // CRITICAL FIX: all synchronous network operations moved to Task.Run so they
-        // never block the UI thread. Previously, GetAllNetworkInterfaces() and
-        // GetActiveTcpConnections() ran synchronously on the UI thread, causing freezes
-        // and potential crashes under certain network driver states.
+        // Sample bytes before — used to compute throughput after 1-second interval.
+        long rxBefore = 0, txBefore = 0;
         await Task.Run(() =>
         {
-            // Adapters
+            // Adapters + first byte sample
             try
             {
                 foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
@@ -44,6 +42,13 @@ public sealed class NetworkService
                         Status     = nic.OperationalStatus.ToString(),
                         Speed      = nic.Speed > 0 ? $"{nic.Speed / 1_000_000} Mbps" : "Unknown"
                     });
+                    try
+                    {
+                        var stats = nic.GetIPStatistics();
+                        rxBefore += stats.BytesReceived;
+                        txBefore += stats.BytesSent;
+                    }
+                    catch { }
                 }
             }
             catch { }
@@ -67,7 +72,32 @@ public sealed class NetworkService
             catch { }
         });
 
-        // Public IP — async HTTP (no Task.Run needed)
+        // Wait 1 second, then sample again to compute real throughput.
+        await Task.Delay(1000);
+
+        await Task.Run(() =>
+        {
+            long rxAfter = 0, txAfter = 0;
+            try
+            {
+                foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                    try
+                    {
+                        var stats = nic.GetIPStatistics();
+                        rxAfter += stats.BytesReceived;
+                        txAfter += stats.BytesSent;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+            result.DownloadBps = Math.Max(0, rxAfter - rxBefore);
+            result.UploadBps   = Math.Max(0, txAfter  - txBefore);
+        });
+
+        // Public IP — async HTTP
         try
         {
             result.PublicIp = (await _http.GetStringAsync("https://api.ipify.org")).Trim();

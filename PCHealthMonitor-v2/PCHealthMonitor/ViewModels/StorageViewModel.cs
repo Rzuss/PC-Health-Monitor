@@ -36,6 +36,9 @@ public sealed class StorageViewModel : BaseViewModel
     private string _statusText = "Select a drive, then click Find Large Items";
     public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
 
+    private bool _scanTimedOut;
+    public bool ScanTimedOut { get => _scanTimedOut; set => SetProperty(ref _scanTimedOut, value); }
+
     private DriveInfo? _selectedDrive;
     public DriveInfo? SelectedDrive
     {
@@ -62,16 +65,20 @@ public sealed class StorageViewModel : BaseViewModel
     {
         if (SelectedDrive is null) return;
 
-        IsScanning = true;
-        StatusText = $"Scanning {SelectedDrive.Name} (top 2 levels)...";
+        IsScanning   = true;
+        ScanTimedOut = false;
+        StatusText   = $"Scanning {SelectedDrive.Name} (top 2 levels)...";
         LargeItems.Clear();
 
-        var items = await _storage.GetLargeItemsAsync(SelectedDrive.RootPath, topN: 50);
-        foreach (var item in items) LargeItems.Add(item);
+        var result = await _storage.GetLargeItemsAsync(SelectedDrive.RootPath, topN: 50);
+        foreach (var item in result.Items) LargeItems.Add(item);
 
-        StatusText = items.Count == 0
-            ? "Scan complete — no large items found (scan may have timed out)"
-            : $"Top {items.Count} items on {SelectedDrive.Name}";
+        ScanTimedOut = result.TimedOut;
+        StatusText = result.TimedOut
+            ? $"⚠ Scan timed out — partial results shown for {SelectedDrive.Name}"
+            : result.Items.Count == 0
+                ? "Scan complete — no large items found"
+                : $"Top {result.Items.Count} items on {SelectedDrive.Name}";
         IsScanning = false;
     }
 }

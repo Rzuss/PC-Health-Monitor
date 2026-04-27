@@ -1,6 +1,7 @@
 using PCHealthMonitor.ViewModels;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace PCHealthMonitor.Services;
@@ -20,18 +21,60 @@ public sealed class SchedulerService
             {
                 foreach (var name in key.GetValueNames())
                 {
+                    var rawPath = key.GetValue(name)?.ToString() ?? string.Empty;
+                    var exePath = ExtractExePath(rawPath);
+                    var (publisher, impact) = GetFileInfo(exePath);
                     entries.Add(new StartupEntry
                     {
                         Name      = name,
-                        Path      = key.GetValue(name)?.ToString() ?? string.Empty,
-                        Publisher = string.Empty,
-                        Impact    = "Medium",
+                        Path      = rawPath,
+                        Publisher = publisher,
+                        Impact    = impact,
                         IsEnabled = true
                     });
                 }
             }
             return entries;
         });
+    }
+
+    // Strip quotes and arguments to get the bare exe path.
+    private static string ExtractExePath(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        if (raw.StartsWith('"'))
+        {
+            var end = raw.IndexOf('"', 1);
+            return end > 1 ? raw[1..end] : raw;
+        }
+        var space = raw.IndexOf(' ');
+        return space > 0 ? raw[..space] : raw;
+    }
+
+    // Read FileVersionInfo for Publisher; estimate Impact from file size.
+    private static (string Publisher, string Impact) GetFileInfo(string exePath)
+    {
+        if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+            return (string.Empty, "Low");
+        try
+        {
+            var fvi       = FileVersionInfo.GetVersionInfo(exePath);
+            var publisher = string.IsNullOrWhiteSpace(fvi.CompanyName)
+                ? fvi.FileDescription ?? string.Empty
+                : fvi.CompanyName ?? string.Empty;
+            var size      = new FileInfo(exePath).Length;
+            var impact    = size switch
+            {
+                > 50_000_000 => "High",
+                > 5_000_000  => "Medium",
+                _            => "Low"
+            };
+            return (publisher.Trim(), impact);
+        }
+        catch
+        {
+            return (string.Empty, "Low");
+        }
     }
 
     public void SetStartupEntry(StartupEntry entry)

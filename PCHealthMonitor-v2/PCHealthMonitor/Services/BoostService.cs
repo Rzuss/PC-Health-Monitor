@@ -70,6 +70,17 @@ public sealed class BoostService
             catch { }
         });
 
+    // ── Check if a boosted process is still alive ─────────────────────────
+    public bool IsProcessAlive(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return !p.HasExited;
+        }
+        catch { return false; }
+    }
+
     // ── Restore ───────────────────────────────────────────────────────────
     public void Deactivate() => RestoreAll();
 

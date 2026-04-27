@@ -111,6 +111,12 @@ public sealed class BoostViewModel : BaseViewModel, IDisposable
         _vipTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _vipTimer.Tick += (_, _) =>
         {
+            if (!_boost.IsProcessAlive(target.Pid))
+            {
+                Deactivate();
+                VipStatus = $"\"{target.DisplayName}\" was closed — boost ended automatically";
+                return;
+            }
             var rem = _vipExpiry - DateTime.Now;
             if (rem <= TimeSpan.Zero)
             {

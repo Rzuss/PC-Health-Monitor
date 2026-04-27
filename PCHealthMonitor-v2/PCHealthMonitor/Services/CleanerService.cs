@@ -32,20 +32,59 @@ public sealed class CleanerService
 
     // ── Category table ────────────────────────────────────────────────────────
     // Recycle Bin has no path entries — handled via Shell32 API in Scan/Clean
-    private static readonly (string Name, string[] Paths)[] Categories =
-    [
-        ("Windows Temp Files",       [Path.GetTempPath(), @"C:\Windows\Temp"]),
-        ("Browser Cache",            [
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                         @"Google\Chrome\User Data\Default\Cache"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                         @"Microsoft\Edge\User Data\Default\Cache")]),
-        ("Recycle Bin",              []),   // size/empty handled via SHQueryRecycleBin / SHEmptyRecycleBin
-        ("Windows Update Cache",     [@"C:\Windows\SoftwareDistribution\Download"]),
-        ("Prefetch Files",           [@"C:\Windows\Prefetch"]),
-        ("Thumbnail Cache",          [Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                                        @"Microsoft\Windows\Explorer")]),
-    ];
+    private static readonly (string Name, string[] Paths)[] Categories = BuildCategories();
+
+    private static (string Name, string[] Paths)[] BuildCategories()
+    {
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return
+        [
+            ("Windows Temp Files",   [Path.GetTempPath(), @"C:\Windows\Temp"]),
+            ("Browser Cache",        GetBrowserCachePaths(local)),
+            ("Recycle Bin",          []),
+            ("Windows Update Cache", [@"C:\Windows\SoftwareDistribution\Download"]),
+            ("Prefetch Files",       [@"C:\Windows\Prefetch"]),
+            ("Thumbnail Cache",      [Path.Combine(local, @"Microsoft\Windows\Explorer")]),
+        ];
+    }
+
+    // Enumerate all Chrome, Edge, and Firefox profile cache directories.
+    private static string[] GetBrowserCachePaths(string localAppData)
+    {
+        var paths = new List<string>();
+        CollectChromiumCaches(Path.Combine(localAppData, @"Google\Chrome\User Data"), paths);
+        CollectChromiumCaches(Path.Combine(localAppData, @"Microsoft\Edge\User Data"), paths);
+        CollectFirefoxCaches(Path.Combine(localAppData, @"Mozilla\Firefox\Profiles"), paths);
+        return paths.ToArray();
+    }
+
+    private static void CollectChromiumCaches(string userDataDir, List<string> paths)
+    {
+        if (!Directory.Exists(userDataDir)) return;
+        try
+        {
+            foreach (var profileDir in Directory.EnumerateDirectories(userDataDir))
+            {
+                var cache = Path.Combine(profileDir, "Cache");
+                if (Directory.Exists(cache)) paths.Add(cache);
+            }
+        }
+        catch { }
+    }
+
+    private static void CollectFirefoxCaches(string profilesDir, List<string> paths)
+    {
+        if (!Directory.Exists(profilesDir)) return;
+        try
+        {
+            foreach (var profileDir in Directory.EnumerateDirectories(profilesDir))
+            {
+                var cache = Path.Combine(profileDir, "cache2");
+                if (Directory.Exists(cache)) paths.Add(cache);
+            }
+        }
+        catch { }
+    }
 
     // CRITICAL FIX: Added 30-second CancellationToken so that large directories
     // (Windows SoftwareDistribution with thousands of files, network drives, etc.)
