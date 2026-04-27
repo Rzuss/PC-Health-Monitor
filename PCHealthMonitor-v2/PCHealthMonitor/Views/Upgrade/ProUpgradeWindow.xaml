@@ -35,7 +35,7 @@
                 <Grid>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Unlock PC Health Monitor Pro"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Foreground="{StaticResource TextBrush}"
                                    FontFamily="Segoe UI Variable, Segoe UI"
                                    FontSize="18" FontWeight="SemiBold"/>
                         <TextBlock Text="One-time purchase · No subscriptions · Lifetime updates"
@@ -93,7 +93,7 @@
                     <StackPanel>
                         <!-- Plan name -->
                         <TextBlock Text="Free"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Foreground="{StaticResource TextBrush}"
                                    FontFamily="Segoe UI Variable, Segoe UI"
                                    FontSize="16" FontWeight="SemiBold" Margin="0,0,0,2"/>
                         <TextBlock Text="$0 · Forever free"
