@@ -1,6 +1,7 @@
 using PCHealthMonitor.Helpers;
 using PCHealthMonitor.Services;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -58,13 +59,29 @@ public sealed class JunkCleanerViewModel : BaseViewModel
 
     private async Task CleanAsync()
     {
+        // Only clean categories the user has checked
+        var selected = Categories.Where(c => c.Selected).ToList();
+        if (selected.Count == 0)
+        {
+            StatusText = "No categories selected — check at least one row.";
+            return;
+        }
+
         IsBusy = true;
         StatusText = "Cleaning...";
-        long cleaned = await _cleaner.CleanAsync(Categories);
-        TotalBytes = 0;
+        long cleaned = await _cleaner.CleanAsync(selected);
+
+        // Remove cleaned categories from the list
+        foreach (var cat in selected)
+            Categories.Remove(cat);
+
+        TotalBytes = Categories.Sum(c => c.Bytes);
         OnPropertyChanged(nameof(TotalDisplay));
-        StatusText = $"Cleaned successfully — freed {FormatBytes(cleaned)}";
-        Categories.Clear();
+
+        StatusText = Categories.Count == 0
+            ? $"All clean! Freed {FormatBytes(cleaned)}"
+            : $"Freed {FormatBytes(cleaned)} — {Categories.Count} categor{(Categories.Count == 1 ? "y" : "ies")} remaining";
+
         IsBusy = false;
     }
 
