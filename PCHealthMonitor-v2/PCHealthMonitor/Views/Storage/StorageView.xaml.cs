@@ -31,7 +31,7 @@ public partial class StorageView : Page
     private void LargeItemsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (sender is not DataGrid grid) return;
-        if (grid.SelectedItem is not StorageItem item) return;
+        if (grid.SelectedItem is not FolderEntry item) return;
 
         try
         {
