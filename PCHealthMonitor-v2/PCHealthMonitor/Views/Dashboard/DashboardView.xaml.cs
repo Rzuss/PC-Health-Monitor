@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace PCHealthMonitor.Views.Dashboard;
 
@@ -47,10 +48,14 @@ public partial class DashboardView : Page
 
         _hardware.SnapshotUpdated += OnSnapshot;
 
+        // Live update when the user activates Pro mid-session
+        var license = App.Services.GetRequiredService<LicenseService>();
+        license.ProStatusChanged += (_, _) =>
+            Dispatcher.InvokeAsync(RefreshProVisibility, DispatcherPriority.Normal);
+
         Loaded += (_, _) =>
         {
-            // Show or hide the History card based on Pro status
-            HistoryCard.Visibility = _pro.IsPro ? Visibility.Visible : Visibility.Collapsed;
+            RefreshProVisibility();
             HighlightTimeRangeButton(_selectedHours);
             OnSnapshot(null, _hardware.Latest);
         };
@@ -61,6 +66,14 @@ public partial class DashboardView : Page
             _arcTimer?.Stop();
             _arcTimer = null;
         };
+    }
+
+    private void RefreshProVisibility()
+    {
+        bool isPro = _pro.IsPro;
+        HistoryCard.Visibility = isPro ? Visibility.Visible : Visibility.Collapsed;
+        // Redraw charts immediately if now Pro and the card just became visible
+        if (isPro) DrawCharts();
     }
 
     // ── Hardware snapshot → UI ────────────────────────────────────────────

@@ -20,7 +20,12 @@ public sealed class AlertService
 
     // Track last alert time per metric key to throttle notifications
     private readonly Dictionary<string, DateTime> _lastAlerted = new();
-    private static readonly TimeSpan ThrottleWindow = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ThrottleWindow    = TimeSpan.FromMinutes(5);
+
+    // Cache settings — refreshed every 60 seconds instead of on every 2-second snapshot
+    private AppSettings?  _cachedSettings;
+    private DateTime      _cacheExpiry = DateTime.MinValue;
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(60);
 
     public AlertService(SettingsService settings, ToastService toast, ProFeatureService pro)
     {
@@ -35,7 +40,13 @@ public sealed class AlertService
     {
         if (!_pro.IsPro) return;
 
-        var s = _settings.Load();
+        // Refresh settings cache at most once per minute — avoids disk I/O on every snapshot
+        if (_cachedSettings is null || DateTime.Now >= _cacheExpiry)
+        {
+            _cachedSettings = _settings.Load();
+            _cacheExpiry    = DateTime.Now + CacheDuration;
+        }
+        var s = _cachedSettings;
 
         if (s.CpuAlertThreshold > 0 && snap.CpuLoad >= s.CpuAlertThreshold)
             FireIfNotThrottled("cpu",

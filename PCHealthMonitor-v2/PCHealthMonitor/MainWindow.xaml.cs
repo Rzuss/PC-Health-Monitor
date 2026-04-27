@@ -209,7 +209,10 @@ public partial class MainWindow : Window
     {
         TrayMenu_Open(sender, e);
         NavigateTo("Dashboard");
-        // TODO: trigger quick scan via DashboardViewModel
+        // Trigger quick scan on the DashboardViewModel
+        var dashVm = App.Services.GetRequiredService<DashboardViewModel>();
+        if (dashVm.RunQuickScanCommand.CanExecute(null))
+            dashVm.RunQuickScanCommand.Execute(null);
     }
 
     private void TrayMenu_Exit(object sender, RoutedEventArgs e)

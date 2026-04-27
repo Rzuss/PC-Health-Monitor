@@ -115,10 +115,11 @@ public sealed class LicenseService
         }
         catch (HttpRequestException)
         {
-            // Fallback: if offline and key looks plausible, grant temporary activation
-            // (will be verified online on next launch)
-            bool looksValid = key.StartsWith("PCHM-", StringComparison.OrdinalIgnoreCase)
-                              && key.Length >= 19;
+            // Fallback: if offline and key looks plausible, grant temporary activation.
+            // Gumroad keys are typically 35 chars: XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX
+            // We accept any key that is at least 10 chars and contains a hyphen.
+            // The key will be verified online on the next launch.
+            bool looksValid = key.Length >= 10 && key.Contains('-');
             if (looksValid)
             {
                 _data = new LicenseData

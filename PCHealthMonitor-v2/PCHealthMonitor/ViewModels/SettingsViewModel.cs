@@ -1,5 +1,8 @@
+using Microsoft.Win32;
 using PCHealthMonitor.Helpers;
 using PCHealthMonitor.Services;
+using System;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -122,6 +125,10 @@ public sealed class SettingsViewModel : BaseViewModel
             WindowWidth = existing.WindowWidth,
             WindowHeight= existing.WindowHeight,
         });
+
+        // Apply "Start with Windows" to the registry immediately
+        ApplyStartWithWindows(StartWithWindows);
+
         LicenseStatus = "Settings saved.";
     }
 
@@ -161,5 +168,31 @@ public sealed class SettingsViewModel : BaseViewModel
         CpuAlertThreshold  = s.CpuAlertThreshold;
         RamAlertThreshold  = s.RamAlertThreshold;
         IsActivated        = _license.IsActivated;
+    }
+
+    // ── Registry: Start with Windows ─────────────────────────────────────────
+    private const string RunKey    = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+    private const string AppRegKey = "PCHealthMonitor";
+
+    private static void ApplyStartWithWindows(bool enable)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+            if (key is null) return;
+
+            if (enable)
+            {
+                // Store the full path in quotes so paths with spaces work
+                var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
+                if (!string.IsNullOrEmpty(exePath))
+                    key.SetValue(AppRegKey, $"\"{exePath}\"");
+            }
+            else
+            {
+                key.DeleteValue(AppRegKey, throwOnMissingValue: false);
+            }
+        }
+        catch { /* insufficient permissions — fail silently */ }
     }
 }
