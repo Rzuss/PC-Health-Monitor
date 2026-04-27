@@ -285,4 +285,14 @@ public partial class DashboardView : Page
         if (Window.GetWindow(this) is MainWindow mw)
             mw.NavigateTo(page);
     }
+
+    private void ProUpgradeOverlay_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new PCHealthMonitor.Views.Upgrade.ProUpgradeWindow
+        {
+            Owner = Window.GetWindow(this)
+        };
+        dlg.NavigateToLicense += (_, _) => NavigateMain("Settings");
+        dlg.ShowDialog();
+    }
 }

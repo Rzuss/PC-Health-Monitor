@@ -8,15 +8,19 @@ namespace PCHealthMonitor.ViewModels;
 
 public sealed class DashboardViewModel : BaseViewModel
 {
-    private readonly HardwareService _hardware;
-    private readonly CleanerService  _cleaner;
+    private readonly HardwareService  _hardware;
+    private readonly CleanerService   _cleaner;
+    private readonly ProFeatureService _pro;
 
-    public DashboardViewModel(HardwareService hardware, CleanerService cleaner)
+    public DashboardViewModel(HardwareService hardware, CleanerService cleaner, ProFeatureService pro)
     {
         _hardware = hardware;
         _cleaner  = cleaner;
+        _pro      = pro;
         RunQuickScanCommand = new AsyncRelayCommand(RunQuickScanAsync);
     }
+
+    public bool IsPro => _pro.IsPro;
 
     public ICommand RunQuickScanCommand { get; }
 

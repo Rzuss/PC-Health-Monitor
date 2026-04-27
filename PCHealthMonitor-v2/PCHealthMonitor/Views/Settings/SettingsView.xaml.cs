@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PCHealthMonitor.ViewModels;
 using System.Diagnostics;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Navigation;
 
@@ -24,5 +25,14 @@ public partial class SettingsView : Page
             UseShellExecute = true
         });
         e.Handled = true;
+    }
+
+    private void ProUpgradeOverlay_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new PCHealthMonitor.Views.Upgrade.ProUpgradeWindow
+        {
+            Owner = Window.GetWindow(this)
+        };
+        dlg.ShowDialog();
     }
 }
