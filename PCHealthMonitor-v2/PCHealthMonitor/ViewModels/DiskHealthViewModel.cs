@@ -33,24 +33,31 @@ public sealed class DiskHealthViewModel : BaseViewModel
     // ── Called by View on Loaded ──────────────────────────────────────────
     public async Task LoadAsync()
     {
-        if (Snapshot is not null) return;   // already loaded — singleton view
+        // Always re-subscribe first — Unsubscribe() may have been called when the
+        // user navigated away. Remove before adding to prevent double-subscription.
+        _hardware.SnapshotUpdated -= OnHardwareUpdate;
+        _hardware.SnapshotUpdated += OnHardwareUpdate;
+
+        if (Snapshot is not null)
+        {
+            // Static data already loaded — just refresh live metrics and return
+            OnHardwareUpdate(null, _hardware.Latest);
+            return;
+        }
 
         IsLoading = true;
         var snap  = await _sysInfo.GetSnapshotAsync();
 
         // Inject live metrics from latest hardware snapshot
         var hw = _hardware.Latest;
-        snap.CpuLoad   = hw.CpuLoad;
-        snap.CpuTempC  = hw.CpuTempC;
+        snap.CpuLoad    = hw.CpuLoad;
+        snap.CpuTempC   = hw.CpuTempC;
         snap.RamTotalGb = hw.RamTotalGb;
         snap.RamUsedGb  = hw.RamUsedGb;
         snap.RamLoadPct = hw.RamLoad;
 
         Snapshot  = snap;
         IsLoading = false;
-
-        // Subscribe for live CPU/RAM updates
-        _hardware.SnapshotUpdated += OnHardwareUpdate;
     }
 
     public void Unsubscribe() =>
