@@ -80,10 +80,12 @@
                 <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
             </StackPanel>
             <Button Grid.Column="1" Content="Scan"
+                    AutomationProperties.AutomationId="JunkScanBtn"
                     Style="{StaticResource SecondaryButtonStyle}"
                     Command="{Binding ScanCommand}" Width="90"
                     VerticalAlignment="Center"/>
             <Button Grid.Column="3" Content="Clean"
+                    AutomationProperties.AutomationId="JunkCleanBtn"
                     Style="{StaticResource PrimaryButtonStyle}"
                     Command="{Binding CleanCommand}" Width="110"
                     VerticalAlignment="Center"/>
@@ -92,6 +94,7 @@
         <!-- Categories list -->
         <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0">
             <DataGrid ItemsSource="{Binding Categories}"
+                      AutomationProperties.AutomationId="JunkCategoriesGrid"
                       Style="{StaticResource DarkDataGridStyle}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"

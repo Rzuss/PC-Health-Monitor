@@ -246,6 +246,7 @@
 
             <!-- Refresh -->
             <Button Grid.Column="3"
+                    AutomationProperties.AutomationId="BoostRefreshBtn"
                     Content="↻  Refresh"
                     Style="{StaticResource SecondaryButtonStyle}"
                     Command="{Binding RefreshCommand}"
@@ -254,6 +255,7 @@
 
             <!-- Activate -->
             <Button Grid.Column="5"
+                    AutomationProperties.AutomationId="BoostActivateBtn"
                     Content="⚡  Activate Boost"
                     Style="{StaticResource PrimaryButtonStyle}"
                     Command="{Binding ActivateCommand}"

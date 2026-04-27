@@ -86,6 +86,7 @@
                 </StackPanel>
                 <Button Grid.Column="1"
                         x:Name="ScanBtn"
+                        AutomationProperties.AutomationId="DashboardScanBtn"
                         Content="Scan Now"
                         Style="{StaticResource PrimaryButtonStyle}"
                         Width="120"
@@ -166,6 +167,7 @@
                             <!-- Score number center -->
                             <StackPanel Canvas.Left="55" Canvas.Top="68" Width="90">
                                 <TextBlock x:Name="ScoreNumber"
+                                           AutomationProperties.AutomationId="DashboardScoreNumber"
                                            Text="--"
                                            Style="{StaticResource TextScoreStyle}"
                                            FontSize="48"

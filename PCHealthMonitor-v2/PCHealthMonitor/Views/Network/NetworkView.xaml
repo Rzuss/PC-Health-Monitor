@@ -78,6 +78,7 @@
                 <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
             </StackPanel>
             <Button Grid.Column="1" Content="Scan"
+                    AutomationProperties.AutomationId="NetworkScanBtn"
                     Style="{StaticResource PrimaryButtonStyle}"
                     Command="{Binding ScanCommand}" Width="100"
                     VerticalAlignment="Center"/>
@@ -88,7 +89,7 @@
             <Border Style="{StaticResource Card2Style}" Margin="0,0,8,0">
                 <StackPanel>
                     <TextBlock Text="PUBLIC IP" Style="{StaticResource TextLabelStyle}" Margin="0,0,0,6"/>
-                    <TextBlock Text="{Binding PublicIp}" Style="{StaticResource TextMetricStyle}" FontSize="16"/>
+                    <TextBlock AutomationProperties.AutomationId="NetworkPublicIp" Text="{Binding PublicIp}" Style="{StaticResource TextMetricStyle}" FontSize="16"/>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource Card2Style}" Margin="4,0">
@@ -119,6 +120,7 @@
                 <TextBlock Grid.Row="0" Text="Active Connections"
                            Style="{StaticResource TextH3Style}" Margin="16,14,0,0"/>
                 <DataGrid Grid.Row="1"
+                          AutomationProperties.AutomationId="NetworkConnectionsGrid"
                           ItemsSource="{Binding Connections}"
                           Style="{StaticResource DarkDataGridStyle}"
                           AutoGenerateColumns="False"

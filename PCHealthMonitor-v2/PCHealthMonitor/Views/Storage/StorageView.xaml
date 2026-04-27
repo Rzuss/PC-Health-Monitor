@@ -75,11 +75,13 @@
                         </Border>
                     </Popup>
                 </StackPanel>
-                <TextBlock Text="{Binding StatusText}"
+                <TextBlock AutomationProperties.AutomationId="StorageStatusText"
+                           Text="{Binding StatusText}"
                            Style="{StaticResource TextCaptionStyle}"
                            Margin="0,2,0,0"/>
             </StackPanel>
             <Button Grid.Column="1"
+                    AutomationProperties.AutomationId="StorageScanBtn"
                     Content="Find Large Items"
                     Style="{StaticResource PrimaryButtonStyle}"
                     Command="{Binding ScanCommand}"
@@ -89,6 +91,7 @@
 
         <!-- Drive cards — selectable ListBox -->
         <ListBox Grid.Row="2"
+                 AutomationProperties.AutomationId="StorageDrivesList"
                  ItemsSource="{Binding Drives}"
                  SelectedItem="{Binding SelectedDrive, Mode=TwoWay}"
                  Background="Transparent"

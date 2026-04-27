@@ -152,6 +152,7 @@
                         <StackPanel x:Name="NavPanel" Margin="8,12,8,0">
                             <!-- Dashboard -->
                             <Button x:Name="NavDashboard"
+                                    AutomationProperties.AutomationId="NavDashboard"
                                     Tag="Dashboard"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click"
@@ -168,7 +169,7 @@
                             </Button>
 
                             <!-- Startup Manager -->
-                            <Button Tag="Startup" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="Startup" AutomationProperties.AutomationId="NavStartup" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
@@ -181,7 +182,7 @@
                             </Button>
 
                             <!-- Junk Cleaner -->
-                            <Button Tag="JunkCleaner" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="JunkCleaner" AutomationProperties.AutomationId="NavJunkCleaner" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
@@ -194,7 +195,7 @@
                             </Button>
 
                             <!-- Storage Analyzer -->
-                            <Button Tag="Storage" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="Storage" AutomationProperties.AutomationId="NavStorage" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
@@ -207,7 +208,7 @@
                             </Button>
 
                             <!-- Boost Mode -->
-                            <Button Tag="Boost" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="Boost" AutomationProperties.AutomationId="NavBoost" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
@@ -220,7 +221,7 @@
                             </Button>
 
                             <!-- System Info -->
-                            <Button Tag="DiskHealth" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="DiskHealth" AutomationProperties.AutomationId="NavDiskHealth" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
@@ -233,7 +234,7 @@
                             </Button>
 
                             <!-- Tools -->
-                            <Button Tag="Tools" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="Tools" AutomationProperties.AutomationId="NavTools" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
@@ -246,7 +247,7 @@
                             </Button>
 
                             <!-- Network -->
-                            <Button Tag="Network" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="Network" AutomationProperties.AutomationId="NavNetwork" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">
@@ -262,7 +263,7 @@
                             <Separator Margin="4,8"/>
 
                             <!-- Settings -->
-                            <Button Tag="Settings" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button Tag="Settings" AutomationProperties.AutomationId="NavSettings" Style="{StaticResource SecondaryButtonStyle}"
                                     Click="NavBtn_Click" Margin="0,2" Height="44"
                                     HorizontalContentAlignment="Left" Padding="12,0">
                                 <StackPanel Orientation="Horizontal">

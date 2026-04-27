@@ -80,6 +80,7 @@
                            Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
             </StackPanel>
             <Button Grid.Column="1" Content="Refresh"
+                    AutomationProperties.AutomationId="StartupRefreshBtn"
                     Style="{StaticResource SecondaryButtonStyle}"
                     Command="{Binding LoadCommand}"
                     VerticalAlignment="Center"/>
@@ -135,6 +136,7 @@
         <!-- Startup list -->
         <Border Grid.Row="5" Style="{StaticResource CardStyle}" Padding="0">
             <ListBox ItemsSource="{Binding Entries}"
+                     AutomationProperties.AutomationId="StartupList"
                      Background="Transparent"
                      BorderThickness="0"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
