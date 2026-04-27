@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,6 +11,27 @@ namespace PCHealthMonitor.Services;
 
 public sealed class CleanerService
 {
+    // ── Shell32 P/Invoke — Recycle Bin size query + empty ────────────────────
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHQueryRecycleBin(string? pszRootPath, ref SHQUERYRBINFO pSHQueryRBInfo);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, uint dwFlags);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SHQUERYRBINFO
+    {
+        public int  cbSize;
+        public long i64Size;
+        public long i64NumItems;
+    }
+
+    private const uint SHERB_NOCONFIRMATION = 0x00000001;
+    private const uint SHERB_NOPROGRESSUI   = 0x00000002;
+    private const uint SHERB_NOSOUND        = 0x00000004;
+
+    // ── Category table ────────────────────────────────────────────────────────
+    // Recycle Bin has no path entries — handled via Shell32 API in Scan/Clean
     private static readonly (string Name, string[] Paths)[] Categories =
     [
         ("Windows Temp Files",       [Path.GetTempPath(), @"C:\Windows\Temp"]),
@@ -18,7 +40,7 @@ public sealed class CleanerService
                          @"Google\Chrome\User Data\Default\Cache"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                          @"Microsoft\Edge\User Data\Default\Cache")]),
-        ("Recycle Bin",              []),   // handled separately
+        ("Recycle Bin",              []),   // size/empty handled via SHQueryRecycleBin / SHEmptyRecycleBin
         ("Windows Update Cache",     [@"C:\Windows\SoftwareDistribution\Download"]),
         ("Prefetch Files",           [@"C:\Windows\Prefetch"]),
         ("Thumbnail Cache",          [Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -52,6 +74,25 @@ public sealed class CleanerService
         foreach (var (name, paths) in Categories)
         {
             if (ct.IsCancellationRequested) break;
+
+            // ── Recycle Bin: use Shell32 API for accurate size ────────────────
+            if (name == "Recycle Bin")
+            {
+                try
+                {
+                    var info = new SHQUERYRBINFO { cbSize = Marshal.SizeOf<SHQUERYRBINFO>() };
+                    int hr   = SHQueryRecycleBin(null, ref info);
+                    if (hr == 0 && info.i64NumItems > 0)
+                        cats.Add(new JunkCategory
+                        {
+                            Name      = name,
+                            Bytes     = info.i64Size,
+                            FileCount = (int)info.i64NumItems
+                        });
+                }
+                catch { }
+                continue;
+            }
 
             long bytes = 0;
             int  count = 0;
@@ -97,6 +138,23 @@ public sealed class CleanerService
         foreach (var cat in categories.Where(c => c.Selected))
         {
             if (ct.IsCancellationRequested) break;
+
+            // ── Recycle Bin: use Shell32 API — never manually delete $Recycle.Bin ──
+            if (cat.Name == "Recycle Bin")
+            {
+                try
+                {
+                    // Query current size so we can report accurate freed bytes
+                    var info = new SHQUERYRBINFO { cbSize = Marshal.SizeOf<SHQUERYRBINFO>() };
+                    SHQueryRecycleBin(null, ref info);
+                    int hr = SHEmptyRecycleBin(IntPtr.Zero, null,
+                        SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
+                    if (hr == 0) freed += info.i64Size;
+                }
+                catch { }
+                continue;
+            }
+
             var entry = Categories.FirstOrDefault(e => e.Name == cat.Name);
             if (entry == default) continue;
             foreach (var p in entry.Paths)
