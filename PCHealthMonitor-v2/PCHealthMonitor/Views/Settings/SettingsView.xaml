@@ -115,18 +115,7 @@
 
             <!-- Pro: Custom Alerts — always visible; locked overlay for free users -->
             <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
-                <Grid>
                 <StackPanel>
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsPro}" Value="False">
-                                    <Setter Property="Opacity" Value="0.18"/>
-                                    <Setter Property="IsEnabled" Value="False"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <TextBlock Text="Custom Alerts" Style="{StaticResource TextH3Style}" Margin="0,0,12,0"/>
                         <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
@@ -166,32 +155,6 @@
                         <Run Text="Alerts are throttled to one per 5 minutes per metric. Save Settings to apply."/>
                     </TextBlock>
                 </StackPanel>
-
-                <!-- ── Pro lock overlay ── -->
-                <Border CornerRadius="12"
-                        Visibility="{Binding IsPro, Converter={StaticResource BoolToCollapsedConverter}}">
-                    <Border.Background>
-                        <SolidColorBrush Color="#D90D0D14"/>
-                    </Border.Background>
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24">
-                        <TextBlock Text="🔒" FontSize="30" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Pro Feature"
-                                   FontFamily="Segoe UI Variable, Segoe UI"
-                                   FontSize="15" FontWeight="SemiBold"
-                                   Foreground="White"
-                                   HorizontalAlignment="Center" Margin="0,10,0,4"/>
-                        <TextBlock Text="Custom Alerts are available for Pro users only."
-                                   FontFamily="Segoe UI Variable, Segoe UI"
-                                   FontSize="12" TextWrapping="Wrap" TextAlignment="Center"
-                                   Foreground="{StaticResource SubTextBrush}" MaxWidth="280"/>
-                        <Button Content="Upgrade to Pro  →"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="170" Margin="0,16,0,0"
-                                Click="ProUpgradeOverlay_Click"/>
-                    </StackPanel>
-                </Border>
-
-                </Grid>
             </Border>
 
             <!-- License / Activation -->

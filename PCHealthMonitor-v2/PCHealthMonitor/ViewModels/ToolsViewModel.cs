@@ -50,6 +50,9 @@ public sealed class ToolsViewModel : BaseViewModel
     // ── Pro visibility ────────────────────────────────────────────────────────
     public bool IsPro => _pro.IsPro;
 
+    /// <summary>Fired when a Pro-gated action is attempted by a free user.</summary>
+    public event EventHandler? ProUpgradeRequested;
+
     // ── Driver Audit ─────────────────────────────────────────────────────────
     public ObservableCollection<DriverEntry> FlaggedDrivers { get; } = new();
 
@@ -96,7 +99,7 @@ public sealed class ToolsViewModel : BaseViewModel
     {
         if (!_pro.CanUse(ProFeature.ScheduledCleanup))
         {
-            ScheduleStatus = "Scheduled Cleanup requires Pro. Upgrade in Settings → License.";
+            ProUpgradeRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
         await _scheduler.SaveCleanupScheduleAsync(ScheduleEnabled, ScheduleIntervalDays, ScheduleTime);
@@ -120,7 +123,7 @@ public sealed class ToolsViewModel : BaseViewModel
     {
         if (!_pro.CanUse(ProFeature.ExportReports))
         {
-            ExportStatus = "CSV Export requires Pro. Upgrade in Settings → License.";
+            ProUpgradeRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
 
@@ -144,7 +147,7 @@ public sealed class ToolsViewModel : BaseViewModel
     {
         if (!_pro.CanUse(ProFeature.ExportReports))
         {
-            ExportStatus = "HTML Export requires Pro. Upgrade in Settings → License.";
+            ProUpgradeRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
 

@@ -15,6 +15,9 @@ public partial class SettingsView : Page
     {
         InitializeComponent();
         DataContext = vm;
+
+        // Wire Pro-gate event: fired when free user tries to save Custom Alert thresholds
+        vm.ProUpgradeRequested += (_, _) => ShowUpgradeDialog();
     }
 
     // Opens the Gumroad purchase page in the default browser
@@ -27,7 +30,7 @@ public partial class SettingsView : Page
         e.Handled = true;
     }
 
-    private void ProUpgradeOverlay_Click(object sender, RoutedEventArgs e)
+    private void ShowUpgradeDialog()
     {
         var dlg = new PCHealthMonitor.Views.Upgrade.ProUpgradeWindow
         {

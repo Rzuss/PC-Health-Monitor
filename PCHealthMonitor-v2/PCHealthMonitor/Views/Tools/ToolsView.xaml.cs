@@ -13,9 +13,12 @@ public partial class ToolsView : Page
     {
         InitializeComponent();
         DataContext = vm;
+
+        // Wire Pro-gate event: any Pro action by a free user opens the upgrade dialog
+        vm.ProUpgradeRequested += (_, _) => ShowUpgradeDialog();
     }
 
-    private void ProUpgradeOverlay_Click(object sender, RoutedEventArgs e)
+    private void ShowUpgradeDialog()
     {
         var dlg = new PCHealthMonitor.Views.Upgrade.ProUpgradeWindow
         {

@@ -32,6 +32,9 @@ public sealed class SettingsViewModel : BaseViewModel
     // ── Pro visibility ────────────────────────────────────────────────────
     public bool IsPro => _license.IsActivated;
 
+    /// <summary>Fired when a Pro-gated Save is attempted by a free user.</summary>
+    public event EventHandler? ProUpgradeRequested;
+
     // ── General settings ──────────────────────────────────────────────────
     private bool _startWithWindows;
     public bool StartWithWindows { get => _startWithWindows; set => SetProperty(ref _startWithWindows, value); }
@@ -95,6 +98,15 @@ public sealed class SettingsViewModel : BaseViewModel
     // ── Commands ──────────────────────────────────────────────────────────
     private void Save()
     {
+        // Gate: alert thresholds are Pro-only — intercept if free user tries to set them
+        if (!IsPro && (CpuAlertThreshold > 0 || RamAlertThreshold > 0))
+        {
+            CpuAlertThreshold = 0;
+            RamAlertThreshold = 0;
+            ProUpgradeRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
         var existing = _settings.Load();
         _settings.Save(new AppSettings
         {

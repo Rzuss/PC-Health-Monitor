@@ -242,6 +242,13 @@ public partial class DashboardView : Page
         if (sender is not Button btn) return;
         if (!int.TryParse(btn.Tag?.ToString(), out int hours)) return;
 
+        // Gate: Performance History is Pro-only
+        if (!_pro.IsPro)
+        {
+            ProUpgradeOverlay_Click(sender, e);
+            return;
+        }
+
         _selectedHours = hours;
         HighlightTimeRangeButton(hours);
         DrawCharts();
