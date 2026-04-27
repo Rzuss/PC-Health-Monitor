@@ -21,7 +21,61 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Startup Manager" Style="{StaticResource TextH1Style}"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Startup Manager" Style="{StaticResource TextH1Style}" VerticalAlignment="Center"/>
+                    <ToggleButton x:Name="Info_Startup_Manager"
+                                  Width="22" Height="22" Margin="10,0,0,0"
+                                  VerticalAlignment="Center" Cursor="Hand"
+                                  ToolTip="What is Startup Manager?">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="Bd" Width="22" Height="22" CornerRadius="11"
+                                                    BorderBrush="{StaticResource BlueBrush}" BorderThickness="1.5"
+                                                    Background="Transparent">
+                                                <TextBlock Text="i" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontStyle="Italic" FontSize="12" FontWeight="Bold"
+                                                           FontFamily="Georgia, serif"
+                                                           Foreground="{StaticResource BlueBrush}"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ToggleButton.Style>
+                    </ToggleButton>
+                    <Popup PlacementTarget="{Binding ElementName=Info_Startup_Manager}"
+                           Placement="Bottom"
+                           IsOpen="{Binding IsChecked, ElementName=Info_Startup_Manager}"
+                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border CornerRadius="10" Padding="18,14" MaxWidth="360"
+                                Background="{StaticResource BgCard2Brush}"
+                                BorderBrush="{StaticResource BlueBrush}" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="🚀  What is Startup Manager?"
+                                           Foreground="{StaticResource BlueBrush}"
+                                           FontFamily="Segoe UI Variable, Segoe UI"
+                                           FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run Text="Programs listed here "/><Run FontWeight="SemiBold" Foreground="White" Text="launch automatically when Windows starts"/><Run Text=". Disabling unnecessary entries reduces boot time and frees CPU & RAM in the background."/></TextBlock>
+                                    <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run FontWeight="SemiBold" Foreground="White" Text="Enabled"/><Run Text=" = starts with Windows. "/><Run FontWeight="SemiBold" Foreground="White" Text="Disabled"/><Run Text=" = skipped at boot. Changes take effect on the "/><Run FontWeight="SemiBold" Foreground="White" Text="next restart"/><Run Text="."/></TextBlock>
+                                    <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource YellowBrush}" Margin="0,8,0,0">⚠  Only disable programs you recognise. System-critical entries are filtered out automatically.</TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </StackPanel>
                 <TextBlock Text="Enable or disable programs that run when Windows starts"
                            Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
             </StackPanel>

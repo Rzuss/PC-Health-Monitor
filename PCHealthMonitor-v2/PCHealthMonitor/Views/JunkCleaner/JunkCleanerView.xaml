@@ -22,7 +22,61 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Junk Cleaner" Style="{StaticResource TextH1Style}"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Junk Cleaner" Style="{StaticResource TextH1Style}" VerticalAlignment="Center"/>
+                    <ToggleButton x:Name="Info_Junk_Cleaner"
+                                  Width="22" Height="22" Margin="10,0,0,0"
+                                  VerticalAlignment="Center" Cursor="Hand"
+                                  ToolTip="What is Junk Cleaner?">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="Bd" Width="22" Height="22" CornerRadius="11"
+                                                    BorderBrush="{StaticResource BlueBrush}" BorderThickness="1.5"
+                                                    Background="Transparent">
+                                                <TextBlock Text="i" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontStyle="Italic" FontSize="12" FontWeight="Bold"
+                                                           FontFamily="Georgia, serif"
+                                                           Foreground="{StaticResource BlueBrush}"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ToggleButton.Style>
+                    </ToggleButton>
+                    <Popup PlacementTarget="{Binding ElementName=Info_Junk_Cleaner}"
+                           Placement="Bottom"
+                           IsOpen="{Binding IsChecked, ElementName=Info_Junk_Cleaner}"
+                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border CornerRadius="10" Padding="18,14" MaxWidth="360"
+                                Background="{StaticResource BgCard2Brush}"
+                                BorderBrush="{StaticResource BlueBrush}" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="🗑  What is Junk Cleaner?"
+                                           Foreground="{StaticResource BlueBrush}"
+                                           FontFamily="Segoe UI Variable, Segoe UI"
+                                           FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run Text="Scans for "/><Run FontWeight="SemiBold" Foreground="White" Text="temporary files, browser cache, Windows Update leftovers"/><Run Text=" and other safe-to-delete data that accumulates over time."/></TextBlock>
+                                    <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run FontWeight="SemiBold" Foreground="White" Text="Check"/><Run Text=" the categories you want to remove, then click "/><Run FontWeight="SemiBold" Foreground="White" Text="Clean"/><Run Text=". Only files flagged as temporary by Windows are targeted — your documents and installed apps are never touched."/></TextBlock>
+                                    <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource GreenBrush}" Margin="0,8,0,0">✓  Safe to run at any time. Average cleanup frees 1–5 GB on most systems.</TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </StackPanel>
                 <TextBlock Text="{Binding StatusText}" Style="{StaticResource TextCaptionStyle}" Margin="0,2,0,0"/>
             </StackPanel>
             <Button Grid.Column="1" Content="Scan"

@@ -24,7 +24,61 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="Dashboard" Style="{StaticResource TextH1Style}"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Dashboard" Style="{StaticResource TextH1Style}" VerticalAlignment="Center"/>
+                    <ToggleButton x:Name="Info_Dashboard"
+                                  Width="22" Height="22" Margin="10,0,0,0"
+                                  VerticalAlignment="Center" Cursor="Hand"
+                                  ToolTip="What is the Dashboard?">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="Bd" Width="22" Height="22" CornerRadius="11"
+                                                    BorderBrush="{StaticResource BlueBrush}" BorderThickness="1.5"
+                                                    Background="Transparent">
+                                                <TextBlock Text="i" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontStyle="Italic" FontSize="12" FontWeight="Bold"
+                                                           FontFamily="Georgia, serif"
+                                                           Foreground="{StaticResource BlueBrush}"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ToggleButton.Style>
+                    </ToggleButton>
+                    <Popup PlacementTarget="{Binding ElementName=Info_Dashboard}"
+                           Placement="Bottom"
+                           IsOpen="{Binding IsChecked, ElementName=Info_Dashboard}"
+                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border CornerRadius="10" Padding="18,14" MaxWidth="360"
+                                Background="{StaticResource BgCard2Brush}"
+                                BorderBrush="{StaticResource BlueBrush}" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="📊  What is the Dashboard?"
+                                           Foreground="{StaticResource BlueBrush}"
+                                           FontFamily="Segoe UI Variable, Segoe UI"
+                                           FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run Text="The "/><Run FontWeight="SemiBold" Foreground="White" Text="Health Score"/><Run Text=" (0–100) is a real-time snapshot of your PC's wellbeing — factoring in CPU load, RAM pressure, disk usage, and startup overhead."/></TextBlock>
+                                    <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run FontWeight="SemiBold" Foreground="White" Text="Live gauges"/><Run Text=" refresh every 2 seconds. Click "/><Run FontWeight="SemiBold" Foreground="White" Text="Scan Now"/><Run Text=" to run a diagnostic and surface any issues immediately."/></TextBlock>
+                                    <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}" Margin="0,8,0,0">Pro users also see a historical chart (1h / 24h / 7d / 30d) below the gauges.</TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </StackPanel>
                     <TextBlock x:Name="LastScanText"
                                Text="Last scan: never"
                                Style="{StaticResource TextCaptionStyle}"
