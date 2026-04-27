@@ -39,6 +39,11 @@ public sealed class ToolsViewModel : BaseViewModel
         DeleteScheduleCommand = new AsyncRelayCommand(DeleteScheduleAsync);
         ExportCsvCommand      = new AsyncRelayCommand(ExportCsvAsync);
         ExportHtmlCommand     = new AsyncRelayCommand(ExportHtmlAsync);
+
+        HourUpCommand   = new RelayCommand(() => ScheduleHour   += 1);
+        HourDownCommand = new RelayCommand(() => ScheduleHour   -= 1);
+        MinUpCommand    = new RelayCommand(() => ScheduleMinute += 5);
+        MinDownCommand  = new RelayCommand(() => ScheduleMinute -= 5);
     }
 
     public ICommand ScanDriversCommand    { get; }
@@ -82,31 +87,54 @@ public sealed class ToolsViewModel : BaseViewModel
     private bool _scheduleEnabled;
     public bool ScheduleEnabled { get => _scheduleEnabled; set => SetProperty(ref _scheduleEnabled, value); }
 
-    // ScheduleIntervalDays stays int for the service call
-    private int _scheduleIntervalDays = 7;
-    public int ScheduleIntervalDays
-    {
-        get => _scheduleIntervalDays;
-        set => SetProperty(ref _scheduleIntervalDays, value);
-    }
+    // Frequency tile options
+    public static IReadOnlyList<FrequencyOption> FrequencyOptions { get; } =
+    [
+        new("Daily",         "Every day",             1),
+        new("Every 3 Days",  "Every 3 days",          3),
+        new("Weekly",        "Once a week",           7),
+        new("Biweekly",      "Every 2 weeks",        14),
+        new("Monthly",       "Once a month",         30),
+    ];
 
-    // String-based option that the ComboBox Tag binding can use
-    public string ScheduleIntervalOption
+    private FrequencyOption _selectedFrequency = FrequencyOptions[2]; // Weekly default
+    public FrequencyOption SelectedFrequency
     {
-        get => _scheduleIntervalDays.ToString();
+        get => _selectedFrequency;
         set
         {
-            if (int.TryParse(value, out int days))
-            {
-                _scheduleIntervalDays = days;
-                OnPropertyChanged(nameof(ScheduleIntervalDays));
-                OnPropertyChanged(nameof(ScheduleIntervalOption));
-            }
+            SetProperty(ref _selectedFrequency, value);
+            if (value is not null) _scheduleIntervalDays = value.Days;
         }
     }
 
-    private string _scheduleTime = "02:00";
-    public string ScheduleTime { get => _scheduleTime; set => SetProperty(ref _scheduleTime, value); }
+    private int _scheduleIntervalDays = 7;   // kept for service call
+    public int ScheduleIntervalDays => _scheduleIntervalDays;
+
+    // ── Clock spinners ─────────────────────────────────────────────────────────
+    private int _scheduleHour   = 2;
+    private int _scheduleMinute = 0;
+
+    public int ScheduleHour
+    {
+        get => _scheduleHour;
+        set { _scheduleHour = ((value % 24) + 24) % 24; OnPropertyChanged(nameof(ScheduleHour)); OnPropertyChanged(nameof(ScheduleTimeDisplay)); }
+    }
+    public int ScheduleMinute
+    {
+        get => _scheduleMinute;
+        set { _scheduleMinute = ((value % 60) + 60) % 60; OnPropertyChanged(nameof(ScheduleMinute)); OnPropertyChanged(nameof(ScheduleTimeDisplay)); }
+    }
+
+    public string ScheduleTimeDisplay => $"{_scheduleHour:D2}:{_scheduleMinute:D2}";
+
+    // kept for service compatibility
+    private string ScheduleTime => ScheduleTimeDisplay;
+
+    public ICommand HourUpCommand    { get; }
+    public ICommand HourDownCommand  { get; }
+    public ICommand MinUpCommand     { get; }
+    public ICommand MinDownCommand   { get; }
 
     private string _scheduleStatus = "No schedule configured";
     public string ScheduleStatus { get => _scheduleStatus; set => SetProperty(ref _scheduleStatus, value); }
@@ -118,9 +146,9 @@ public sealed class ToolsViewModel : BaseViewModel
             ProUpgradeRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
-        await _scheduler.SaveCleanupScheduleAsync(ScheduleEnabled, ScheduleIntervalDays, ScheduleTime);
+        await _scheduler.SaveCleanupScheduleAsync(ScheduleEnabled, ScheduleIntervalDays, ScheduleTimeDisplay);
         ScheduleStatus = ScheduleEnabled
-            ? $"Scheduled: every {ScheduleIntervalDays} day(s) at {ScheduleTime}"
+            ? $"Active — {SelectedFrequency?.Label ?? "Weekly"} at {ScheduleTimeDisplay}"
             : "Schedule disabled";
     }
 
@@ -192,3 +220,5 @@ public sealed class DriverEntry
     public string Status      { get; init; } = string.Empty;
     public string DeviceClass { get; init; } = string.Empty;
 }
+
+public sealed record FrequencyOption(string Label, string Subtitle, int Days);

@@ -115,82 +115,190 @@
             <Border Grid.Row="4" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
-                    <!-- Title row with PRO badge + enable toggle -->
-                    <Grid Margin="0,0,0,20">
+                    <!-- Title row: PRO badge + enable toggle -->
+                    <Grid Margin="0,0,0,6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-
-                        <!-- Left: title + PRO badge -->
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="Auto-Schedule Cleanup"
-                                       Style="{StaticResource TextH3Style}"
-                                       Margin="0,0,10,0"/>
+                                       Style="{StaticResource TextH3Style}" Margin="0,0,10,0"/>
                             <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
                                     Background="{StaticResource BlueGlowBrush}">
                                 <TextBlock Text="PRO" FontSize="10" FontWeight="Bold"
                                            Foreground="{StaticResource BlueBrush}"/>
                             </Border>
                         </StackPanel>
-
-                        <!-- Right: enable toggle -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <TextBlock Text="Enabled"
-                                       Style="{StaticResource TextBodySmStyle}"
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Enabled" Style="{StaticResource TextBodySmStyle}"
                                        Foreground="{StaticResource SubTextBrush}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,10,0"/>
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
                             <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
                                           IsChecked="{Binding ScheduleEnabled}"/>
                         </StackPanel>
                     </Grid>
 
-                    <!-- Description -->
-                    <TextBlock Text="Automatically cleans junk files on a recurring schedule. Set your preferred frequency and time — cleanup runs silently in the background."
-                               Style="{StaticResource TextCaptionStyle}"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,20"/>
+                    <TextBlock Text="Automatically cleans junk files in the background. Choose how often and at what time."
+                               Style="{StaticResource TextCaptionStyle}" TextWrapping="Wrap" Margin="0,0,0,20"/>
 
-                    <!-- Schedule settings grid -->
+                    <!-- ── Two-column picker ────────────────────────── -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Frequency (ComboBox) -->
+                        <!-- LEFT: Frequency tiles -->
                         <StackPanel Grid.Column="0">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="🗓  " FontSize="13" VerticalAlignment="Center"/>
-                                <TextBlock Text="Frequency"
-                                           Style="{StaticResource TextCaptionStyle}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <ComboBox Style="{StaticResource DarkComboBoxStyle}"
-                                      SelectedValue="{Binding ScheduleIntervalOption, Mode=TwoWay}"
-                                      SelectedValuePath="Tag">
-                                <ComboBoxItem Content="Daily"          Tag="1"/>
-                                <ComboBoxItem Content="Every 3 days"   Tag="3"/>
-                                <ComboBoxItem Content="Weekly"         Tag="7"/>
-                                <ComboBoxItem Content="Every 2 weeks"  Tag="14"/>
-                                <ComboBoxItem Content="Monthly"        Tag="30"/>
-                            </ComboBox>
+                            <TextBlock Text="🗓   Frequency" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,10"/>
+                            <ListBox ItemsSource="{Binding FrequencyOptions}"
+                                     SelectedItem="{Binding SelectedFrequency, Mode=TwoWay}"
+                                     Background="Transparent" BorderThickness="0">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0,0,0,6"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border x:Name="Tile"
+                                                            Background="{StaticResource BgCard2Brush}"
+                                                            BorderBrush="{StaticResource BorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="8"
+                                                            Padding="14,10"
+                                                            Cursor="Hand">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Label}"
+                                                                           FontFamily="Segoe UI Variable, Segoe UI"
+                                                                           FontSize="13" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TextBrush}"/>
+                                                                <TextBlock Text="{Binding Subtitle}"
+                                                                           FontFamily="Segoe UI Variable, Segoe UI"
+                                                                           FontSize="11"
+                                                                           Foreground="{StaticResource SubTextBrush}"
+                                                                           Margin="0,1,0,0"/>
+                                                            </StackPanel>
+                                                            <!-- Selected checkmark -->
+                                                            <Ellipse x:Name="Dot"
+                                                                     Grid.Column="1"
+                                                                     Width="8" Height="8"
+                                                                     Fill="{StaticResource BlueBrush}"
+                                                                     VerticalAlignment="Center"
+                                                                     Visibility="Hidden"/>
+                                                        </Grid>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="Tile" Property="BorderBrush"
+                                                                    Value="{StaticResource BlueBrush}"/>
+                                                            <Setter TargetName="Tile" Property="BorderThickness"
+                                                                    Value="2"/>
+                                                            <Setter TargetName="Tile" Property="Background"
+                                                                    Value="{StaticResource BlueGlowBrush}"/>
+                                                            <Setter TargetName="Dot" Property="Visibility"
+                                                                    Value="Visible"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Tile" Property="Background"
+                                                                    Value="{StaticResource BgCard3Brush}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
                         </StackPanel>
 
-                        <!-- Time of day -->
-                        <StackPanel Grid.Column="2">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="⏰  " FontSize="13" VerticalAlignment="Center"/>
-                                <TextBlock Text="Start time (HH:MM)"
-                                           Style="{StaticResource TextCaptionStyle}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <TextBox Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource DarkTextBoxStyle}"
-                                     Tag="e.g. 02:00"/>
+                        <!-- RIGHT: Clock spinner -->
+                        <StackPanel Grid.Column="2" Width="160" VerticalAlignment="Center">
+                            <TextBlock Text="⏰   Start Time" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,10"/>
+
+                            <!-- Clock display -->
+                            <Border Background="{StaticResource BgCard2Brush}"
+                                    BorderBrush="{StaticResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="12"
+                                    Padding="16,14">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Hours -->
+                                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                        <Button Content="▲"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding HourUpCommand}"
+                                                Width="44" Height="30" FontSize="10" Padding="0"/>
+                                        <Border Background="{StaticResource BgCard3Brush}"
+                                                CornerRadius="6" Margin="0,6" Padding="4,8">
+                                            <TextBlock Text="{Binding ScheduleHour, StringFormat=D2}"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
+                                                       FontSize="28" FontWeight="Bold"
+                                                       Foreground="{StaticResource BlueBrush}"
+                                                       HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <Button Content="▼"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding HourDownCommand}"
+                                                Width="44" Height="30" FontSize="10" Padding="0"/>
+                                        <TextBlock Text="HH" Style="{StaticResource TextCaptionStyle}"
+                                                   HorizontalAlignment="Center" Margin="0,4,0,0" Opacity="0.5"/>
+                                    </StackPanel>
+
+                                    <!-- Colon separator -->
+                                    <TextBlock Grid.Column="1"
+                                               Text=":"
+                                               FontSize="26" FontWeight="Bold"
+                                               Foreground="{StaticResource SubTextBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="6,0,6,10"/>
+
+                                    <!-- Minutes -->
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                        <Button Content="▲"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding MinUpCommand}"
+                                                Width="44" Height="30" FontSize="10" Padding="0"/>
+                                        <Border Background="{StaticResource BgCard3Brush}"
+                                                CornerRadius="6" Margin="0,6" Padding="4,8">
+                                            <TextBlock Text="{Binding ScheduleMinute, StringFormat=D2}"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
+                                                       FontSize="28" FontWeight="Bold"
+                                                       Foreground="{StaticResource BlueBrush}"
+                                                       HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <Button Content="▼"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding MinDownCommand}"
+                                                Width="44" Height="30" FontSize="10" Padding="0"/>
+                                        <TextBlock Text="MM" Style="{StaticResource TextCaptionStyle}"
+                                                   HorizontalAlignment="Center" Margin="0,4,0,0" Opacity="0.5"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Time preview label -->
+                            <TextBlock Margin="0,10,0,0" HorizontalAlignment="Center">
+                                <Run Text="Runs at  " Foreground="{StaticResource SubTextBrush}"
+                                     FontFamily="Segoe UI Variable, Segoe UI" FontSize="12"/>
+                                <Run Text="{Binding ScheduleTimeDisplay}"
+                                     Foreground="{StaticResource BlueBrush}"
+                                     FontFamily="Segoe UI Variable, Segoe UI"
+                                     FontSize="12" FontWeight="SemiBold"/>
+                            </TextBlock>
                         </StackPanel>
                     </Grid>
 
@@ -198,7 +306,7 @@
                     <Border CornerRadius="8" Padding="14,10" Margin="0,16,0,0"
                             Background="{StaticResource BgCard2Brush}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="📋  " FontSize="13" VerticalAlignment="Center"/>
+                            <TextBlock Text="📋  " FontSize="12" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding ScheduleStatus}"
                                        Style="{StaticResource TextCaptionStyle}"
                                        Foreground="{StaticResource GreenBrush}"
