@@ -114,63 +114,110 @@
             <!-- ── Auto-Schedule ────────────────────────────────────── -->
             <Border Grid.Row="4" Style="{StaticResource CardStyle}">
                 <StackPanel>
-                    <TextBlock Text="Auto-Schedule Cleanup" Style="{StaticResource TextH3Style}" Margin="0,0,0,16"/>
 
+                    <!-- Title row with PRO badge + enable toggle -->
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left: title + PRO badge -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Auto-Schedule Cleanup"
+                                       Style="{StaticResource TextH3Style}"
+                                       Margin="0,0,10,0"/>
+                            <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                    Background="{StaticResource BlueGlowBrush}">
+                                <TextBlock Text="PRO" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource BlueBrush}"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Right: enable toggle -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="Enabled"
+                                       Style="{StaticResource TextBodySmStyle}"
+                                       Foreground="{StaticResource SubTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,10,0"/>
+                            <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
+                                          IsChecked="{Binding ScheduleEnabled}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Description -->
+                    <TextBlock Text="Automatically cleans junk files on a recurring schedule. Set your preferred frequency and time — cleanup runs silently in the background."
+                               Style="{StaticResource TextCaptionStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,20"/>
+
+                    <!-- Schedule settings grid -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="16"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="16"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="20"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
 
-                        <!-- Enable toggle -->
-                        <StackPanel Grid.Row="0" Grid.ColumnSpan="2"
-                                    Orientation="Horizontal" VerticalAlignment="Center">
-                            <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
-                                          IsChecked="{Binding ScheduleEnabled}"/>
-                            <TextBlock Text="Enable automatic cleanup" Style="{StaticResource TextBodyStyle}"
-                                       VerticalAlignment="Center"/>
+                        <!-- Frequency (ComboBox) -->
+                        <StackPanel Grid.Column="0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="🗓  " FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="Frequency"
+                                           Style="{StaticResource TextCaptionStyle}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <ComboBox Style="{StaticResource DarkComboBoxStyle}"
+                                      SelectedValue="{Binding ScheduleIntervalOption, Mode=TwoWay}"
+                                      SelectedValuePath="Tag">
+                                <ComboBoxItem Content="Daily"          Tag="1"/>
+                                <ComboBoxItem Content="Every 3 days"   Tag="3"/>
+                                <ComboBoxItem Content="Weekly"         Tag="7"/>
+                                <ComboBoxItem Content="Every 2 weeks"  Tag="14"/>
+                                <ComboBoxItem Content="Monthly"        Tag="30"/>
+                            </ComboBox>
                         </StackPanel>
 
-                        <!-- Interval -->
-                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="Run every (days)" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,6"/>
-                            <TextBox Text="{Binding ScheduleIntervalDays}"
-                                     Style="{StaticResource DarkTextBoxStyle}"/>
-                        </StackPanel>
-
-                        <!-- Time -->
-                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="At time (HH:MM)" Style="{StaticResource TextCaptionStyle}" Margin="0,0,0,6"/>
-                            <TextBox Text="{Binding ScheduleTime}"
-                                     Style="{StaticResource DarkTextBoxStyle}"/>
-                        </StackPanel>
-
-                        <!-- Status -->
-                        <TextBlock Grid.Row="4" Grid.ColumnSpan="2"
-                                   Text="{Binding ScheduleStatus}"
-                                   Style="{StaticResource TextCaptionStyle}"
-                                   Foreground="{StaticResource GreenBrush}"/>
-
-                        <!-- Buttons -->
-                        <StackPanel Grid.Row="6" Grid.ColumnSpan="2"
-                                    Orientation="Horizontal">
-                            <Button Content="Save Schedule"
-                                    Style="{StaticResource PrimaryButtonStyle}"
-                                    Command="{Binding SaveScheduleCommand}" Width="140"/>
-                            <Button Content="Remove Schedule"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Command="{Binding DeleteScheduleCommand}" Width="160"/>
+                        <!-- Time of day -->
+                        <StackPanel Grid.Column="2">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="⏰  " FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="Start time (HH:MM)"
+                                           Style="{StaticResource TextCaptionStyle}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBox Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     Tag="e.g. 02:00"/>
                         </StackPanel>
                     </Grid>
+
+                    <!-- Status banner -->
+                    <Border CornerRadius="8" Padding="14,10" Margin="0,16,0,0"
+                            Background="{StaticResource BgCard2Brush}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📋  " FontSize="13" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ScheduleStatus}"
+                                       Style="{StaticResource TextCaptionStyle}"
+                                       Foreground="{StaticResource GreenBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Buttons -->
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <Button Content="Save Schedule"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding SaveScheduleCommand}"
+                                Width="150" Margin="0,0,12,0"/>
+                        <Button Content="Remove Schedule"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding DeleteScheduleCommand}"
+                                Width="160"/>
+                    </StackPanel>
+
                 </StackPanel>
             </Border>
             <!-- ── Pro: Export Report ────────────────────────────────── -->

@@ -82,11 +82,27 @@ public sealed class ToolsViewModel : BaseViewModel
     private bool _scheduleEnabled;
     public bool ScheduleEnabled { get => _scheduleEnabled; set => SetProperty(ref _scheduleEnabled, value); }
 
+    // ScheduleIntervalDays stays int for the service call
     private int _scheduleIntervalDays = 7;
     public int ScheduleIntervalDays
     {
         get => _scheduleIntervalDays;
         set => SetProperty(ref _scheduleIntervalDays, value);
+    }
+
+    // String-based option that the ComboBox Tag binding can use
+    public string ScheduleIntervalOption
+    {
+        get => _scheduleIntervalDays.ToString();
+        set
+        {
+            if (int.TryParse(value, out int days))
+            {
+                _scheduleIntervalDays = days;
+                OnPropertyChanged(nameof(ScheduleIntervalDays));
+                OnPropertyChanged(nameof(ScheduleIntervalOption));
+            }
+        }
     }
 
     private string _scheduleTime = "02:00";
