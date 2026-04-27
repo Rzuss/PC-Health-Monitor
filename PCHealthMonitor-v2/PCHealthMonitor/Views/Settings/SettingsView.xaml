@@ -163,7 +163,6 @@
                             </Grid.ColumnDefinitions>
                             <TextBox Grid.Column="0"
                                      Text="{Binding LicenseKey, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource DarkTextBoxStyle}"
                                      Tag="XXXX-XXXX-XXXX-XXXX">
                                 <TextBox.Style>
                                     <Style TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
