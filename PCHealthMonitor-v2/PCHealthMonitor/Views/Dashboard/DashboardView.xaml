@@ -5,7 +5,7 @@
       Background="{StaticResource BgBaseBrush}"
       Title="Dashboard">
 
-    <ScrollViewer Padding="24,20,24,24">
+    <ScrollViewer Padding="28,22,28,28">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>   <!-- Header row -->
@@ -35,20 +35,20 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ToggleButton">
-                                            <Border x:Name="Bd" Width="22" Height="22" CornerRadius="11"
-                                                    BorderBrush="{StaticResource BlueBrush}" BorderThickness="1.5"
+                                            <Border x:Name="Bd" Width="20" Height="20" CornerRadius="10"
+                                                    BorderBrush="{StaticResource BlueLightBrush}" BorderThickness="1.2"
                                                     Background="Transparent">
                                                 <TextBlock Text="i" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                           FontStyle="Italic" FontSize="12" FontWeight="Bold"
+                                                           FontStyle="Italic" FontSize="11" FontWeight="Bold"
                                                            FontFamily="Georgia, serif"
-                                                           Foreground="{StaticResource BlueBrush}"/>
+                                                           Foreground="{StaticResource BlueLightBrush}"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueLightGlowBrush}"/>
                                                 </Trigger>
                                                 <Trigger Property="IsChecked" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueGlowBrush}"/>
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlueLightGlowBrush}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -61,15 +61,15 @@
                            Placement="Bottom"
                            IsOpen="{Binding IsChecked, ElementName=Info_Dashboard}"
                            StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
-                        <Border CornerRadius="10" Padding="18,14" MaxWidth="360"
-                                Background="{StaticResource BgCard2Brush}"
-                                BorderBrush="{StaticResource BlueBrush}" BorderThickness="1">
+                        <Border CornerRadius="8" Padding="16,12" MaxWidth="360"
+                                Background="{StaticResource BgCard3Brush}"
+                                BorderBrush="{StaticResource BlueLightBrush}" BorderThickness="1">
                             <Border.Effect>
                                 <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.7"/>
                             </Border.Effect>
                             <StackPanel>
-                                <TextBlock Text="📊  What is the Dashboard?"
-                                           Foreground="{StaticResource BlueBrush}"
+                                <TextBlock Text="What is the Dashboard?"
+                                           Foreground="{StaticResource BlueLightBrush}"
                                            FontFamily="Segoe UI Variable, Segoe UI"
                                            FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                 <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run Text="The "/><Run FontWeight="SemiBold" Foreground="White" Text="Health Score"/><Run Text=" (0–100) is a real-time snapshot of your PC's wellbeing — factoring in CPU load, RAM pressure, disk usage, and startup overhead."/></TextBlock>
@@ -97,7 +97,7 @@
             <!-- ─── Health Score + Mini Gauges row ──────────────────────── -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="280"/>   <!-- Score ring -->
+                    <ColumnDefinition Width="270"/>   <!-- Score ring -->
                     <ColumnDefinition Width="16"/>
                     <ColumnDefinition Width="*"/>     <!-- Mini gauges -->
                 </Grid.ColumnDefinitions>
@@ -147,8 +147,8 @@
                                   Fill="Transparent">
                                 <Path.Stroke>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                        <GradientStop Color="#30D158" Offset="0"/>
-                                        <GradientStop Color="#6C63FF" Offset="1"/>
+                                        <GradientStop Color="#4CC2FF" Offset="0"/>
+                                        <GradientStop Color="#0067C0" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Path.Stroke>
                                 <Path.Data>
@@ -322,17 +322,20 @@
                 <Border Grid.Column="0">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Color="#1A1A2E" Offset="0"/>
-                            <GradientStop Color="#16213E" Offset="1"/>
+                            <GradientStop Color="#0C1A2E" Offset="0"/>
+                            <GradientStop Color="#0A1628" Offset="1"/>
                         </LinearGradientBrush>
                     </Border.Background>
-                    <Border BorderBrush="#6C63FF" BorderThickness="1" CornerRadius="12" Padding="20">
+                    <Border BorderBrush="#2A4CC2FF" BorderThickness="1" CornerRadius="8" Padding="20">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="⚡" FontSize="18" Margin="0,0,8,0"/>
+                                <Path Width="16" Height="16" Margin="0,0,8,0"
+                                      Data="M 8 1 L 5 7 L 1 7 L 5 11 L 3.5 15 L 8 11.5 L 12.5 15 L 11 11 L 15 7 L 11 7 Z"
+                                      Fill="#4CC2FF" Stretch="Uniform" VerticalAlignment="Center"/>
                                 <TextBlock Text="VIP BOOST MODE"
                                            Style="{StaticResource TextH3Style}"
-                                           Foreground="{StaticResource BlueBrush}"/>
+                                           FontSize="14"
+                                           Foreground="{StaticResource BlueLightBrush}"/>
                             </StackPanel>
                             <TextBlock x:Name="VipStatusText"
                                        Text="No VIP session active"
@@ -429,9 +432,9 @@
                                        Style="{StaticResource TextH3Style}"
                                        Margin="0,0,10,0"/>
                             <Border CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
-                                    Background="{StaticResource BlueGlowBrush}">
+                                    Background="{StaticResource BlueLightGlowBrush}">
                                 <TextBlock Text="PRO" FontSize="10" FontWeight="Bold"
-                                           Foreground="{StaticResource BlueBrush}"/>
+                                           Foreground="{StaticResource BlueLightBrush}"/>
                             </Border>
                         </StackPanel>
 
@@ -454,16 +457,16 @@
 
                     <!-- Legend -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <Ellipse Width="8" Height="8" Fill="{StaticResource BlueBrush}"   Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource BlueLightBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="CPU" Style="{StaticResource TextCaptionStyle}" Margin="0,0,16,0"/>
-                        <Ellipse Width="8" Height="8" Fill="{StaticResource PurpleBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource GreenBrush}"    Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="RAM" Style="{StaticResource TextCaptionStyle}" Margin="0,0,16,0"/>
-                        <Ellipse Width="8" Height="8" Fill="{StaticResource YellowBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource YellowBrush}"   Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="Disk" Style="{StaticResource TextCaptionStyle}"/>
                     </StackPanel>
 
                     <!-- Chart canvas -->
-                    <Border CornerRadius="8" Background="{StaticResource BgCard2Brush}"
+                    <Border CornerRadius="6" Background="{StaticResource BgCard3Brush}"
                             Height="130" ClipToBounds="True"
                             SizeChanged="ChartCanvas_SizeChanged">
                         <Canvas x:Name="ChartCanvas">
@@ -492,12 +495,12 @@
 
                             <!-- Chart polylines -->
                             <Polyline x:Name="CpuLine"
-                                      Stroke="{StaticResource BlueBrush}"
+                                      Stroke="{StaticResource BlueLightBrush}"
                                       StrokeThickness="1.5"
                                       StrokeLineJoin="Round"
                                       Fill="Transparent"/>
                             <Polyline x:Name="RamLine"
-                                      Stroke="{StaticResource PurpleBrush}"
+                                      Stroke="{StaticResource GreenBrush}"
                                       StrokeThickness="1.5"
                                       StrokeLineJoin="Round"
                                       Fill="Transparent"/>

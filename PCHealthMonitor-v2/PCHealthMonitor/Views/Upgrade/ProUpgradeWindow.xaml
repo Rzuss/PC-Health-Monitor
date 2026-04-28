@@ -1,4 +1,4 @@
-<Window x:Class="PCHealthMonitor.Views.Upgrade.ProUpgradeWindow"
+﻿<Window x:Class="PCHealthMonitor.Views.Upgrade.ProUpgradeWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Upgrade to Pro — PC Health Monitor"
@@ -113,8 +113,8 @@
                         BorderThickness="1.5">
                     <Border.BorderBrush>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Color="#7C6FF5" Offset="0"/>
-                            <GradientStop Color="#5B54E8" Offset="1"/>
+                            <GradientStop Color="#1A86D4" Offset="0"/>
+                            <GradientStop Color="#0067C0" Offset="1"/>
                         </LinearGradientBrush>
                     </Border.BorderBrush>
                     <Border.Background>
@@ -130,7 +130,7 @@
                                        Foreground="White"
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="16" FontWeight="SemiBold"/>
-                            <Border Background="#5B54E8" CornerRadius="4" Padding="7,2"
+                            <Border Background="#0067C0" CornerRadius="4" Padding="7,2"
                                     Margin="8,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="BEST VALUE" Foreground="White"
                                            FontSize="9" FontWeight="Bold"
@@ -145,7 +145,7 @@
                                        FontSize="26" FontWeight="Bold"
                                        VerticalAlignment="Bottom"/>
                             <TextBlock Text=" one-time"
-                                       Foreground="#BDB8FF"
+                                       Foreground="#99DDFF"
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="12"
                                        VerticalAlignment="Bottom" Margin="0,0,0,3"/>
@@ -176,8 +176,8 @@
                                 <Border x:Name="Bd" CornerRadius="8">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                            <GradientStop Color="#5B54E8" Offset="0"/>
-                                            <GradientStop Color="#7C6FF5" Offset="1"/>
+                                            <GradientStop Color="#0067C0" Offset="0"/>
+                                            <GradientStop Color="#1A86D4" Offset="1"/>
                                         </LinearGradientBrush>
                                     </Border.Background>
                                     <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -199,7 +199,7 @@
                             Content="I already have a license key →"
                             FontSize="12"
                             FontFamily="Segoe UI Variable, Segoe UI"
-                            Foreground="{StaticResource BlueBrush}"
+                            Foreground="{StaticResource BlueLightBrush}"
                             Background="Transparent"
                             BorderThickness="0"
                             Cursor="Hand"
@@ -226,3 +226,4 @@
         </Grid>
     </Border>
 </Window>
+

@@ -2,15 +2,16 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ═══════════════════════════════════════════════════════════
-         DEEP SPACE — Typography System v2.0
-         Font: Segoe UI Variable (Win 11 default) → fallback Segoe UI
+         WIN 11 FLUENT — Typography System v3.0
+         Font: Segoe UI Variable (Win11 default) → Segoe UI fallback
+         Type roles aligned with WinUI3 type ramp
     ═══════════════════════════════════════════════════════════ -->
 
-    <!-- ─── Font Family ──────────────────────────────────────── -->
+    <!-- ─── Font Families ─────────────────────────────────────── -->
     <FontFamily x:Key="PrimaryFont">Segoe UI Variable, Segoe UI, sans-serif</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Code, Consolas, monospace</FontFamily>
 
-    <!-- ─── Font Sizes ───────────────────────────────────────── -->
+    <!-- ─── Font Sizes (WinUI3 type ramp) ─────────────────────── -->
     <sys:Double x:Key="FontSizeXS"   xmlns:sys="clr-namespace:System;assembly=mscorlib">10</sys:Double>
     <sys:Double x:Key="FontSizeSM"   xmlns:sys="clr-namespace:System;assembly=mscorlib">12</sys:Double>
     <sys:Double x:Key="FontSizeMD"   xmlns:sys="clr-namespace:System;assembly=mscorlib">13</sys:Double>
@@ -18,12 +19,22 @@
     <sys:Double x:Key="FontSizeLG"   xmlns:sys="clr-namespace:System;assembly=mscorlib">16</sys:Double>
     <sys:Double x:Key="FontSizeXL"   xmlns:sys="clr-namespace:System;assembly=mscorlib">20</sys:Double>
     <sys:Double x:Key="FontSize2XL"  xmlns:sys="clr-namespace:System;assembly=mscorlib">24</sys:Double>
-    <sys:Double x:Key="FontSize3XL"  xmlns:sys="clr-namespace:System;assembly=mscorlib">32</sys:Double>
-    <sys:Double x:Key="FontSize4XL"  xmlns:sys="clr-namespace:System;assembly=mscorlib">48</sys:Double>
+    <sys:Double x:Key="FontSize3XL"  xmlns:sys="clr-namespace:System;assembly=mscorlib">28</sys:Double>
+    <sys:Double x:Key="FontSize4XL"  xmlns:sys="clr-namespace:System;assembly=mscorlib">44</sys:Double>
 
-    <!-- ─── Text Styles ─────────────────────────────────────── -->
+    <!-- ─── Text Styles ─────────────────────────────────────────
+         Mapping to WinUI3 roles:
+           TextDisplayStyle  → Display
+           TextH1Style       → Title Large
+           TextH2Style       → Title
+           TextH3Style       → Subtitle
+           TextBodyStyle     → Body
+           TextBodySmStyle   → Body Strong
+           TextCaptionStyle  → Caption
+           TextLabelStyle    → Caption (uppercase)
+    ─────────────────────────────────────────────────────────── -->
 
-    <!-- Display: hero numbers (CPU %, scores) -->
+    <!-- Display: hero numbers (score, large metrics) -->
     <Style x:Key="TextDisplayStyle" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSize4XL}"/>
@@ -32,15 +43,16 @@
         <Setter Property="LineHeight"   Value="52"/>
     </Style>
 
-    <!-- H1: Page titles -->
+    <!-- H1: Page title (Title Large — 28px SemiBold) -->
     <Style x:Key="TextH1Style" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSize3XL}"/>
         <Setter Property="FontWeight"   Value="SemiBold"/>
         <Setter Property="Foreground"   Value="{StaticResource TextBrush}"/>
+        <Setter Property="LineHeight"   Value="36"/>
     </Style>
 
-    <!-- H2: Section titles -->
+    <!-- H2: Section title (Title — 24px SemiBold) -->
     <Style x:Key="TextH2Style" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSize2XL}"/>
@@ -48,34 +60,34 @@
         <Setter Property="Foreground"   Value="{StaticResource TextBrush}"/>
     </Style>
 
-    <!-- H3: Card titles -->
+    <!-- H3: Card / panel title (Subtitle — 20px SemiBold) -->
     <Style x:Key="TextH3Style" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
-        <Setter Property="FontSize"     Value="{StaticResource FontSizeLG}"/>
+        <Setter Property="FontSize"     Value="{StaticResource FontSizeXL}"/>
         <Setter Property="FontWeight"   Value="SemiBold"/>
         <Setter Property="Foreground"   Value="{StaticResource TextBrush}"/>
     </Style>
 
-    <!-- Body: Default body text -->
+    <!-- Body: Default body text (14px Regular) -->
     <Style x:Key="TextBodyStyle" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSizeBase}"/>
         <Setter Property="FontWeight"   Value="Normal"/>
         <Setter Property="Foreground"   Value="{StaticResource TextBrush}"/>
-        <Setter Property="LineHeight"   Value="22"/>
+        <Setter Property="LineHeight"   Value="20"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
-    <!-- BodySM: Small body / table cells -->
+    <!-- BodySM: Table cells, compact text (13px Regular) -->
     <Style x:Key="TextBodySmStyle" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSizeMD}"/>
         <Setter Property="FontWeight"   Value="Normal"/>
         <Setter Property="Foreground"   Value="{StaticResource TextBrush}"/>
-        <Setter Property="LineHeight"   Value="20"/>
+        <Setter Property="LineHeight"   Value="18"/>
     </Style>
 
-    <!-- Caption: Sub-labels, timestamps -->
+    <!-- Caption: Sub-labels, timestamps (12px #9D9D9D) -->
     <Style x:Key="TextCaptionStyle" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSizeSM}"/>
@@ -83,13 +95,12 @@
         <Setter Property="Foreground"   Value="{StaticResource SubTextBrush}"/>
     </Style>
 
-    <!-- Label: Uppercase section labels -->
+    <!-- Label: Uppercase section dividers (10px SemiBold #555) -->
     <Style x:Key="TextLabelStyle" TargetType="TextBlock">
         <Setter Property="FontFamily"    Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"      Value="{StaticResource FontSizeXS}"/>
         <Setter Property="FontWeight"    Value="SemiBold"/>
-        <Setter Property="Foreground"    Value="{StaticResource SubTextBrush}"/>
-        <!-- CharacterSpacing removed — WPF TextBlock uses Letter-Spacing via Typeface, not a simple DP -->
+        <Setter Property="Foreground"    Value="{StaticResource DimBrush}"/>
     </Style>
 
     <!-- Mono: Log output, file paths -->
@@ -100,29 +111,29 @@
         <Setter Property="Foreground"   Value="{StaticResource SubTextBrush}"/>
     </Style>
 
-    <!-- Metric: Big stat numbers on cards (with accent color override) -->
+    <!-- Metric: Big stat number on cards (24px Bold, accent override) -->
     <Style x:Key="TextMetricStyle" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSize2XL}"/>
-        <Setter Property="FontWeight"   Value="Bold"/>
+        <Setter Property="FontWeight"   Value="SemiBold"/>
         <Setter Property="Foreground"   Value="{StaticResource TextBrush}"/>
     </Style>
 
-    <!-- Sidebar item label -->
+    <!-- Sidebar item label (14px, subdued) -->
     <Style x:Key="TextSidebarStyle" TargetType="TextBlock">
-        <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
-        <Setter Property="FontSize"     Value="{StaticResource FontSizeBase}"/>
-        <Setter Property="FontWeight"   Value="Normal"/>
-        <Setter Property="Foreground"   Value="{StaticResource SubTextBrush}"/>
+        <Setter Property="FontFamily"        Value="{StaticResource PrimaryFont}"/>
+        <Setter Property="FontSize"          Value="{StaticResource FontSizeBase}"/>
+        <Setter Property="FontWeight"        Value="Normal"/>
+        <Setter Property="Foreground"        Value="{StaticResource SubTextBrush}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
-    <!-- Score large number -->
+    <!-- Score large ring number (accent blue) -->
     <Style x:Key="TextScoreStyle" TargetType="TextBlock">
         <Setter Property="FontFamily"   Value="{StaticResource PrimaryFont}"/>
         <Setter Property="FontSize"     Value="{StaticResource FontSize4XL}"/>
         <Setter Property="FontWeight"   Value="Bold"/>
-        <Setter Property="Foreground"   Value="{StaticResource GreenBrush}"/>
+        <Setter Property="Foreground"   Value="{StaticResource BlueLightBrush}"/>
     </Style>
 
 </ResourceDictionary>

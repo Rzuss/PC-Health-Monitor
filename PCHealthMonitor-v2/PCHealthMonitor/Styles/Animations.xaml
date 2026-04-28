@@ -7,18 +7,25 @@
          Easing:    EaseOut for enter, EaseIn for exit
     ═══════════════════════════════════════════════════════════ -->
 
-    <!-- ─── Easing Functions ─────────────────────────────────── -->
-    <CubicEase x:Key="EaseOut" EasingMode="EaseOut"/>
-    <CubicEase x:Key="EaseIn"  EasingMode="EaseIn"/>
-    <CubicEase x:Key="EaseInOut" EasingMode="EaseInOut"/>
-    <ElasticEase x:Key="SpringEase" EasingMode="EaseOut" Oscillations="1" Springiness="6"/>
-    <BackEase x:Key="BackEaseOut" EasingMode="EaseOut" Amplitude="0.4"/>
+    <!-- ─── Easing Functions (Win11 Fluent motion) ─────────── -->
+    <!-- Win11 uses primarily CubicEase-Out for enters, CubicEase-In for exits -->
+    <CubicEase   x:Key="EaseOut"    EasingMode="EaseOut"/>
+    <CubicEase   x:Key="EaseIn"     EasingMode="EaseIn"/>
+    <CubicEase   x:Key="EaseInOut"  EasingMode="EaseInOut"/>
+    <QuinticEase x:Key="FastOut"    EasingMode="EaseOut"/>
+    <ElasticEase x:Key="SpringEase" EasingMode="EaseOut" Oscillations="1" Springiness="8"/>
+    <BackEase    x:Key="BackEaseOut" EasingMode="EaseOut" Amplitude="0.3"/>
 
-    <!-- ─── Durations ────────────────────────────────────────── -->
-    <Duration x:Key="DurationMicro">0:0:0.150</Duration>
+    <!-- ─── Durations (Win11 motion rhythm) ─────────────────────
+         micro  = 100ms  — instant feedback (hover, press)
+         normal = 200ms  — standard transitions
+         slow   = 250ms  — page/section enters
+         xslow  = 350ms  — complex reveals, charts
+    ─────────────────────────────────────────────────────────── -->
+    <Duration x:Key="DurationMicro">0:0:0.100</Duration>
     <Duration x:Key="DurationNormal">0:0:0.200</Duration>
-    <Duration x:Key="DurationSlow">0:0:0.300</Duration>
-    <Duration x:Key="DurationXSlow">0:0:0.400</Duration>
+    <Duration x:Key="DurationSlow">0:0:0.250</Duration>
+    <Duration x:Key="DurationXSlow">0:0:0.350</Duration>
 
     <!-- ─── Fade In ──────────────────────────────────────────── -->
     <Storyboard x:Key="FadeInStoryboard">

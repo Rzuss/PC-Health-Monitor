@@ -2,60 +2,81 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ═══════════════════════════════════════════════════════════
-         DEEP SPACE — Color System v2.0
-         Matches the PowerShell v1 palette exactly
+         WIN 11 FLUENT DESIGN — Color System v3.0
+         Language: Mica Dark (system tinted dark surface)
+         Accent:   #0067C0 / #4CC2FF  (Windows 11 default blue)
     ═══════════════════════════════════════════════════════════ -->
 
-    <!-- Backgrounds -->
-    <Color x:Key="BgBaseColor">#0D0D0F</Color>
-    <Color x:Key="BgCardColor">#161619</Color>
-    <Color x:Key="BgCard2Color">#121214</Color>
-    <Color x:Key="BgCard3Color">#1C1C20</Color>
+    <!-- ─── Backgrounds (Mica layering) ──────────────────────── -->
+    <Color x:Key="BgBaseColor">#1C1C1C</Color>        <!-- Mica base -->
+    <Color x:Key="BgCardColor">#252525</Color>         <!-- Layer 1 card -->
+    <Color x:Key="BgCard2Color">#202020</Color>        <!-- Sidebar / title bar -->
+    <Color x:Key="BgCard3Color">#2C2C2C</Color>        <!-- Layer 2 card / input bg -->
 
-    <!-- Accents -->
-    <Color x:Key="BlueColor">#6C63FF</Color>
-    <Color x:Key="PurpleColor">#8B7CF8</Color>
-    <Color x:Key="GreenColor">#30D158</Color>
-    <Color x:Key="YellowColor">#FF9F0A</Color>
-    <Color x:Key="RedColor">#FF3B30</Color>
-    <Color x:Key="OrangeColor">#FF6B35</Color>
+    <!-- ─── Accent Colors (Win11 system blue) ────────────────── -->
+    <Color x:Key="BlueColor">#0067C0</Color>           <!-- Primary accent -->
+    <Color x:Key="BlueLightColor">#4CC2FF</Color>      <!-- Accent light (text/icons) -->
+    <Color x:Key="PurpleColor">#8764B8</Color>         <!-- Secondary accent -->
 
-    <!-- Text -->
-    <Color x:Key="TextColor">#F5F5F7</Color>
-    <Color x:Key="SubTextColor">#8E8E93</Color>
-    <Color x:Key="DimColor">#3A3A3C</Color>
+    <!-- ─── Semantic Status ───────────────────────────────────── -->
+    <Color x:Key="GreenColor">#6CCB5F</Color>          <!-- Success / Healthy -->
+    <Color x:Key="YellowColor">#FFB900</Color>         <!-- Warning -->
+    <Color x:Key="RedColor">#FF4343</Color>            <!-- Error / Critical -->
+    <Color x:Key="OrangeColor">#FF8C00</Color>         <!-- Caution -->
 
-    <!-- Borders -->
-    <Color x:Key="BorderColor">#2C2C2E</Color>
+    <!-- ─── Text ─────────────────────────────────────────────── -->
+    <Color x:Key="TextColor">#FFFFFF</Color>
+    <Color x:Key="SubTextColor">#9D9D9D</Color>
+    <Color x:Key="DimColor">#555555</Color>
 
-    <!-- Glow / transparent accents -->
-    <Color x:Key="BlueGlowColor">#376C63FF</Color>
-    <Color x:Key="GreenGlowColor">#2230D158</Color>
-    <Color x:Key="RedGlowColor">#22FF3B30</Color>
-    <Color x:Key="YellowGlowColor">#22FF9F0A</Color>
+    <!-- ─── Borders (Fluent subtle) ──────────────────────────── -->
+    <Color x:Key="BorderColor">#333333</Color>
+    <Color x:Key="BorderHoverColor">#505050</Color>
 
-    <!-- ─── SolidColorBrushes ─────────────────────────────────── -->
-    <SolidColorBrush x:Key="BgBaseBrush"   Color="{StaticResource BgBaseColor}"/>
-    <SolidColorBrush x:Key="BgCardBrush"   Color="{StaticResource BgCardColor}"/>
-    <SolidColorBrush x:Key="BgCard2Brush"  Color="{StaticResource BgCard2Color}"/>
-    <SolidColorBrush x:Key="BgCard3Brush"  Color="{StaticResource BgCard3Color}"/>
-    <SolidColorBrush x:Key="BlueBrush"     Color="{StaticResource BlueColor}"/>
-    <SolidColorBrush x:Key="PurpleBrush"   Color="{StaticResource PurpleColor}"/>
-    <SolidColorBrush x:Key="GreenBrush"    Color="{StaticResource GreenColor}"/>
-    <SolidColorBrush x:Key="YellowBrush"   Color="{StaticResource YellowColor}"/>
-    <SolidColorBrush x:Key="RedBrush"      Color="{StaticResource RedColor}"/>
-    <SolidColorBrush x:Key="TextBrush"     Color="{StaticResource TextColor}"/>
-    <SolidColorBrush x:Key="SubTextBrush"  Color="{StaticResource SubTextColor}"/>
-    <SolidColorBrush x:Key="DimBrush"      Color="{StaticResource DimColor}"/>
-    <SolidColorBrush x:Key="BorderBrush"   Color="{StaticResource BorderColor}"/>
-    <SolidColorBrush x:Key="BlueGlowBrush" Color="{StaticResource BlueGlowColor}"/>
+    <!-- ─── Glow / Transparent Accents ───────────────────────── -->
+    <Color x:Key="BlueGlowColor">#2A0067C0</Color>     <!-- Selection tint -->
+    <Color x:Key="BlueLightGlowColor">#1A4CC2FF</Color><!-- Hover accent tint -->
+    <Color x:Key="GreenGlowColor">#1A6CCB5F</Color>
+    <Color x:Key="RedGlowColor">#1AFF4343</Color>
+    <Color x:Key="YellowGlowColor">#1AFFB900</Color>
 
-    <!-- Score tier brushes -->
+    <!-- ─── Overlay Surfaces ─────────────────────────────────── -->
+    <Color x:Key="OverlayColor">#CC1C1C1C</Color>      <!-- Modal scrim backdrop -->
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SolidColorBrushes
+    ═══════════════════════════════════════════════════════════ -->
+    <SolidColorBrush x:Key="BgBaseBrush"      Color="{StaticResource BgBaseColor}"/>
+    <SolidColorBrush x:Key="BgCardBrush"      Color="{StaticResource BgCardColor}"/>
+    <SolidColorBrush x:Key="BgCard2Brush"     Color="{StaticResource BgCard2Color}"/>
+    <SolidColorBrush x:Key="BgCard3Brush"     Color="{StaticResource BgCard3Color}"/>
+
+    <SolidColorBrush x:Key="BlueBrush"        Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="BlueLightBrush"   Color="{StaticResource BlueLightColor}"/>
+    <SolidColorBrush x:Key="PurpleBrush"      Color="{StaticResource PurpleColor}"/>
+    <SolidColorBrush x:Key="GreenBrush"       Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="YellowBrush"      Color="{StaticResource YellowColor}"/>
+    <SolidColorBrush x:Key="RedBrush"         Color="{StaticResource RedColor}"/>
+    <SolidColorBrush x:Key="OrangeBrush"      Color="{StaticResource OrangeColor}"/>
+
+    <SolidColorBrush x:Key="TextBrush"        Color="{StaticResource TextColor}"/>
+    <SolidColorBrush x:Key="SubTextBrush"     Color="{StaticResource SubTextColor}"/>
+    <SolidColorBrush x:Key="DimBrush"         Color="{StaticResource DimColor}"/>
+    <SolidColorBrush x:Key="BorderBrush"      Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderHoverBrush" Color="{StaticResource BorderHoverColor}"/>
+
+    <SolidColorBrush x:Key="BlueGlowBrush"      Color="{StaticResource BlueGlowColor}"/>
+    <SolidColorBrush x:Key="BlueLightGlowBrush" Color="{StaticResource BlueLightGlowColor}"/>
+    <SolidColorBrush x:Key="GreenGlowBrush"     Color="{StaticResource GreenGlowColor}"/>
+    <SolidColorBrush x:Key="RedGlowBrush"       Color="{StaticResource RedGlowColor}"/>
+    <SolidColorBrush x:Key="YellowGlowBrush"    Color="{StaticResource YellowGlowColor}"/>
+
+    <!-- Score tier brushes (semantic) -->
     <SolidColorBrush x:Key="ScoreExcellentBrush" Color="{StaticResource GreenColor}"/>
-    <SolidColorBrush x:Key="ScoreGoodBrush"       Color="#30D158"/>
-    <SolidColorBrush x:Key="ScoreFairBrush"        Color="{StaticResource YellowColor}"/>
-    <SolidColorBrush x:Key="ScorePoorBrush"        Color="#FF6B35"/>
-    <SolidColorBrush x:Key="ScoreCriticalBrush"    Color="{StaticResource RedColor}"/>
+    <SolidColorBrush x:Key="ScoreGoodBrush"       Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="ScoreFairBrush"       Color="{StaticResource YellowColor}"/>
+    <SolidColorBrush x:Key="ScorePoorBrush"       Color="{StaticResource OrangeColor}"/>
+    <SolidColorBrush x:Key="ScoreCriticalBrush"   Color="{StaticResource RedColor}"/>
 
     <!-- Transparent -->
     <SolidColorBrush x:Key="TransparentBrush" Color="Transparent"/>

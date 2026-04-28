@@ -21,37 +21,37 @@
                         TrayLeftMouseDown="TrayIcon_LeftMouseDown">
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
-                    <MenuItem Header="Open"   Click="TrayMenu_Open"/>
+                    <MenuItem Header="Open"     Click="TrayMenu_Open"/>
                     <MenuItem Header="Scan Now" Click="TrayMenu_Scan"/>
                     <Separator/>
-                    <MenuItem Header="Exit"   Click="TrayMenu_Exit"/>
+                    <MenuItem Header="Exit"     Click="TrayMenu_Exit"/>
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>
         </tb:TaskbarIcon>
     </Window.Resources>
 
-    <!-- Outer chrome border -->
+    <!-- ─── App Window Chrome ──────────────────────────────────── -->
     <Border Background="{StaticResource BgBaseBrush}"
-            CornerRadius="12"
-            BorderBrush="{StaticResource BorderBrush}"
+            CornerRadius="10"
+            BorderBrush="#3A3A3A"
             BorderThickness="1"
             ClipToBounds="True">
 
         <Border.Effect>
-            <DropShadowEffect Color="Black" BlurRadius="40" ShadowDepth="0" Opacity="0.8"/>
+            <DropShadowEffect Color="Black" BlurRadius="48" ShadowDepth="0" Opacity="0.75"/>
         </Border.Effect>
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>   <!-- Custom title bar -->
+                <RowDefinition Height="44"/>   <!-- Win11 title bar height -->
                 <RowDefinition Height="*"/>    <!-- Main content -->
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220" x:Name="SidebarColumn"/>
+                <ColumnDefinition Width="260" x:Name="SidebarColumn"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ─── Custom Title Bar ─────────────────────────────────── -->
+            <!-- ─── Win11 Title Bar ──────────────────────────────── -->
             <Border Grid.Row="0" Grid.ColumnSpan="2"
                     Background="{StaticResource BgCard2Brush}"
                     BorderBrush="{StaticResource BorderBrush}"
@@ -59,29 +59,40 @@
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="260"/>   <!-- Brand area -->
+                        <ColumnDefinition Width="*"/>     <!-- Drag + status -->
+                        <ColumnDefinition Width="Auto"/>  <!-- Window controls -->
                     </Grid.ColumnDefinitions>
 
-                    <!-- Logo + App name -->
+                    <!-- Brand: icon + title + PRO badge -->
                     <StackPanel Grid.Column="0"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center"
                                 Margin="16,0">
-                        <Image Source="/Assets/icon.ico" Width="22" Height="22" Margin="0,0,8,0"/>
+                        <Border Width="20" Height="20" CornerRadius="4" Margin="0,0,8,0">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#4CC2FF" Offset="0"/>
+                                    <GradientStop Color="#0067C0" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Image Source="/Assets/icon.ico" Width="14" Height="14"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border>
                         <TextBlock Text="PC Health Monitor"
-                                   Style="{StaticResource TextH3Style}"
-                                   FontSize="13"
+                                   FontFamily="Segoe UI Variable, Segoe UI"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource SubTextBrush}"
                                    VerticalAlignment="Center"/>
                         <Border Background="{StaticResource BlueBrush}"
-                                CornerRadius="4"
-                                Padding="6,2"
+                                CornerRadius="3"
+                                Padding="5,1"
                                 Margin="8,0,0,0"
                                 VerticalAlignment="Center">
                             <TextBlock Text="PRO"
                                        Foreground="White"
-                                       FontSize="10"
+                                       FontSize="9"
                                        FontWeight="Bold"
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        x:Name="ProBadge"
@@ -89,115 +100,121 @@
                         </Border>
                     </StackPanel>
 
-                    <!-- Center: scan status text -->
+                    <!-- Centre: status text (drag region) -->
                     <TextBlock Grid.Column="1"
                                x:Name="StatusText"
                                Text="System is healthy"
-                               Style="{StaticResource TextCaptionStyle}"
+                               FontFamily="Segoe UI Variable, Segoe UI"
+                               FontSize="12"
+                               Foreground="{StaticResource DimBrush}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
 
-                    <!-- Window controls -->
+                    <!-- Win11-style window controls: minimize / maximize / close -->
                     <StackPanel Grid.Column="2"
                                 Orientation="Horizontal"
-                                VerticalAlignment="Center"
-                                Margin="0,0,8,0">
+                                VerticalAlignment="Stretch">
                         <Button x:Name="MinimizeBtn"
-                                Style="{StaticResource IconButtonStyle}"
-                                Width="40" Height="40"
+                                Style="{StaticResource WinControlButtonStyle}"
                                 Click="MinimizeBtn_Click"
-                                ToolTip="Minimize to tray">
-                            <Path Data="M 8 0 L 16 0" Stroke="{StaticResource SubTextBrush}" StrokeThickness="1.5"
+                                ToolTip="Minimize">
+                            <Path Data="M 8 0 L 16 0"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.2"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Button>
                         <Button x:Name="MaximizeBtn"
-                                Style="{StaticResource IconButtonStyle}"
-                                Width="40" Height="40"
+                                Style="{StaticResource WinControlButtonStyle}"
                                 Click="MaximizeBtn_Click"
                                 ToolTip="Maximize">
                             <Path x:Name="MaximizePath"
                                   Data="M 2 2 L 14 2 L 14 14 L 2 14 Z"
-                                  Stroke="{StaticResource SubTextBrush}" StrokeThickness="1.5" Fill="Transparent"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.2"
+                                  Fill="Transparent"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Button>
                         <Button x:Name="CloseBtn"
-                                Style="{StaticResource IconButtonStyle}"
-                                Width="40" Height="40"
+                                Style="{StaticResource WinCloseButtonStyle}"
                                 Click="CloseBtn_Click"
                                 ToolTip="Close">
-                            <Path Data="M 2 2 L 14 14 M 14 2 L 2 14"
-                                  Stroke="{StaticResource SubTextBrush}" StrokeThickness="1.5"
+                            <Path Data="M 3 3 L 13 13 M 13 3 L 3 13"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- ─── Sidebar ──────────────────────────────────────────── -->
+            <!-- ─── Win11 Navigation Rail ─────────────────────────── -->
             <Border Grid.Row="1" Grid.Column="0"
                     Background="{StaticResource BgCard2Brush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,0,1,0">
-                <!-- Grid layout: Row 0 = nav, Row 1+3 = equal flexible spacers, Row 2 = banner centered -->
+
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>  <!-- Nav items -->
-                        <RowDefinition Height="*"/>     <!-- Spacer above banner -->
-                        <RowDefinition Height="Auto"/>  <!-- Banner -->
-                        <RowDefinition Height="*"/>     <!-- Spacer below banner (equal → centered) -->
+                        <RowDefinition Height="*"/>     <!-- Nav items -->
+                        <RowDefinition Height="Auto"/>  <!-- Upgrade banner -->
+                        <RowDefinition Height="8"/>     <!-- Bottom padding -->
                     </Grid.RowDefinitions>
 
-                    <!-- Nav items -->
+                    <!-- Navigation Items -->
                     <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Hidden">
                         <StackPanel x:Name="NavPanel" Margin="8,12,8,0">
+
+                            <!-- Section: Main -->
+                            <TextBlock Text="MAIN"
+                                       Style="{StaticResource TextLabelStyle}"
+                                       Margin="12,4,0,6"/>
+
                             <!-- Dashboard -->
                             <Button x:Name="NavDashboard"
                                     AutomationProperties.AutomationId="NavDashboard"
                                     Tag="Dashboard"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click"
-                                    Margin="0,2"
-                                    Height="44" HorizontalContentAlignment="Left"
-                                    Padding="12,0">
+                                    Style="{StaticResource NavItemStyle}"
+                                    Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
-                                    <Path Width="16" Height="16" Margin="0,0,10,0"
-                                          Data="M 2 10 L 8 2 L 14 10 M 4 10 L 4 14 L 12 14 L 12 10"
+                                    <Path Width="16" Height="16" Margin="0,0,10,0" Stretch="None"
+                                          Data="M 1 9 L 7 1 L 15 9 M 3 9 L 3 15 L 11 15 L 11 9"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="1.5" Fill="Transparent"/>
+                                          StrokeThickness="1.5" Fill="Transparent"
+                                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                                     <TextBlock Text="Dashboard" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
                             <!-- Startup Manager -->
-                            <Button Tag="Startup" AutomationProperties.AutomationId="NavStartup" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
+                            <Button Tag="Startup" AutomationProperties.AutomationId="NavStartup"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
                                           Data="M 2 4 L 14 4 M 2 8 L 10 8 M 2 12 L 12 12"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="1.5"/>
+                                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                                     <TextBlock Text="Startup Manager" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
                             <!-- Junk Cleaner -->
-                            <Button Tag="JunkCleaner" AutomationProperties.AutomationId="NavJunkCleaner" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
+                            <Button Tag="JunkCleaner" AutomationProperties.AutomationId="NavJunkCleaner"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
                                           Data="M 4 4 L 12 4 L 11 14 L 5 14 Z M 2 4 L 14 4 M 6 2 L 10 2"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="1.5" Fill="Transparent"/>
+                                          StrokeThickness="1.5" Fill="Transparent"
+                                          StrokeLineJoin="Round"/>
                                     <TextBlock Text="Junk Cleaner" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
                             <!-- Storage Analyzer -->
-                            <Button Tag="Storage" AutomationProperties.AutomationId="NavStorage" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
+                            <Button Tag="Storage" AutomationProperties.AutomationId="NavStorage"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
                                           Data="M 2 4 L 14 4 L 14 12 L 2 12 Z M 2 8 L 14 8"
@@ -208,48 +225,39 @@
                             </Button>
 
                             <!-- Boost Mode -->
-                            <Button Tag="Boost" AutomationProperties.AutomationId="NavBoost" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
+                            <Button Tag="Boost" AutomationProperties.AutomationId="NavBoost"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
                                           Data="M 8 2 L 4 9 L 7 9 L 6 14 L 12 7 L 9 7 Z"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="1.5" Fill="Transparent"/>
+                                          StrokeThickness="1.5" Fill="Transparent"
+                                          StrokeLineJoin="Round"/>
                                     <TextBlock Text="Boost Mode" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
-                            <!-- System Info -->
-                            <Button Tag="DiskHealth" AutomationProperties.AutomationId="NavDiskHealth" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
+                            <!-- Section Separator: System -->
+                            <Separator Margin="4,10,4,4"/>
+                            <TextBlock Text="SYSTEM"
+                                       Style="{StaticResource TextLabelStyle}"
+                                       Margin="12,0,0,6"/>
+
+                            <!-- System Info / Disk Health -->
+                            <Button Tag="DiskHealth" AutomationProperties.AutomationId="NavDiskHealth"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
-                                          Data="M 8 2 L 8 2.5 M 4 4 L 12 4 L 13 13 L 3 13 Z M 6 7 L 10 7 M 6 10 L 9 10"
+                                          Data="M 8 2 A 6 6 0 1 1 7.99 2 M 8 6 L 8 9 M 8 11 L 8 11.5"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="1.5" Fill="Transparent"/>
+                                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                                     <TextBlock Text="System Info" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
-                            <!-- Tools -->
-                            <Button Tag="Tools" AutomationProperties.AutomationId="NavTools" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Width="16" Height="16" Margin="0,0,10,0"
-                                          Data="M 10 2 L 10 5 L 12 7 L 14 5 L 12 3 Z M 2 14 L 8 8"
-                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="1.5"/>
-                                    <TextBlock Text="Tools" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-
                             <!-- Network -->
-                            <Button Tag="Network" AutomationProperties.AutomationId="NavNetwork" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
+                            <Button Tag="Network" AutomationProperties.AutomationId="NavNetwork"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
                                           Data="M 8 2 A 6 6 0 1 1 8 14 A 6 6 0 1 1 8 2 M 2 8 L 14 8 M 8 2 C 6 5 6 11 8 14"
@@ -259,70 +267,86 @@
                                 </StackPanel>
                             </Button>
 
-                            <!-- Separator -->
-                            <Separator Margin="4,8"/>
-
-                            <!-- Settings -->
-                            <Button Tag="Settings" AutomationProperties.AutomationId="NavSettings" Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="NavBtn_Click" Margin="0,2" Height="44"
-                                    HorizontalContentAlignment="Left" Padding="12,0">
+                            <!-- Tools -->
+                            <Button Tag="Tools" AutomationProperties.AutomationId="NavTools"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Width="16" Height="16" Margin="0,0,10,0"
-                                          Data="M 8 6 A 2 2 0 1 1 8 10 A 2 2 0 1 1 8 6 M 8 2 L 8 4 M 8 12 L 8 14 M 2 8 L 4 8 M 12 8 L 14 8"
+                                          Data="M 10 2 L 10 5 L 12 7 L 14 5 L 12 3 Z M 2 14 L 8 8"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.5"/>
+                                    <TextBlock Text="Tools" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Separator: bottom zone -->
+                            <Separator Margin="4,10,4,4"/>
+
+                            <!-- Settings -->
+                            <Button Tag="Settings" AutomationProperties.AutomationId="NavSettings"
+                                    Style="{StaticResource NavItemStyle}" Click="NavBtn_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Width="16" Height="16" Margin="0,0,10,0"
+                                          Data="M 8 6 A 2 2 0 1 1 8 10 A 2 2 0 1 1 8 6 M 8 2 L 8 4 M 8 12 L 8 14 M 2 8 L 4 8 M 12 8 L 14 8 M 3.5 3.5 L 5 5 M 11 11 L 12.5 12.5 M 3.5 12.5 L 5 11 M 11 5 L 12.5 3.5"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                           StrokeThickness="1.5"/>
                                     <TextBlock Text="Settings" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
+
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- Upgrade banner — Row 2, centered between nav and bottom -->
-                    <Border Grid.Row="2"
-                            Margin="14,0,14,0"
-                            CornerRadius="10"
-                            Padding="14,11"
+                    <!-- Upgrade Banner (Win11 accent gradient) -->
+                    <Border Grid.Row="1"
+                            Margin="10,0,10,10"
+                            CornerRadius="8"
+                            Padding="14,12"
                             x:Name="UpgradeBanner">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#5B54E8" Offset="0"/>
-                                <GradientStop Color="#7C6FF5" Offset="1"/>
+                                <GradientStop Color="#0067C0" Offset="0"/>
+                                <GradientStop Color="#1A86D4" Offset="1"/>
                             </LinearGradientBrush>
                         </Border.Background>
                         <StackPanel>
-                            <Grid Margin="0,0,0,8">
+                            <Grid Margin="0,0,0,10">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="✦" Foreground="#FFD580" FontSize="10"
-                                               VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <Path Width="12" Height="12" Margin="0,0,6,0"
+                                          Data="M 6 0 L 7.5 4.5 L 12 4.5 L 8.5 7.5 L 9.5 12 L 6 9 L 2.5 12 L 3.5 7.5 L 0 4.5 L 4.5 4.5 Z"
+                                          Fill="#FFD580" Stretch="Uniform"/>
                                     <TextBlock Text="Upgrade to Pro"
-                                               Foreground="White" FontWeight="SemiBold" FontSize="13"
+                                               Foreground="White"
+                                               FontWeight="SemiBold"
+                                               FontSize="13"
                                                FontFamily="Segoe UI Variable, Segoe UI"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBlock Text="$9.99" HorizontalAlignment="Right"
-                                           Foreground="#BDB8FF" FontSize="11"
+                                <TextBlock Text="$9.99"
+                                           HorizontalAlignment="Right"
+                                           Foreground="#99FFFFFF"
+                                           FontSize="11"
                                            FontFamily="Segoe UI Variable, Segoe UI"
                                            VerticalAlignment="Center"/>
                             </Grid>
-                            <Button Content="Get Pro  →"
+                            <Button Content="Get Pro →"
                                     Height="28"
                                     FontSize="12"
                                     FontWeight="SemiBold"
                                     FontFamily="Segoe UI Variable, Segoe UI"
                                     Background="White"
-                                    Foreground="#5B54E8"
+                                    Foreground="#0067C0"
                                     BorderThickness="0"
                                     Cursor="Hand"
                                     Click="GetProBtn_Click">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}" CornerRadius="6">
-                                            <ContentPresenter HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center"/>
+                                        <Border Background="{TemplateBinding Background}" CornerRadius="5">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#F0EEFF"/>
+                                                <Setter Property="Background" Value="#EAF4FF"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -334,18 +358,14 @@
                 </Grid>
             </Border>
 
-            <!-- ─── Main Content Area ────────────────────────────────── -->
+            <!-- ─── Main Content Frame ────────────────────────────── -->
             <Frame Grid.Row="1" Grid.Column="1"
                    x:Name="MainFrame"
                    NavigationUIVisibility="Hidden"
                    JournalOwnership="OwnsJournal"
                    Background="Transparent"/>
 
-            <!-- ─── Toast Overlay ────────────────────────────────────── -->
-            <!-- Spans full content area (row 1 only, above sidebar too).
-                 IsHitTestVisible=False on the host so toasts never block
-                 clicks; individual toast cards enable hit-testing for
-                 the dismiss button. -->
+            <!-- ─── Toast Overlay ─────────────────────────────────── -->
             <Grid Grid.Row="1" Grid.ColumnSpan="2"
                   IsHitTestVisible="False"
                   Panel.ZIndex="999">

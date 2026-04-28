@@ -1,4 +1,4 @@
-<Page x:Class="PCHealthMonitor.Views.Network.NetworkView"
+﻿<Page x:Class="PCHealthMonitor.Views.Network.NetworkView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Background="{StaticResource BgBaseBrush}"
@@ -37,7 +37,7 @@
                                                 <TextBlock Text="i" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                            FontStyle="Italic" FontSize="12" FontWeight="Bold"
                                                            FontFamily="Georgia, serif"
-                                                           Foreground="{StaticResource BlueBrush}"/>
+                                                           Foreground="{StaticResource BlueLightBrush}"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -65,7 +65,7 @@
                             </Border.Effect>
                             <StackPanel>
                                 <TextBlock Text="🌐  What is Network Monitor?"
-                                           Foreground="{StaticResource BlueBrush}"
+                                           Foreground="{StaticResource BlueLightBrush}"
                                            FontFamily="Segoe UI Variable, Segoe UI"
                                            FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                 <TextBlock FontFamily="Segoe UI Variable, Segoe UI" FontSize="12" LineHeight="20" TextWrapping="Wrap" Foreground="{StaticResource SubTextBrush}"><Run Text="Scans your active network and displays your "/><Run FontWeight="SemiBold" Foreground="White" Text="local IP, public IP, active interfaces"/><Run Text=", and open listening ports."/></TextBlock>
@@ -105,7 +105,7 @@
                     <TextBlock Text="UPLOAD" Style="{StaticResource TextLabelStyle}" Margin="0,0,0,6"/>
                     <TextBlock Text="{Binding UploadDisplay}"
                                Style="{StaticResource TextMetricStyle}" FontSize="18"
-                               Foreground="{StaticResource BlueBrush}"/>
+                               Foreground="{StaticResource BlueLightBrush}"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
@@ -140,3 +140,4 @@
         </Border>
     </Grid>
 </Page>
+
